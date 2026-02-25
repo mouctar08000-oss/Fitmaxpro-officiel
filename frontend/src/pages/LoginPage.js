@@ -42,6 +42,11 @@ const LoginPage = () => {
         { withCredentials: true }
       );
 
+      // Store token in localStorage as backup
+      if (response.data.session_token) {
+        localStorage.setItem('session_token', response.data.session_token);
+      }
+
       setUser(response.data.user);
       toast.success('Connexion réussie !');
       navigate('/dashboard');
