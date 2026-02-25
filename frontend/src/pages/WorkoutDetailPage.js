@@ -20,7 +20,9 @@ const WorkoutDetailPage = () => {
   const fetchWorkout = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/workouts/${workoutId}?language=${i18n.language}`);
+      // Normalize language to just 'fr' or 'en'
+      const lang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
+      const response = await axios.get(`${API}/workouts/${workoutId}?language=${lang}`);
       setWorkout(response.data);
     } catch (error) {
       console.error('Error fetching workout:', error);
