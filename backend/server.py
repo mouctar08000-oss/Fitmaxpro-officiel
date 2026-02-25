@@ -404,30 +404,34 @@ async def create_checkout(checkout_req: CheckoutRequest, current_user: User = De
 @api_router.get("/payments/status/{session_id}")
 async def get_payment_status(session_id: str, current_user: User = Depends(get_current_user)):
     try:
-        host_url = os.environ.get('APP_URL', 'http://localhost:3000')
-        webhook_url = f"{host_url}/api/webhook/stripe"
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+        stripe.api_key = stripe_api_key
         
-        status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+        # Retrieve the checkout session from Stripe
+        session = stripe.checkout.Session.retrieve(session_id)
         
         payment_doc = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
         if not payment_doc:
             raise HTTPException(status_code=404, detail="Payment not found")
         
-        if status.payment_status == "paid" and payment_doc["payment_status"] != "paid":
+        # Check if session is complete (subscription started with trial)
+        if session.status == "complete" and payment_doc["payment_status"] != "paid":
             await db.payment_transactions.update_one(
                 {"session_id": session_id},
-                {"$set": {"payment_status": "paid"}}
+                {"$set": {"payment_status": "paid", "subscription_id": session.subscription}}
             )
             
             tier = payment_doc["tier"]
             billing_cycle = payment_doc["billing_cycle"]
             
+            # Calculate trial end date
+            trial_end = datetime.now(timezone.utc) + timedelta(days=FREE_TRIAL_DAYS)
+            
             await db.users.update_one(
                 {"user_id": current_user.user_id},
                 {"$set": {
                     "subscription_tier": tier,
-                    "subscription_status": "active"
+                    "subscription_status": "trialing",
+                    "trial_ends_at": trial_end.isoformat()
                 }}
             )
             
@@ -435,18 +439,21 @@ async def get_payment_status(session_id: str, current_user: User = Depends(get_c
                 "user_id": current_user.user_id,
                 "tier": tier,
                 "billing_cycle": billing_cycle,
-                "status": "active",
+                "status": "trialing",
+                "trial_ends_at": trial_end.isoformat(),
                 "started_at": datetime.now(timezone.utc).isoformat(),
-                "auto_renew": billing_cycle == "monthly",
+                "stripe_subscription_id": session.subscription,
+                "auto_renew": True,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             await db.user_subscriptions.insert_one(subscription_doc)
         
         return {
-            "status": status.status,
-            "payment_status": status.payment_status,
-            "amount_total": status.amount_total,
-            "currency": status.currency
+            "status": session.status,
+            "payment_status": session.payment_status or "trialing",
+            "amount_total": session.amount_total,
+            "currency": session.currency,
+            "trial_days": FREE_TRIAL_DAYS
         }
     except Exception as e:
         logging.error(f"Payment status error: {e}")
