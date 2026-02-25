@@ -18,10 +18,6 @@ const WorkoutsPage = () => {
   const [levelFilter, setLevelFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'all');
 
-  useEffect(() => {
-    fetchWorkouts();
-  }, [levelFilter, typeFilter, i18n.language]);
-
   const fetchWorkouts = async () => {
     setLoading(true);
     try {
@@ -38,6 +34,11 @@ const WorkoutsPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchWorkouts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [levelFilter, typeFilter, i18n.language]);
 
   const getLevelColor = (level) => {
     switch(level) {
