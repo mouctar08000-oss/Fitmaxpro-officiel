@@ -22,7 +22,9 @@ const WorkoutsPage = () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append('language', i18n.language);
+      // Normalize language to just 'fr' or 'en'
+      const lang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
+      params.append('language', lang);
       if (levelFilter !== 'all') params.append('level', levelFilter);
       if (typeFilter !== 'all') params.append('program_type', typeFilter);
 
