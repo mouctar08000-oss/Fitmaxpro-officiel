@@ -465,11 +465,69 @@ async def stripe_webhook(request: Request):
     signature = request.headers.get("Stripe-Signature")
     
     try:
-        host_url = os.environ.get('APP_URL', 'http://localhost:3000')
-        webhook_url = f"{host_url}/api/webhook/stripe"
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+        stripe.api_key = stripe_api_key
+        webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
         
-        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        # Verify webhook signature if secret is configured
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(body, signature, webhook_secret)
+        else:
+            event = stripe.Event.construct_from(
+                json.loads(body.decode('utf-8')), stripe.api_key
+            )
+        
+        # Handle different event types
+        if event['type'] == 'customer.subscription.trial_will_end':
+            # Trial ending soon - could send notification email
+            subscription = event['data']['object']
+            logging.info(f"Trial ending soon for subscription: {subscription['id']}")
+            
+        elif event['type'] == 'customer.subscription.updated':
+            subscription = event['data']['object']
+            user_id = subscription.get('metadata', {}).get('user_id')
+            
+            if user_id:
+                new_status = "active" if subscription['status'] == 'active' else subscription['status']
+                await db.users.update_one(
+                    {"user_id": user_id},
+                    {"$set": {"subscription_status": new_status}}
+                )
+                
+        elif event['type'] == 'customer.subscription.deleted':
+            subscription = event['data']['object']
+            user_id = subscription.get('metadata', {}).get('user_id')
+            
+            if user_id:
+                await db.users.update_one(
+                    {"user_id": user_id},
+                    {"$set": {
+                        "subscription_tier": "free",
+                        "subscription_status": "cancelled"
+                    }}
+                )
+        
+        elif event['type'] == 'invoice.payment_succeeded':
+            # Payment successful after trial
+            invoice = event['data']['object']
+            subscription_id = invoice.get('subscription')
+            
+            if subscription_id:
+                await db.user_subscriptions.update_one(
+                    {"stripe_subscription_id": subscription_id},
+                    {"$set": {"status": "active"}}
+                )
+        
+        elif event['type'] == 'invoice.payment_failed':
+            # Payment failed
+            invoice = event['data']['object']
+            subscription_id = invoice.get('subscription')
+            
+            if subscription_id:
+                await db.user_subscriptions.update_one(
+                    {"stripe_subscription_id": subscription_id},
+                    {"$set": {"status": "past_due"}}
+                )
+        
         return {"status": "success"}
     except Exception as e:
         logging.error(f"Webhook error: {e}")
