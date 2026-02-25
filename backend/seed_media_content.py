@@ -256,11 +256,11 @@ EXERCISE_MEDIA = {
     
     # Échauffement/Étirements
     "échauffement": {
-        "image_url": "https://images.pexels.com/photos/4162456/pexels-photo-4162456.jpeg?auto=compress&cs=tinysrgb&w=600",
+        "image_url": "https://images.pexels.com/photos/6456141/pexels-photo-6456141.jpeg?auto=compress&cs=tinysrgb&w=600",
         "video_url": "https://www.youtube.com/embed/Hm2p1VqYXTQ"
     },
     "étirements": {
-        "image_url": "https://images.pexels.com/photos/4162438/pexels-photo-4162438.jpeg?auto=compress&cs=tinysrgb&w=600",
+        "image_url": "https://images.pexels.com/photos/4056723/pexels-photo-4056723.jpeg?auto=compress&cs=tinysrgb&w=600",
         "video_url": "https://www.youtube.com/embed/SsT_go-oCcQ"
     },
 }
