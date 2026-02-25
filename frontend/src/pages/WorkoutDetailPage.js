@@ -16,10 +16,6 @@ const WorkoutDetailPage = () => {
   const [workout, setWorkout] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchWorkout();
-  }, [workoutId, i18n.language]);
-
   const fetchWorkout = async () => {
     setLoading(true);
     try {
@@ -31,6 +27,11 @@ const WorkoutDetailPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchWorkout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workoutId, i18n.language]);
 
   if (loading) {
     return (
