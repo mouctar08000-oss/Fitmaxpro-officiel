@@ -15,6 +15,7 @@ const WorkoutDetailPage = () => {
   const navigate = useNavigate();
   const [workout, setWorkout] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeVideo, setActiveVideo] = useState(null);
 
   const fetchWorkout = async () => {
     setLoading(true);
