@@ -102,15 +102,38 @@ const WorkoutDetailPage = () => {
               {t('workout.exercises')}
             </h2>
             
-            <div className="space-y-4">
+            <div className="space-y-6">
               {workout.exercises.map((exercise, index) => (
                 <div
                   key={index}
                   data-testid={`exercise-${index}`}
-                  className="bg-[#121212] border border-[#27272a] p-6 rounded-md hover:border-white/20 transition-colors"
+                  className="bg-[#121212] border border-[#27272a] rounded-md overflow-hidden hover:border-white/20 transition-colors"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                  <div className="flex flex-col lg:flex-row">
+                    {/* Image de l'exercice */}
+                    {exercise.image_url && (
+                      <div className="lg:w-64 h-48 lg:h-auto flex-shrink-0 relative group">
+                        <img 
+                          src={exercise.image_url} 
+                          alt={exercise.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {exercise.video_url && (
+                          <button
+                            data-testid={`play-video-${index}`}
+                            onClick={() => setActiveVideo(exercise.video_url)}
+                            className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          >
+                            <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center">
+                              <Play className="w-8 h-8 text-[#09090b] ml-1" fill="currentColor" />
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Détails de l'exercice */}
+                    <div className="flex-1 p-6">
                       <div className="flex items-center gap-3 mb-3">
                         <span className="text-3xl font-bold text-gray-600">{index + 1}</span>
                         <h3 
@@ -121,26 +144,71 @@ const WorkoutDetailPage = () => {
                         </h3>
                       </div>
                       
+                      {exercise.description && (
+                        <p className="text-gray-400 text-sm mb-4">{exercise.description}</p>
+                      )}
+                      
                       <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-400">{t('workout.sets')}: </span>
-                          <span className="font-bold">{exercise.sets}</span>
+                        <div className="bg-[#09090b] p-3 rounded-sm">
+                          <span className="text-gray-400 block text-xs mb-1">{t('workout.sets')}</span>
+                          <span className="font-bold text-lg">{exercise.sets}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-400">{t('workout.reps')}: </span>
-                          <span className="font-bold">{exercise.reps}</span>
+                        <div className="bg-[#09090b] p-3 rounded-sm">
+                          <span className="text-gray-400 block text-xs mb-1">{t('workout.reps')}</span>
+                          <span className="font-bold text-lg">{exercise.reps}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-400">{t('workout.rest')}: </span>
-                          <span className="font-bold">{exercise.rest}</span>
+                        <div className="bg-[#09090b] p-3 rounded-sm">
+                          <span className="text-gray-400 block text-xs mb-1">{t('workout.rest')}</span>
+                          <span className="font-bold text-lg">{exercise.rest}</span>
                         </div>
                       </div>
+                      
+                      {exercise.video_url && (
+                        <Button
+                          data-testid={`watch-video-btn-${index}`}
+                          onClick={() => setActiveVideo(exercise.video_url)}
+                          className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-sm"
+                        >
+                          <Play className="w-4 h-4 mr-2" />
+                          {i18n.language === 'fr' ? 'Voir la vidéo' : 'Watch Video'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Modal Vidéo */}
+          {activeVideo && (
+            <div 
+              className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+              onClick={() => setActiveVideo(null)}
+            >
+              <div 
+                className="relative w-full max-w-4xl bg-[#121212] rounded-md overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  data-testid="close-video-modal"
+                  onClick={() => setActiveVideo(null)}
+                  className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                <div className="aspect-video">
+                  <iframe
+                    src={`${activeVideo}?autoplay=1`}
+                    title="Exercise Video"
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
