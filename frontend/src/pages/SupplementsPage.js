@@ -22,7 +22,9 @@ const SupplementsPage = () => {
   const fetchSupplements = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/supplements?language=${i18n.language}`);
+      // Normalize language to just 'fr' or 'en'
+      const lang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
+      const response = await axios.get(`${API}/supplements?language=${lang}`);
       setSupplements(response.data);
     } catch (error) {
       console.error('Error fetching supplements:', error);
