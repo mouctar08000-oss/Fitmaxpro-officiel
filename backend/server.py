@@ -312,59 +312,91 @@ async def login(request: LoginRequest, response: Response):
         raise HTTPException(status_code=400, detail=str(e))
 
 # Payment Endpoints
+import stripe
+
+# Configuration des prix Stripe (à créer dans le dashboard Stripe ou dynamiquement)
 PACKAGES = {
-    "standard_monthly": {"amount": 6.99, "tier": "standard", "billing": "monthly"},
-    "standard_annual": {"amount": 69.99, "tier": "standard", "billing": "annual"},
-    "vip_monthly": {"amount": 9.99, "tier": "vip", "billing": "monthly"},
-    "vip_annual": {"amount": 99.99, "tier": "vip", "billing": "annual"},
-    "supplements": {"amount": 4.99, "tier": "supplements", "billing": "monthly"}
+    "standard_monthly": {"amount": 699, "tier": "standard", "billing": "monthly", "interval": "month"},
+    "standard_annual": {"amount": 6999, "tier": "standard", "billing": "annual", "interval": "year"},
+    "vip_monthly": {"amount": 999, "tier": "vip", "billing": "monthly", "interval": "month"},
+    "vip_annual": {"amount": 9999, "tier": "vip", "billing": "annual", "interval": "year"},
+    "supplements_monthly": {"amount": 499, "tier": "supplements", "billing": "monthly", "interval": "month"}
 }
+
+# Durée de l'essai gratuit en jours
+FREE_TRIAL_DAYS = 7
 
 @api_router.post("/payments/checkout")
 async def create_checkout(checkout_req: CheckoutRequest, current_user: User = Depends(get_current_user)):
-    package_key = f"{checkout_req.tier}_{checkout_req.billing_cycle}"
+    # Handle supplements as a special case
+    if checkout_req.tier == "supplements":
+        package_key = "supplements_monthly"
+    else:
+        package_key = f"{checkout_req.tier}_{checkout_req.billing_cycle}"
     
     if package_key not in PACKAGES:
         raise HTTPException(status_code=400, detail="Invalid package")
     
     package = PACKAGES[package_key]
-    amount = package["amount"]
     
     success_url = f"{checkout_req.origin_url}/success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{checkout_req.origin_url}/pricing"
     
     try:
-        host_url = checkout_req.origin_url
-        webhook_url = f"{host_url}/api/webhook/stripe"
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+        # Configure Stripe
+        stripe.api_key = stripe_api_key
         
-        checkout_request = CheckoutSessionRequest(
-            amount=amount,
-            currency="eur",
+        # Create a Stripe Checkout Session with subscription mode and free trial
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            mode='subscription',
+            line_items=[{
+                'price_data': {
+                    'currency': 'eur',
+                    'product_data': {
+                        'name': f"FitMaxPro - {checkout_req.tier.upper()} ({checkout_req.billing_cycle})",
+                        'description': f"Abonnement {checkout_req.tier} avec 7 jours d'essai gratuit"
+                    },
+                    'unit_amount': package["amount"],  # Amount in cents
+                    'recurring': {
+                        'interval': package["interval"]
+                    }
+                },
+                'quantity': 1,
+            }],
+            subscription_data={
+                'trial_period_days': FREE_TRIAL_DAYS,
+                'metadata': {
+                    'user_id': current_user.user_id,
+                    'tier': package["tier"],
+                    'billing_cycle': package["billing"]
+                }
+            },
             success_url=success_url,
             cancel_url=cancel_url,
             metadata={
-                "user_id": current_user.user_id,
-                "tier": package["tier"],
-                "billing_cycle": package["billing"]
-            }
+                'user_id': current_user.user_id,
+                'tier': package["tier"],
+                'billing_cycle': package["billing"]
+            },
+            customer_email=current_user.email
         )
         
-        session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
-        
         payment_doc = {
-            "session_id": session.session_id,
+            "session_id": session.id,
             "user_id": current_user.user_id,
-            "amount": amount,
+            "amount": package["amount"] / 100,  # Convert to euros
             "currency": "eur",
             "tier": package["tier"],
             "billing_cycle": package["billing"],
             "payment_status": "pending",
+            "has_trial": True,
+            "trial_days": FREE_TRIAL_DAYS,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.payment_transactions.insert_one(payment_doc)
         
-        return {"url": session.url, "session_id": session.session_id}
+        return {"url": session.url, "session_id": session.id}
     except Exception as e:
         logging.error(f"Checkout error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
