@@ -13,7 +13,8 @@ const Navigation = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const toggleLanguage = () => {
-    const newLang = i18n.language === 'fr' ? 'en' : 'fr';
+    const currentLang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
+    const newLang = currentLang === 'fr' ? 'en' : 'fr';
     i18n.changeLanguage(newLang);
   };
 
