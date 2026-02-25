@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import { Button } from '../components/ui/button.jsx';
-import { Pill } from 'lucide-react';
+import { Pill, Play, X, Utensils, Flame } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
