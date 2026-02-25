@@ -17,10 +17,6 @@ const SupplementsPage = () => {
   const [supplements, setSupplements] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchSupplements();
-  }, [i18n.language]);
-
   const fetchSupplements = async () => {
     setLoading(true);
     try {
@@ -32,6 +28,11 @@ const SupplementsPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchSupplements();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i18n.language]);
 
   const getTypeColor = (type) => {
     return type === 'mass_gain' ? '#EF4444' : '#3B82F6';
