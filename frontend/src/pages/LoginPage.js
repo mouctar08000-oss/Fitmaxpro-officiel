@@ -130,6 +130,19 @@ const LoginPage = () => {
                 {t('login.google')}
               </Button>
             </div>
+
+            <div className="mt-6 text-center">
+              <p className="text-gray-400">
+                {t('login.noAccount')}{' '}
+                <Link 
+                  to="/signup" 
+                  className="text-white hover:underline font-bold"
+                  data-testid="signup-link"
+                >
+                  {t('login.signup')}
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>
