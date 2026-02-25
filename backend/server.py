@@ -198,6 +198,116 @@ async def logout(response: Response, current_user: User = Depends(get_current_us
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out successfully"}
 
+# Email/Password Auth Endpoints
+@api_router.post("/auth/register", response_model=SessionResponse)
+async def register(request: RegisterRequest, response: Response):
+    try:
+        # Check if user already exists
+        existing_user = await db.users.find_one({"email": request.email}, {"_id": 0})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Hash password
+        hashed_password = pwd_context.hash(request.password)
+        
+        # Create user
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        user_doc = {
+            "user_id": user_id,
+            "email": request.email,
+            "name": request.name,
+            "password": hashed_password,
+            "picture": None,
+            "subscription_tier": "none",
+            "subscription_status": "inactive",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(user_doc)
+        
+        # Create session
+        session_token = f"session_{uuid.uuid4().hex}"
+        session_doc = {
+            "user_id": user_id,
+            "session_token": session_token,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.user_sessions.insert_one(session_doc)
+        
+        # Set cookie
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=True,
+            samesite="none",
+            path="/",
+            max_age=7*24*60*60
+        )
+        
+        # Return user (without password)
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password": 0})
+        if isinstance(user["created_at"], str):
+            user["created_at"] = datetime.fromisoformat(user["created_at"])
+        
+        return SessionResponse(user=User(**user), session_token=session_token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Registration error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/auth/login", response_model=SessionResponse)
+async def login(request: LoginRequest, response: Response):
+    try:
+        # Find user
+        user_doc = await db.users.find_one({"email": request.email}, {"_id": 0})
+        if not user_doc:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Check if user has password (OAuth users don't have password)
+        if "password" not in user_doc:
+            raise HTTPException(status_code=401, detail="Please login with Google")
+        
+        # Verify password
+        if not pwd_context.verify(request.password, user_doc["password"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        user_id = user_doc["user_id"]
+        
+        # Create session
+        session_token = f"session_{uuid.uuid4().hex}"
+        session_doc = {
+            "user_id": user_id,
+            "session_token": session_token,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.user_sessions.insert_one(session_doc)
+        
+        # Set cookie
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=True,
+            samesite="none",
+            path="/",
+            max_age=7*24*60*60
+        )
+        
+        # Return user (without password)
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password": 0})
+        if isinstance(user["created_at"], str):
+            user["created_at"] = datetime.fromisoformat(user["created_at"])
+        
+        return SessionResponse(user=User(**user), session_token=session_token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Login error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
 # Payment Endpoints
 PACKAGES = {
     "standard_monthly": {"amount": 6.99, "tier": "standard", "billing": "monthly"},
