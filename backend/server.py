@@ -455,6 +455,7 @@ async def get_workout(workout_id: str, language: str = "fr"):
     if not workout:
         # If not found, try to find by ID only (fallback to any language version)
         workout = await db.workouts.find_one({"workout_id": workout_id}, {"_id": 0})
+    if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
     return Workout(**workout)
 
