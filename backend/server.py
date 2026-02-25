@@ -450,8 +450,11 @@ async def get_workouts(level: Optional[str] = None, program_type: Optional[str] 
 
 @api_router.get("/workouts/{workout_id}", response_model=Workout)
 async def get_workout(workout_id: str, language: str = "fr"):
+    # First try to find with exact language match
     workout = await db.workouts.find_one({"workout_id": workout_id, "language": language}, {"_id": 0})
     if not workout:
+        # If not found, try to find by ID only (fallback to any language version)
+        workout = await db.workouts.find_one({"workout_id": workout_id}, {"_id": 0})
         raise HTTPException(status_code=404, detail="Workout not found")
     return Workout(**workout)
 
