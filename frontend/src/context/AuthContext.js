@@ -25,12 +25,18 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
+      // Try with cookie first, then with localStorage token
+      const token = localStorage.getItem('session_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const response = await axios.get(`${API}/auth/me`, {
-        withCredentials: true
+        withCredentials: true,
+        headers
       });
       setUser(response.data);
     } catch (error) {
       setUser(null);
+      localStorage.removeItem('session_token');
     } finally {
       setLoading(false);
     }
@@ -42,10 +48,18 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+      const token = localStorage.getItem('session_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      await axios.post(`${API}/auth/logout`, {}, { 
+        withCredentials: true,
+        headers
+      });
       setUser(null);
+      localStorage.removeItem('session_token');
     } catch (error) {
       console.error('Logout error:', error);
+      localStorage.removeItem('session_token');
     }
   };
 
