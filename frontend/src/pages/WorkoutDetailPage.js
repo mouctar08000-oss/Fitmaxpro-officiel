@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Navigation from '../components/Navigation';
 import { Button } from '../components/ui/button.jsx';
-import { ArrowLeft, Clock, Dumbbell } from 'lucide-react';
+import { ArrowLeft, Clock, Dumbbell, Play, X } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
