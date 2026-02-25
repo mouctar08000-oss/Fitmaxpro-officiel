@@ -16,6 +16,8 @@ const SupplementsPage = () => {
   const { user } = useAuth();
   const [supplements, setSupplements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeVideo, setActiveVideo] = useState(null);
+  const [activeTab, setActiveTab] = useState({});
 
   const fetchSupplements = async () => {
     setLoading(true);
