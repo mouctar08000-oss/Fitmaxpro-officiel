@@ -646,8 +646,9 @@ async def update_workouts_with_media():
             exercise['video_url'] = media['video_url']
             updated_exercises.append(exercise)
         
+        # Update this specific workout document (use _id for exact match)
         await db.workouts.update_one(
-            {"workout_id": workout['workout_id']},
+            {"workout_id": workout['workout_id'], "language": workout['language']},
             {"$set": {"exercises": updated_exercises}}
         )
         updated_count += 1
