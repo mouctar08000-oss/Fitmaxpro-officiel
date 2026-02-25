@@ -82,7 +82,10 @@ class Supplement(BaseModel):
     description: str
     program_type: str
     nutrients: List[Dict]
+    meals: Optional[List[Dict]] = None
     language: str
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
 
 class CheckoutRequest(BaseModel):
     tier: str
