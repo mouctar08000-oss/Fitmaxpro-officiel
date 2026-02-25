@@ -86,15 +86,15 @@ const SignupPage = () => {
       <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full">
           <div className="bg-[#121212] border border-[#27272a] p-8 rounded-md">
-            <div className=\"text-center mb-8\">
+            <div className="text-center mb-8">
               <h1 
-                className=\"text-4xl font-bold mb-2\"
-                style={{ fontFamily: \"'Barlow Condensed', sans-serif\" }}
-                data-testid=\"signup-title\"
+                className="text-4xl font-bold mb-2"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                data-testid="signup-title"
               >
                 Créer un compte
               </h1>
-              <p className=\"text-gray-400\">Rejoignez FitMaxPro aujourd'hui</p>
+              <p className="text-gray-400">Rejoignez FitMaxPro aujourd'hui</p>
             </div>
 
             <form onSubmit={handleSubmit} className=\"space-y-6\">
