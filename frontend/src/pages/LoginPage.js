@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 import Navigation from '../components/Navigation';
 import { LogIn } from 'lucide-react';
+import axios from 'axios';
+import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const LoginPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = () => {
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -20,8 +28,30 @@ const LoginPage = () => {
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
-    // Email/password authentication would be implemented here
-    console.log('Email login not implemented yet');
+    
+    if (!email || !password) {
+      toast.error('Veuillez remplir tous les champs');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${API}/auth/login`,
+        { email, password },
+        { withCredentials: true }
+      );
+
+      setUser(response.data.user);
+      toast.success('Connexion réussie !');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      const message = error.response?.data?.detail || 'Erreur de connexion';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
