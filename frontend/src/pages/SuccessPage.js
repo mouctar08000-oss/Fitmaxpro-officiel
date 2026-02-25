@@ -18,18 +18,6 @@ const SuccessPage = () => {
   const [attempts, setAttempts] = useState(0);
   const maxAttempts = 5;
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const sessionId = params.get('session_id');
-
-    if (!sessionId) {
-      navigate('/pricing');
-      return;
-    }
-
-    pollPaymentStatus(sessionId);
-  }, [location]);
-
   const pollPaymentStatus = async (sessionId, attempt = 0) => {
     if (attempt >= maxAttempts) {
       setStatus('timeout');
@@ -58,6 +46,19 @@ const SuccessPage = () => {
       setStatus('error');
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const sessionId = params.get('session_id');
+
+    if (!sessionId) {
+      navigate('/pricing');
+      return;
+    }
+
+    pollPaymentStatus(sessionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
 
   return (
     <div className="min-h-screen bg-[#09090b] noise-bg flex items-center justify-center px-4">
