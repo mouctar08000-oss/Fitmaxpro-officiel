@@ -300,7 +300,7 @@ async def stripe_webhook(request: Request):
     signature = request.headers.get("Stripe-Signature")
     
     try:
-        host_url = "https://fitmax-gains.preview.emergentagent.com"
+        host_url = os.environ.get('APP_URL', 'http://localhost:3000')
         webhook_url = f"{host_url}/api/webhook/stripe"
         stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
         
