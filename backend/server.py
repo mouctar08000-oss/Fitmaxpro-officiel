@@ -47,6 +47,15 @@ class UserSession(BaseModel):
     expires_at: datetime
     created_at: datetime
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
 class SessionRequest(BaseModel):
     session_id: str
 
