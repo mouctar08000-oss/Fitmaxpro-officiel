@@ -246,7 +246,7 @@ async def create_checkout(checkout_req: CheckoutRequest, current_user: User = De
 @api_router.get("/payments/status/{session_id}")
 async def get_payment_status(session_id: str, current_user: User = Depends(get_current_user)):
     try:
-        host_url = "https://fitmax-gains.preview.emergentagent.com"
+        host_url = os.environ.get('APP_URL', 'http://localhost:3000')
         webhook_url = f"{host_url}/api/webhook/stripe"
         stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
         
