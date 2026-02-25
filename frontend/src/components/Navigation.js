@@ -104,7 +104,7 @@ const Navigation = () => {
               className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
             >
               <Globe className="w-4 h-4" />
-              <span className="uppercase">{i18n.language}</span>
+              <span className="uppercase">{i18n.language?.startsWith('fr') ? 'FR' : 'EN'}</span>
             </button>
 
             {user ? (
