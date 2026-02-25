@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button.jsx';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.jsx';
 import Navigation from '../components/Navigation';
 import Footer from '../components/Footer';
-import { Check } from 'lucide-react';
+import { Check, Gift } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -14,7 +14,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const PricingPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState('monthly');
@@ -28,6 +28,9 @@ const PricingPage = () => {
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('session_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const response = await axios.post(
         `${API}/payments/checkout`,
         {
@@ -35,7 +38,7 @@ const PricingPage = () => {
           billing_cycle: billingCycle,
           origin_url: window.location.origin
         },
-        { withCredentials: true }
+        { withCredentials: true, headers }
       );
 
       window.location.href = response.data.url;
@@ -86,15 +89,30 @@ const PricingPage = () => {
             >
               {t('pricing.title')}
             </h1>
-            <p className="text-gray-400 text-lg mb-8">{t('pricing.subtitle')}</p>
+            <p className="text-gray-400 text-lg mb-4">{t('pricing.subtitle')}</p>
+            
+            {/* Free Trial Banner */}
+            <div 
+              data-testid="free-trial-banner"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 px-6 py-3 rounded-full mb-8"
+            >
+              <Gift className="w-5 h-5 text-green-400" />
+              <span className="text-green-400 font-bold">
+                {i18n.language?.startsWith('fr') 
+                  ? '🎁 7 JOURS D\'ESSAI GRATUIT sur tous les plans !'
+                  : '🎁 7 DAYS FREE TRIAL on all plans!'}
+              </span>
+            </div>
             
             {billingCycle !== 'supplements' && (
-              <Tabs value={billingCycle} onValueChange={setBillingCycle} className="inline-flex">
-                <TabsList data-testid="billing-cycle-tabs" className="bg-[#121212] border border-[#27272a]">
-                  <TabsTrigger value="monthly" data-testid="monthly-tab">{t('pricing.monthly')}</TabsTrigger>
-                  <TabsTrigger value="annual" data-testid="annual-tab">{t('pricing.annual')}</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div>
+                <Tabs value={billingCycle} onValueChange={setBillingCycle} className="inline-flex">
+                  <TabsList data-testid="billing-cycle-tabs" className="bg-[#121212] border border-[#27272a]">
+                    <TabsTrigger value="monthly" data-testid="monthly-tab">{t('pricing.monthly')}</TabsTrigger>
+                    <TabsTrigger value="annual" data-testid="annual-tab">{t('pricing.annual')}</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
             )}
           </div>
 
@@ -117,15 +135,28 @@ const PricingPage = () => {
                 
                 <div className="text-center mb-8">
                   <h3 
-                    className="text-3xl font-bold mb-4"
+                    className="text-3xl font-bold mb-2"
                     style={{ fontFamily: "'Barlow Condensed', sans-serif", color: plan.color }}
                   >
                     {plan.name}
                   </h3>
+                  
+                  {/* Trial Badge */}
+                  <div className="mb-4">
+                    <span className="text-xs bg-green-500/20 text-green-400 px-3 py-1 rounded-full font-medium">
+                      {i18n.language?.startsWith('fr') ? '7 jours gratuits' : '7 days free'}
+                    </span>
+                  </div>
+                  
                   <div className="flex items-baseline justify-center gap-2">
                     <span className="text-5xl font-bold">{plan.price}€</span>
                     <span className="text-gray-400">/{plan.tier === 'supplements' ? 'mois' : billingCycle === 'monthly' ? 'mois' : 'an'}</span>
                   </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    {i18n.language?.startsWith('fr') 
+                      ? 'Après la période d\'essai'
+                      : 'After trial period'}
+                  </p>
                 </div>
 
                 <ul className="space-y-4 mb-8">
@@ -147,10 +178,21 @@ const PricingPage = () => {
                       : 'bg-[#FAFAFA] text-[#09090b] hover:bg-white'
                   }`}
                 >
-                  {user && user.subscription_tier === plan.tier ? t('pricing.current') : t('pricing.select')}
+                  {user && user.subscription_tier === plan.tier 
+                    ? t('pricing.current') 
+                    : (i18n.language?.startsWith('fr') ? 'Essayer gratuitement' : 'Start free trial')}
                 </Button>
               </div>
             ))}
+          </div>
+          
+          {/* Additional Info */}
+          <div className="mt-12 text-center">
+            <p className="text-gray-500 text-sm">
+              {i18n.language?.startsWith('fr') 
+                ? '✓ Annulation possible à tout moment • ✓ Aucun frais pendant l\'essai • ✓ Carte bancaire requise'
+                : '✓ Cancel anytime • ✓ No charges during trial • ✓ Credit card required'}
+            </p>
           </div>
         </div>
       </div>
