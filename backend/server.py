@@ -361,6 +361,25 @@ async def cancel_subscription(current_user: User = Depends(get_current_user)):
     else:
         raise HTTPException(status_code=400, detail="No active monthly subscription found")
 
+# Health check endpoint (required for deployment)
+@app.get("/health")
+async def health_check():
+    try:
+        # Test MongoDB connection
+        await db.command('ping')
+        return {
+            "status": "healthy",
+            "service": "fitmaxpro-backend",
+            "database": "connected"
+        }
+    except Exception as e:
+        logging.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "service": "fitmaxpro-backend",
+            "error": str(e)
+        }
+
 app.include_router(api_router)
 
 app.add_middleware(
