@@ -97,62 +97,62 @@ const SignupPage = () => {
               <p className="text-gray-400">Rejoignez FitMaxPro aujourd'hui</p>
             </div>
 
-            <form onSubmit={handleSubmit} className=\"space-y-6\">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <Input
-                  data-testid=\"name-input\"
-                  type=\"text\"
-                  name=\"name\"
-                  placeholder=\"Nom complet\"
+                  data-testid="name-input"
+                  type="text"
+                  name="name"
+                  placeholder="Nom complet"
                   value={formData.name}
                   onChange={handleChange}
-                  className=\"bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0\"
+                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0"
                 />
               </div>
               
               <div>
                 <Input
-                  data-testid=\"email-input\"
-                  type=\"email\"
-                  name=\"email\"
-                  placeholder=\"Email\"
+                  data-testid="email-input"
+                  type="email"
+                  name="email"
+                  placeholder="Email"
                   value={formData.email}
                   onChange={handleChange}
-                  className=\"bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0\"
+                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0"
                 />
               </div>
               
               <div>
                 <Input
-                  data-testid=\"password-input\"
-                  type=\"password\"
-                  name=\"password\"
-                  placeholder=\"Mot de passe (min. 6 caractères)\"
+                  data-testid="password-input"
+                  type="password"
+                  name="password"
+                  placeholder="Mot de passe (min. 6 caractères)"
                   value={formData.password}
                   onChange={handleChange}
-                  className=\"bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0\"
+                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0"
                 />
               </div>
               
               <div>
                 <Input
-                  data-testid=\"confirm-password-input\"
-                  type=\"password\"
-                  name=\"confirmPassword\"
-                  placeholder=\"Confirmer le mot de passe\"
+                  data-testid="confirm-password-input"
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirmer le mot de passe"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className=\"bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0\"
+                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0"
                 />
               </div>
 
               <Button 
-                data-testid=\"signup-submit-btn\"
-                type=\"submit\"
+                data-testid="signup-submit-btn"
+                type="submit"
                 disabled={loading}
-                className=\"w-full bg-[#FAFAFA] text-[#09090b] hover:bg-white font-bold py-6 rounded-sm hover:shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-all hover:-translate-y-1\"
+                className="w-full bg-[#FAFAFA] text-[#09090b] hover:bg-white font-bold py-6 rounded-sm hover:shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-all hover:-translate-y-1"
               >
-                <UserPlus className=\"w-5 h-5 mr-2\" />
+                <UserPlus className="w-5 h-5 mr-2" />
                 {loading ? 'Création...' : 'Créer mon compte'}
               </Button>
             </form>
