@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Dumbbell, Target, Pill, TrendingUp } from 'lucide-react';
-import { Button } from '../components/ui/button';
+import { Button } from '../components/ui/button.jsx';
 import Navigation from '../components/Navigation';
 import Footer from '../components/Footer';
 

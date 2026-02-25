@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
-import { Button } from '../components/ui/button';
+import { Button } from '../components/ui/button.jsx';
 import { Dumbbell, Pill, TrendingUp, CreditCard } from 'lucide-react';
 import axios from 'axios';
 

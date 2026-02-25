@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
+import { Button } from '../components/ui/button.jsx';
+import { Input } from '../components/ui/input.jsx';
 import Navigation from '../components/Navigation';
 import { LogIn } from 'lucide-react';
 

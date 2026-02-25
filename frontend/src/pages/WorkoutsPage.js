@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navigation from '../components/Navigation';
-import { Button } from '../components/ui/button';
+import { Button } from '../components/ui/button.jsx';
 import { Clock, Dumbbell } from 'lucide-react';
 import axios from 'axios';
 
