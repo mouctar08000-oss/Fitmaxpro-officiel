@@ -13,6 +13,7 @@ import WorkoutsPage from './pages/WorkoutsPage';
 import WorkoutDetailPage from './pages/WorkoutDetailPage';
 import SupplementsPage from './pages/SupplementsPage';
 import SuccessPage from './pages/SuccessPage';
+import AdminPage from './pages/AdminPage';
 import './i18n';
 import './App.css';
 
@@ -52,6 +53,12 @@ function AppRouter() {
       <Route path="/supplements" element={
         <ProtectedRoute>
           <SupplementsPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <AdminPage />
         </ProtectedRoute>
       } />
     </Routes>
