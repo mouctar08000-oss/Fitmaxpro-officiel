@@ -884,6 +884,10 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Include router after all endpoints are defined
+app.include_router(api_router)
+
 logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
