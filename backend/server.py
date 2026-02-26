@@ -618,6 +618,268 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==========================================
+# ADMIN ENDPOINTS - Gestion des médias
+# ==========================================
+
+class ExerciseUpdate(BaseModel):
+    name: str
+    sets: int
+    reps: str
+    rest: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+class WorkoutUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    exercises: Optional[List[ExerciseUpdate]] = None
+
+class NutrientUpdate(BaseModel):
+    name: str
+    dosage: str
+    timing: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+class MealUpdate(BaseModel):
+    name: str
+    description: str
+    calories: int
+    proteins: int
+    carbs: int
+    fats: int
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+class SupplementUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    nutrients: Optional[List[NutrientUpdate]] = None
+    meals: Optional[List[MealUpdate]] = None
+
+async def verify_admin(current_user: User = Depends(get_current_user)):
+    """Vérifie que l'utilisateur est admin (VIP)"""
+    if current_user.subscription_tier != "vip":
+        raise HTTPException(status_code=403, detail="Admin access required (VIP)")
+    return current_user
+
+# --- WORKOUTS ADMIN ---
+
+@api_router.get("/admin/workouts")
+async def admin_get_all_workouts(admin: User = Depends(verify_admin)):
+    """Liste tous les workouts pour l'admin"""
+    workouts = await db.workouts.find({}, {"_id": 0}).to_list(1000)
+    return workouts
+
+@api_router.get("/admin/workouts/{workout_id}")
+async def admin_get_workout(workout_id: str, language: str = "fr", admin: User = Depends(verify_admin)):
+    """Récupère un workout spécifique"""
+    workout = await db.workouts.find_one(
+        {"workout_id": workout_id, "language": language}, 
+        {"_id": 0}
+    )
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    return workout
+
+@api_router.put("/admin/workouts/{workout_id}")
+async def admin_update_workout(
+    workout_id: str, 
+    update: WorkoutUpdate, 
+    language: str = "fr",
+    admin: User = Depends(verify_admin)
+):
+    """Met à jour un workout (titre, description, image, exercices)"""
+    update_data = {}
+    
+    if update.title is not None:
+        update_data["title"] = update.title
+    if update.description is not None:
+        update_data["description"] = update.description
+    if update.image_url is not None:
+        update_data["image_url"] = update.image_url
+    if update.exercises is not None:
+        update_data["exercises"] = [ex.model_dump() for ex in update.exercises]
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+    
+    result = await db.workouts.update_one(
+        {"workout_id": workout_id, "language": language},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    return {"message": "Workout updated successfully", "modified": result.modified_count}
+
+@api_router.put("/admin/workouts/{workout_id}/exercise/{exercise_index}")
+async def admin_update_exercise(
+    workout_id: str,
+    exercise_index: int,
+    exercise: ExerciseUpdate,
+    language: str = "fr",
+    admin: User = Depends(verify_admin)
+):
+    """Met à jour un exercice spécifique dans un workout"""
+    workout = await db.workouts.find_one(
+        {"workout_id": workout_id, "language": language}
+    )
+    
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    exercises = workout.get("exercises", [])
+    if exercise_index < 0 or exercise_index >= len(exercises):
+        raise HTTPException(status_code=400, detail="Invalid exercise index")
+    
+    exercises[exercise_index] = exercise.model_dump()
+    
+    await db.workouts.update_one(
+        {"workout_id": workout_id, "language": language},
+        {"$set": {"exercises": exercises}}
+    )
+    
+    return {"message": "Exercise updated successfully"}
+
+# --- SUPPLEMENTS ADMIN ---
+
+@api_router.get("/admin/supplements")
+async def admin_get_all_supplements(admin: User = Depends(verify_admin)):
+    """Liste tous les suppléments pour l'admin"""
+    supplements = await db.supplements.find({}, {"_id": 0}).to_list(100)
+    return supplements
+
+@api_router.get("/admin/supplements/{supplement_id}")
+async def admin_get_supplement(supplement_id: str, admin: User = Depends(verify_admin)):
+    """Récupère un supplément spécifique"""
+    supplement = await db.supplements.find_one(
+        {"supplement_id": supplement_id}, 
+        {"_id": 0}
+    )
+    if not supplement:
+        raise HTTPException(status_code=404, detail="Supplement not found")
+    return supplement
+
+@api_router.put("/admin/supplements/{supplement_id}")
+async def admin_update_supplement(
+    supplement_id: str, 
+    update: SupplementUpdate,
+    admin: User = Depends(verify_admin)
+):
+    """Met à jour un supplément (titre, description, image, nutrients, meals)"""
+    update_data = {}
+    
+    if update.title is not None:
+        update_data["title"] = update.title
+    if update.description is not None:
+        update_data["description"] = update.description
+    if update.image_url is not None:
+        update_data["image_url"] = update.image_url
+    if update.video_url is not None:
+        update_data["video_url"] = update.video_url
+    if update.nutrients is not None:
+        update_data["nutrients"] = [n.model_dump() for n in update.nutrients]
+    if update.meals is not None:
+        update_data["meals"] = [m.model_dump() for m in update.meals]
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+    
+    result = await db.supplements.update_one(
+        {"supplement_id": supplement_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Supplement not found")
+    
+    return {"message": "Supplement updated successfully", "modified": result.modified_count}
+
+@api_router.put("/admin/supplements/{supplement_id}/nutrient/{nutrient_index}")
+async def admin_update_nutrient(
+    supplement_id: str,
+    nutrient_index: int,
+    nutrient: NutrientUpdate,
+    admin: User = Depends(verify_admin)
+):
+    """Met à jour un nutriment spécifique"""
+    supplement = await db.supplements.find_one({"supplement_id": supplement_id})
+    
+    if not supplement:
+        raise HTTPException(status_code=404, detail="Supplement not found")
+    
+    nutrients = supplement.get("nutrients", [])
+    if nutrient_index < 0 or nutrient_index >= len(nutrients):
+        raise HTTPException(status_code=400, detail="Invalid nutrient index")
+    
+    nutrients[nutrient_index] = nutrient.model_dump()
+    
+    await db.supplements.update_one(
+        {"supplement_id": supplement_id},
+        {"$set": {"nutrients": nutrients}}
+    )
+    
+    return {"message": "Nutrient updated successfully"}
+
+@api_router.put("/admin/supplements/{supplement_id}/meal/{meal_index}")
+async def admin_update_meal(
+    supplement_id: str,
+    meal_index: int,
+    meal: MealUpdate,
+    admin: User = Depends(verify_admin)
+):
+    """Met à jour un repas spécifique"""
+    supplement = await db.supplements.find_one({"supplement_id": supplement_id})
+    
+    if not supplement:
+        raise HTTPException(status_code=404, detail="Supplement not found")
+    
+    meals = supplement.get("meals", [])
+    if meal_index < 0 or meal_index >= len(meals):
+        raise HTTPException(status_code=400, detail="Invalid meal index")
+    
+    meals[meal_index] = meal.model_dump()
+    
+    await db.supplements.update_one(
+        {"supplement_id": supplement_id},
+        {"$set": {"meals": meals}}
+    )
+    
+    return {"message": "Meal updated successfully"}
+
+# --- STATS ADMIN ---
+
+@api_router.get("/admin/stats")
+async def admin_get_stats(admin: User = Depends(verify_admin)):
+    """Statistiques pour l'admin"""
+    users_count = await db.users.count_documents({})
+    workouts_count = await db.workouts.count_documents({})
+    supplements_count = await db.supplements.count_documents({})
+    subscriptions_count = await db.user_subscriptions.count_documents({})
+    
+    # Compter par tier
+    vip_count = await db.users.count_documents({"subscription_tier": "vip"})
+    standard_count = await db.users.count_documents({"subscription_tier": "standard"})
+    
+    return {
+        "total_users": users_count,
+        "total_workouts": workouts_count,
+        "total_supplements": supplements_count,
+        "total_subscriptions": subscriptions_count,
+        "vip_users": vip_count,
+        "standard_users": standard_count
+    }
+
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
