@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
