@@ -42,3 +42,7 @@ htmlcov/
 # Capacitor (généré)
 android/
 ios/
+-e 
+# Environment files
+*.env
+*.env.*
