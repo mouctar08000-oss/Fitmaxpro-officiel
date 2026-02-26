@@ -608,7 +608,7 @@ async def health_check():
             "error": str(e)
         }
 
-app.include_router(api_router)
+# Router will be included after all endpoints are defined
 
 app.add_middleware(
     CORSMiddleware,
