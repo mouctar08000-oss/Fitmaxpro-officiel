@@ -110,9 +110,21 @@ const Navigation = () => {
 
             {user ? (
               <div className="flex items-center gap-4">
+                {user.subscription_tier === 'vip' && (
+                  <button
+                    data-testid="nav-admin"
+                    onClick={() => navigate('/admin')}
+                    className={`flex items-center gap-2 hover:text-white transition-colors ${
+                      isActive('/admin') ? 'text-[#EF4444]' : 'text-gray-400'
+                    }`}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Admin
+                  </button>
+                )}
                 <button
                   data-testid="nav-profile"
-                  onClick={() => navigate('/profile')}
+                  onClick={() => navigate('/dashboard')}
                   className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
                 >
                   <User className="w-4 h-4" />
