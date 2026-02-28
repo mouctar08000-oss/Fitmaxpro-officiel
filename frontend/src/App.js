@@ -14,6 +14,7 @@ import WorkoutDetailPage from './pages/WorkoutDetailPage';
 import SupplementsPage from './pages/SupplementsPage';
 import SuccessPage from './pages/SuccessPage';
 import AdminPage from './pages/AdminPage';
+import QRCodePage from './pages/QRCodePage';
 import './i18n';
 import './App.css';
 
