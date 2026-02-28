@@ -194,6 +194,7 @@ const WorkoutDetailPage = () => {
                     </div>
                   </div>
                 </div>
+                </React.Fragment>
               ))}
             </div>
           </div>
