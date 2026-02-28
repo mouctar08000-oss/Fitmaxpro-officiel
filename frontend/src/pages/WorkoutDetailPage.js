@@ -159,9 +159,12 @@ const WorkoutDetailPage = () => {
                           <span className="text-gray-400 block text-xs mb-1">{t('workout.reps')}</span>
                           <span className="font-bold text-lg">{exercise.reps}</span>
                         </div>
-                        <div className="bg-[#09090b] p-3 rounded-sm">
-                          <span className="text-gray-400 block text-xs mb-1">{t('workout.rest')}</span>
-                          <span className="font-bold text-lg">{exercise.rest}</span>
+                        <div className="bg-[#09090b] p-3 rounded-sm border-2 border-[#EAB308]">
+                          <span className="text-[#EAB308] block text-xs mb-1 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {t('workout.rest')}
+                          </span>
+                          <span className="font-bold text-lg text-[#EAB308]">{exercise.rest}</span>
                         </div>
                       </div>
                       
