@@ -106,11 +106,24 @@ const WorkoutDetailPage = () => {
             
             <div className="space-y-6">
               {workout.exercises.map((exercise, index) => (
-                <div
-                  key={index}
-                  data-testid={`exercise-${index}`}
-                  className="bg-[#121212] border border-[#27272a] rounded-md overflow-hidden hover:border-white/20 transition-colors"
-                >
+                <React.Fragment key={index}>
+                  {/* Séparateur de repos entre les exercices */}
+                  {index > 0 && (
+                    <div className="flex items-center justify-center py-4" data-testid={`rest-separator-${index}`}>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#EAB308] to-transparent"></div>
+                      <div className="mx-4 flex items-center gap-2 bg-[#EAB308]/10 border border-[#EAB308]/30 px-4 py-2 rounded-full">
+                        <Clock className="w-5 h-5 text-[#EAB308]" />
+                        <span className="text-[#EAB308] font-bold text-sm">
+                          {i18n.language?.startsWith('fr') ? 'REPOS' : 'REST'}: {workout.exercises[index - 1]?.rest || '60s'}
+                        </span>
+                      </div>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#EAB308] to-transparent"></div>
+                    </div>
+                  )}
+                  <div
+                    data-testid={`exercise-${index}`}
+                    className="bg-[#121212] border border-[#27272a] rounded-md overflow-hidden hover:border-white/20 transition-colors"
+                  >
                   <div className="flex flex-col lg:flex-row">
                     {/* Image de l'exercice */}
                     {exercise.image_url && (
