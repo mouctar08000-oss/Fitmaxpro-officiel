@@ -31,6 +31,7 @@ function AppRouter() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/qrcode" element={<QRCodePage />} />
       <Route path="/success" element={<SuccessPage />} />
       
       <Route path="/dashboard" element={
