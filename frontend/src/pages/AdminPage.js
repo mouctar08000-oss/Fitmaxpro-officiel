@@ -605,10 +605,10 @@ const AdminPage = () => {
               {/* User Details Panel */}
               <div className="lg:col-span-1">
                 {selectedUser ? (
-                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 sticky top-24">
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 sticky top-24 max-h-[85vh] overflow-y-auto">
                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                       <Eye className="w-5 h-5 text-[#EF4444]" />
-                      {isFr ? 'Détails Utilisateur' : 'User Details'}
+                      {isFr ? 'Détails & Évolution' : 'Details & Progress'}
                     </h3>
                     
                     <div className="space-y-4">
@@ -633,34 +633,112 @@ const AdminPage = () => {
 
                       <hr className="border-[#27272a]" />
 
-                      <h4 className="font-bold text-[#EF4444]">{isFr ? 'Statistiques' : 'Statistics'}</h4>
+                      {/* Evolution Section */}
+                      <h4 className="font-bold text-[#EF4444] flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" />
+                        {isFr ? 'Évolution & Progression' : 'Evolution & Progress'}
+                      </h4>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-[#09090b] p-3 rounded">
-                          <p className="text-gray-400 text-xs">{isFr ? 'Séances' : 'Sessions'}</p>
-                          <p className="text-xl font-bold">{selectedUser.stats?.total_sessions || 0}</p>
+                      {/* Progress Stats */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 p-3 rounded-lg">
+                          <p className="text-blue-400 text-xs font-medium">{isFr ? 'Séances Totales' : 'Total Sessions'}</p>
+                          <p className="text-2xl font-bold text-blue-400">{selectedUser.stats?.total_sessions || 0}</p>
                         </div>
-                        <div className="bg-[#09090b] p-3 rounded">
-                          <p className="text-gray-400 text-xs">{isFr ? 'Complétées' : 'Completed'}</p>
-                          <p className="text-xl font-bold text-green-400">{selectedUser.stats?.completed_sessions || 0}</p>
+                        <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 p-3 rounded-lg">
+                          <p className="text-green-400 text-xs font-medium">{isFr ? 'Complétées' : 'Completed'}</p>
+                          <p className="text-2xl font-bold text-green-400">{selectedUser.stats?.completed_sessions || 0}</p>
                         </div>
-                        <div className="col-span-2 bg-[#09090b] p-3 rounded">
-                          <p className="text-gray-400 text-xs">{isFr ? 'Temps Total' : 'Total Time'}</p>
-                          <p className="text-xl font-bold text-purple-400">{selectedUser.stats?.total_duration_formatted || '0h 0m'}</p>
+                        <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 p-3 rounded-lg">
+                          <p className="text-purple-400 text-xs font-medium">{isFr ? 'Temps Total' : 'Total Time'}</p>
+                          <p className="text-lg font-bold text-purple-400">{selectedUser.stats?.total_duration_formatted || '0h 0m'}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 p-3 rounded-lg">
+                          <p className="text-yellow-400 text-xs font-medium">{isFr ? 'Taux Complétion' : 'Completion Rate'}</p>
+                          <p className="text-2xl font-bold text-yellow-400">
+                            {selectedUser.stats?.total_sessions > 0 
+                              ? Math.round((selectedUser.stats?.completed_sessions / selectedUser.stats?.total_sessions) * 100) 
+                              : 0}%
+                          </p>
                         </div>
                       </div>
 
+                      {/* Progress Bar */}
+                      <div className="bg-[#09090b] p-4 rounded-lg">
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-400">{isFr ? 'Progression' : 'Progress'}</span>
+                          <span className="text-[#EF4444] font-bold">
+                            {selectedUser.stats?.completed_sessions || 0} / {selectedUser.stats?.total_sessions || 0}
+                          </span>
+                        </div>
+                        <div className="w-full bg-[#27272a] rounded-full h-3">
+                          <div 
+                            className="bg-gradient-to-r from-[#EF4444] to-[#F97316] h-3 rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${selectedUser.stats?.total_sessions > 0 
+                                ? (selectedUser.stats?.completed_sessions / selectedUser.stats?.total_sessions) * 100 
+                                : 0}%` 
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Workout History */}
                       {selectedUser.workout_stats?.length > 0 && (
                         <>
-                          <h4 className="font-bold text-[#EF4444] mt-4">{isFr ? 'Par Séance' : 'By Workout'}</h4>
-                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                          <h4 className="font-bold text-[#EF4444] mt-4 flex items-center gap-2">
+                            <Dumbbell className="w-4 h-4" />
+                            {isFr ? 'Détail par Séance' : 'Workout Breakdown'}
+                          </h4>
+                          <div className="space-y-2 max-h-60 overflow-y-auto">
                             {selectedUser.workout_stats.map((ws, idx) => (
-                              <div key={idx} className="bg-[#09090b] p-2 rounded text-sm">
-                                <p className="font-medium truncate">{ws.workout_title}</p>
-                                <div className="flex justify-between text-gray-400 text-xs mt-1">
-                                  <span>{ws.launches} {isFr ? 'lancements' : 'launches'}</span>
-                                  <span>{ws.completed} {isFr ? 'complétées' : 'completed'}</span>
+                              <div key={idx} className="bg-[#09090b] p-3 rounded-lg border border-[#27272a]">
+                                <p className="font-medium text-sm truncate mb-2">{ws.workout_title}</p>
+                                <div className="flex items-center gap-4 text-xs">
+                                  <div className="flex items-center gap-1">
+                                    <Activity className="w-3 h-3 text-blue-400" />
+                                    <span className="text-gray-400">{ws.launches}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Check className="w-3 h-3 text-green-400" />
+                                    <span className="text-gray-400">{ws.completed}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-purple-400" />
+                                    <span className="text-gray-400">{formatDuration(ws.total_duration || 0)}</span>
+                                  </div>
                                 </div>
+                                {/* Mini progress bar */}
+                                <div className="mt-2 w-full bg-[#27272a] rounded-full h-1.5">
+                                  <div 
+                                    className="bg-green-500 h-1.5 rounded-full"
+                                    style={{ width: `${ws.launches > 0 ? (ws.completed / ws.launches) * 100 : 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Recent Sessions */}
+                      {selectedUser.recent_sessions?.length > 0 && (
+                        <>
+                          <h4 className="font-bold text-[#EF4444] mt-4 flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            {isFr ? 'Séances Récentes' : 'Recent Sessions'}
+                          </h4>
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {selectedUser.recent_sessions.slice(0, 5).map((session, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-[#09090b] p-2 rounded text-xs">
+                                <div className="flex items-center gap-2">
+                                  {session.completed ? 
+                                    <Check className="w-3 h-3 text-green-400" /> : 
+                                    <X className="w-3 h-3 text-red-400" />
+                                  }
+                                  <span className="truncate max-w-[120px]">{session.workout_title}</span>
+                                </div>
+                                <span className="text-gray-500">{formatDate(session.started_at)?.split(',')[0]}</span>
                               </div>
                             ))}
                           </div>
@@ -671,7 +749,7 @@ const AdminPage = () => {
                 ) : (
                   <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 text-center text-gray-400">
                     <Eye className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                    <p>{isFr ? 'Sélectionnez un utilisateur pour voir ses détails' : 'Select a user to view details'}</p>
+                    <p>{isFr ? 'Sélectionnez un utilisateur pour voir son évolution' : 'Select a user to view their progress'}</p>
                   </div>
                 )}
               </div>
