@@ -9,106 +9,94 @@ Application de fitness nommée "FitMaxPro" avec:
 - Internationalisation: Français et Anglais
 - Système de tracking des séances avec début/fin et pauses
 - Messagerie directe entre abonnés et coach
+- Rappels d'entraînement programmables
 - Panneau d'administration complet avec suivi des progrès utilisateurs
 
 ## Website URL
 **https://fitmax-gains.preview.emergentagent.com**
 
-## Implemented Features (March 2026)
+## All Implemented Features (March 2026)
 
-### Session Tracking System ✅ NEW
+### 1. Session Tracking System ✅
 - **Bouton "START WORKOUT"** sur chaque séance
 - **Barre de tracking rouge** en haut avec chronomètre
 - **Bouton PAUSE/RESUME** pour gérer les temps de repos
 - **Bouton FINISH** pour terminer la séance
 - **Chronomètre de pause** en jaune pendant les pauses
-- **Messages de feedback** : "Session started!", "Pause started...", "Great job! Session completed in Xm Xs"
+- **Messages de feedback** avec temps total
 
-### User Progress Tracking ✅ NEW
+### 2. User Progress Tracking ✅
 - Page **/my-progress** pour voir son évolution
 - Statistiques: Séances totales, Séances terminées, Temps total, Taux de complétion
 - Historique détaillé de chaque séance avec durée et pauses
-- Statut: Terminée (vert) ou Arrêtée (rouge)
 
-### Coach Messaging System ✅ NEW
+### 3. Coach Messaging System ✅
 - Page **/messages** pour contacter le coach
 - Options affichées: Audio Call, Video Call (Coming soon), Text Chat (Available)
 - Chat en temps réel avec Coach FitMaxPro
-- Indicateur "Online"
-- Envoi de messages avec confirmation
 
-### Admin Features ✅ NEW
+### 4. Workout Reminders ✅ NEW
+- Page **/reminders** pour programmer ses rappels
+- **Sélection de séance** parmi tous les workouts
+- **Choix du jour** (Lundi à Dimanche)
+- **Choix de l'heure** précise
+- **Option "Répéter chaque semaine"**
+- **Notes optionnelles** 
+- **Section "Upcoming Reminders"** avec aperçu coloré des prochains rappels
+- **Liste complète** avec activation/désactivation, accès direct, suppression
+- **Badge "Weekly"** pour les répétitions hebdomadaires
+
+### 5. Admin Features ✅
 - **Onglet Progress**: Voir les progrès de tous les abonnés
-  - Tableau avec: Utilisateur, Séances, Taux de complétion, Temps Total, Durée Moyenne
-  - Détail par utilisateur avec historique complet des séances
 - **Onglet Messages**: Recevoir et répondre aux messages des abonnés
-  - Liste des conversations
-  - Badge avec nombre de messages non lus
-  - Boutons Appeler et Vidéo (à venir)
-  - Interface de chat pour répondre
+- **Gestion complète** des séances, nutrition, utilisateurs
 
-### Complete Website (Landing Page)
-- Hero section avec badge "7 jours essai gratuit" et statistiques
-- Section "Comment ça marche" en 4 étapes
-- Grille de 4 programmes avec images
-- Section "Pourquoi FitMaxPro?" avec 3 features
-- 3 Témoignages clients avec avatars et étoiles
-- FAQ accordéon avec 5 questions
+### 6. Complete Website (Landing Page) ✅
+- Hero section avec statistiques
+- Sections: How It Works, Programs, Why FitMaxPro, Testimonials, FAQ
 - CTA final avec garantie 30 jours
-- Footer complet avec liens App Store/Google Play
+- Footer complet
 
-### Nutrition Content (84 repas total)
-- **Pack Prise de Masse (FR)**: 21 repas avec recettes complètes
-- **Pack Perte de Poids (FR)**: 21 repas avec recettes complètes
-- **Mass Gain Pack (EN)**: 21 repas avec recettes complètes
-- **Weight Loss Pack (EN)**: 21 repas avec recettes complètes
-- Gestion admin: Ajout/Suppression de repas
+### 7. Nutrition Content (84 repas) ✅
+- 21 repas par plan (FR + EN)
+- Recettes complètes avec ingrédients et étapes
+- Gestion admin des repas
+
+## Navigation Links
+- **Progress** (rouge) - /my-progress
+- **Coach** (vert) - /messages  
+- **Reminders** (jaune) - /reminders
 
 ## Test Credentials
 - Admin Email: mouctar08000@hotmail.com
 - Admin Password: Football-du-08
 - Subscription: VIP
 
-## API Endpoints (New)
-
-### Session Tracking
-- POST /api/workout/start?workout_id={id} - Démarrer une séance
-- POST /api/workout/end?session_id={id}&completed={bool} - Terminer une séance
-- POST /api/workout/pause/start?session_id={id} - Démarrer une pause
-- POST /api/workout/pause/end?session_id={id}&pause_id={id} - Terminer une pause
-- GET /api/workout/my-sessions - Historique de mes séances
-- GET /api/workout/session/{session_id} - Détails d'une séance
-
-### Admin Progress
-- GET /api/admin/all-user-progress - Progrès de tous les utilisateurs
-- GET /api/admin/user/{user_id}/sessions - Séances d'un utilisateur spécifique
-
-### Messaging
-- POST /api/messages/send - Envoyer un message
-- GET /api/messages/inbox - Ma boîte de réception
-- GET /api/messages/conversation/{user_id} - Conversation avec un utilisateur (admin)
-- GET /api/admin/messages/unread-count - Nombre de messages non lus
-- GET /api/admin/messages/users-with-messages - Liste des utilisateurs avec messages
-
-## Navigation Links
-- **Progress** (rouge) - /my-progress
-- **Coach** (vert) - /messages
+## API Endpoints (Reminders)
+- POST /api/reminders - Créer un rappel
+- GET /api/reminders - Liste de mes rappels
+- PUT /api/reminders/{id} - Modifier un rappel
+- DELETE /api/reminders/{id} - Supprimer un rappel
+- POST /api/reminders/{id}/toggle - Activer/Désactiver
+- GET /api/reminders/today - Rappels d'aujourd'hui
+- GET /api/reminders/upcoming - Prochains rappels (7 jours)
 
 ## Prioritized Backlog
 
 ### P0 - Critical
-- Implémenter les appels audio/vidéo en temps réel (WebRTC)
-- Achats in-app natifs (Apple/Google) pour publication stores
+- Implémenter les appels audio/vidéo (WebRTC)
+- Achats in-app natifs pour les stores
+- Notifications push réelles (PWA ou mobile)
 
 ### P1 - Important
 - Guide de soumission aux App Stores
-- Configuration domaine personnalisé (fitmax-gains.com)
-- Notifications push pour nouveaux messages
+- Configuration domaine personnalisé
+- Email de rappel automatique
 
 ### P2 - Nice to Have
-- Photos pour les étapes des recettes
-- Système de rappels d'entraînement
 - Graphiques d'évolution des progrès
+- Système de badges/achievements
+- Partage de progrès sur réseaux sociaux
 
 ## Known Issues
-- ⚠️ Export GitHub - Bug plateforme Emergent (support technique requis)
+- ⚠️ Export GitHub - Bug plateforme Emergent

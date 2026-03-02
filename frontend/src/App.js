@@ -17,6 +17,7 @@ import AdminPage from './pages/AdminPage';
 import QRCodePage from './pages/QRCodePage';
 import MyProgressPage from './pages/MyProgressPage';
 import MessagesPage from './pages/MessagesPage';
+import RemindersPage from './pages/RemindersPage';
 import './i18n';
 import './App.css';
 
@@ -75,6 +76,12 @@ function AppRouter() {
       <Route path="/messages" element={
         <ProtectedRoute>
           <MessagesPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/reminders" element={
+        <ProtectedRoute>
+          <RemindersPage />
         </ProtectedRoute>
       } />
     </Routes>

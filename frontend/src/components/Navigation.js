@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
@@ -104,6 +104,16 @@ const Navigation = () => {
                 >
                   <MessageCircle className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Coach' : 'Coach'}
+                </button>
+                <button
+                  data-testid="nav-reminders"
+                  onClick={() => navigate('/reminders')}
+                  className={`flex items-center gap-1 hover:text-yellow-400 transition-colors ${
+                    isActive('/reminders') ? 'text-yellow-400' : 'text-gray-400'
+                  }`}
+                >
+                  <Bell className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Rappels' : 'Reminders'}
                 </button>
               </>
             )}
@@ -226,6 +236,13 @@ const Navigation = () => {
                 >
                   <MessageCircle className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Contacter Coach' : 'Contact Coach'}
+                </button>
+                <button
+                  onClick={() => { navigate('/reminders'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-yellow-400 hover:text-white transition-colors"
+                >
+                  <Bell className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Mes Rappels' : 'My Reminders'}
                 </button>
               </>
             )}
