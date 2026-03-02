@@ -93,6 +93,24 @@ class CheckoutRequest(BaseModel):
     billing_cycle: str
     origin_url: str
 
+# Model for tracking workout sessions
+class WorkoutSession(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    session_id: str
+    user_id: str
+    workout_id: str
+    workout_title: str
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+    duration_seconds: int = 0
+    completed: bool = False
+
+# Model for admin subscription management
+class SubscriptionUpdate(BaseModel):
+    user_id: str
+    subscription_tier: str
+    subscription_status: str
+
 # Auth Helper
 async def get_current_user(request: Request, authorization: Optional[str] = Header(None)) -> User:
     session_token = request.cookies.get("session_token")
@@ -868,6 +886,18 @@ async def admin_get_stats(admin: User = Depends(verify_admin)):
     # Compter par tier
     vip_count = await db.users.count_documents({"subscription_tier": "vip"})
     standard_count = await db.users.count_documents({"subscription_tier": "standard"})
+    supplements_tier_count = await db.users.count_documents({"subscription_tier": "supplements"})
+    
+    # Statistiques des séances
+    total_sessions = await db.workout_sessions.count_documents({})
+    completed_sessions = await db.workout_sessions.count_documents({"completed": True})
+    
+    # Temps total passé sur les séances
+    pipeline = [
+        {"$group": {"_id": None, "total_duration": {"$sum": "$duration_seconds"}}}
+    ]
+    duration_result = await db.workout_sessions.aggregate(pipeline).to_list(1)
+    total_duration = duration_result[0]["total_duration"] if duration_result else 0
     
     return {
         "total_users": users_count,
@@ -875,8 +905,262 @@ async def admin_get_stats(admin: User = Depends(verify_admin)):
         "total_supplements": supplements_count,
         "total_subscriptions": subscriptions_count,
         "vip_users": vip_count,
-        "standard_users": standard_count
+        "standard_users": standard_count,
+        "supplements_users": supplements_tier_count,
+        "total_workout_sessions": total_sessions,
+        "completed_workout_sessions": completed_sessions,
+        "total_workout_duration_seconds": total_duration
     }
+
+# ==================== ADMIN - GESTION DES ABONNÉS ====================
+
+@api_router.get("/admin/subscribers")
+async def admin_get_subscribers(admin: User = Depends(verify_admin)):
+    """Récupérer la liste complète des abonnés avec leurs détails"""
+    users = await db.users.find(
+        {},
+        {"_id": 0, "password": 0}
+    ).to_list(1000)
+    
+    # Enrichir avec les statistiques de séances pour chaque utilisateur
+    for user in users:
+        user_id = user.get("user_id")
+        
+        # Nombre de séances effectuées
+        sessions_count = await db.workout_sessions.count_documents({"user_id": user_id})
+        completed_count = await db.workout_sessions.count_documents({"user_id": user_id, "completed": True})
+        
+        # Temps total passé
+        pipeline = [
+            {"$match": {"user_id": user_id}},
+            {"$group": {"_id": None, "total_duration": {"$sum": "$duration_seconds"}}}
+        ]
+        duration_result = await db.workout_sessions.aggregate(pipeline).to_list(1)
+        total_duration = duration_result[0]["total_duration"] if duration_result else 0
+        
+        user["stats"] = {
+            "total_sessions": sessions_count,
+            "completed_sessions": completed_count,
+            "total_duration_seconds": total_duration,
+            "total_duration_formatted": f"{total_duration // 3600}h {(total_duration % 3600) // 60}m"
+        }
+    
+    return {"subscribers": users, "total": len(users)}
+
+@api_router.get("/admin/subscriber/{user_id}")
+async def admin_get_subscriber_detail(user_id: str, admin: User = Depends(verify_admin)):
+    """Récupérer les détails complets d'un abonné"""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Récupérer toutes les séances de l'utilisateur
+    sessions = await db.workout_sessions.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("started_at", -1).to_list(100)
+    
+    # Statistiques détaillées
+    total_sessions = len(sessions)
+    completed_sessions = sum(1 for s in sessions if s.get("completed"))
+    total_duration = sum(s.get("duration_seconds", 0) for s in sessions)
+    
+    # Séances par workout
+    workout_stats = {}
+    for session in sessions:
+        wid = session.get("workout_id")
+        if wid not in workout_stats:
+            workout_stats[wid] = {
+                "workout_title": session.get("workout_title", "Unknown"),
+                "launches": 0,
+                "completed": 0,
+                "total_duration": 0
+            }
+        workout_stats[wid]["launches"] += 1
+        if session.get("completed"):
+            workout_stats[wid]["completed"] += 1
+        workout_stats[wid]["total_duration"] += session.get("duration_seconds", 0)
+    
+    return {
+        "user": user,
+        "stats": {
+            "total_sessions": total_sessions,
+            "completed_sessions": completed_sessions,
+            "total_duration_seconds": total_duration,
+            "total_duration_formatted": f"{total_duration // 3600}h {(total_duration % 3600) // 60}m"
+        },
+        "workout_stats": list(workout_stats.values()),
+        "recent_sessions": sessions[:20]
+    }
+
+@api_router.put("/admin/subscriber/{user_id}/subscription")
+async def admin_update_subscription(user_id: str, update: SubscriptionUpdate, admin: User = Depends(verify_admin)):
+    """Modifier l'abonnement d'un utilisateur (Admin seulement)"""
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "subscription_tier": update.subscription_tier,
+            "subscription_status": update.subscription_status
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"success": True, "message": f"Subscription updated for user {user_id}"}
+
+@api_router.delete("/admin/subscriber/{user_id}")
+async def admin_delete_subscriber(user_id: str, admin: User = Depends(verify_admin)):
+    """Supprimer un abonné (Admin seulement)"""
+    # Vérifier que ce n'est pas l'admin lui-même
+    if user_id == admin.user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    result = await db.users.delete_one({"user_id": user_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Supprimer aussi les sessions et données associées
+    await db.user_sessions.delete_many({"user_id": user_id})
+    await db.workout_sessions.delete_many({"user_id": user_id})
+    await db.user_subscriptions.delete_many({"user_id": user_id})
+    
+    return {"success": True, "message": f"User {user_id} deleted successfully"}
+
+# ==================== TRACKING DES SÉANCES ====================
+
+@api_router.post("/workout/start")
+async def start_workout_session(workout_id: str, user: User = Depends(get_current_user)):
+    """Démarrer une séance d'entraînement"""
+    # Récupérer le workout pour avoir le titre
+    workout = await db.workouts.find_one({"workout_id": workout_id}, {"_id": 0})
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    session_id = str(uuid.uuid4())
+    session_data = {
+        "session_id": session_id,
+        "user_id": user.user_id,
+        "workout_id": workout_id,
+        "workout_title": workout.get("title", "Unknown"),
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "ended_at": None,
+        "duration_seconds": 0,
+        "completed": False
+    }
+    
+    await db.workout_sessions.insert_one(session_data)
+    
+    return {"session_id": session_id, "message": "Workout session started"}
+
+@api_router.post("/workout/end")
+async def end_workout_session(session_id: str, completed: bool = True, user: User = Depends(get_current_user)):
+    """Terminer une séance d'entraînement"""
+    session = await db.workout_sessions.find_one(
+        {"session_id": session_id, "user_id": user.user_id},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    started_at = session.get("started_at")
+    if isinstance(started_at, str):
+        started_at = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+    
+    ended_at = datetime.now(timezone.utc)
+    duration_seconds = int((ended_at - started_at).total_seconds())
+    
+    await db.workout_sessions.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "ended_at": ended_at.isoformat(),
+            "duration_seconds": duration_seconds,
+            "completed": completed
+        }}
+    )
+    
+    return {
+        "message": "Workout session ended",
+        "duration_seconds": duration_seconds,
+        "duration_formatted": f"{duration_seconds // 60}m {duration_seconds % 60}s",
+        "completed": completed
+    }
+
+@api_router.get("/workout/my-sessions")
+async def get_my_sessions(user: User = Depends(get_current_user)):
+    """Récupérer l'historique de mes séances"""
+    sessions = await db.workout_sessions.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("started_at", -1).to_list(50)
+    
+    total_duration = sum(s.get("duration_seconds", 0) for s in sessions)
+    completed_count = sum(1 for s in sessions if s.get("completed"))
+    
+    return {
+        "sessions": sessions,
+        "stats": {
+            "total_sessions": len(sessions),
+            "completed_sessions": completed_count,
+            "total_duration_seconds": total_duration,
+            "total_duration_formatted": f"{total_duration // 3600}h {(total_duration % 3600) // 60}m"
+        }
+    }
+
+# ==================== ADMIN - STATISTIQUES AVANCÉES ====================
+
+@api_router.get("/admin/workout-analytics")
+async def admin_get_workout_analytics(admin: User = Depends(verify_admin)):
+    """Statistiques détaillées sur les séances par workout"""
+    pipeline = [
+        {"$group": {
+            "_id": "$workout_id",
+            "workout_title": {"$first": "$workout_title"},
+            "total_launches": {"$sum": 1},
+            "completed_count": {"$sum": {"$cond": ["$completed", 1, 0]}},
+            "total_duration": {"$sum": "$duration_seconds"},
+            "avg_duration": {"$avg": "$duration_seconds"}
+        }},
+        {"$sort": {"total_launches": -1}}
+    ]
+    
+    results = await db.workout_sessions.aggregate(pipeline).to_list(100)
+    
+    for r in results:
+        r["workout_id"] = r.pop("_id")
+        r["avg_duration_formatted"] = f"{int(r['avg_duration'] // 60)}m {int(r['avg_duration'] % 60)}s" if r['avg_duration'] else "0m"
+        r["total_duration_formatted"] = f"{r['total_duration'] // 3600}h {(r['total_duration'] % 3600) // 60}m"
+        r["completion_rate"] = f"{(r['completed_count'] / r['total_launches'] * 100):.1f}%" if r['total_launches'] > 0 else "0%"
+    
+    return {"workout_analytics": results}
+
+@api_router.get("/admin/daily-activity")
+async def admin_get_daily_activity(days: int = 30, admin: User = Depends(verify_admin)):
+    """Activité quotidienne des 30 derniers jours"""
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    
+    pipeline = [
+        {"$match": {"started_at": {"$gte": start_date.isoformat()}}},
+        {"$group": {
+            "_id": {"$substr": ["$started_at", 0, 10]},
+            "sessions_count": {"$sum": 1},
+            "unique_users": {"$addToSet": "$user_id"},
+            "total_duration": {"$sum": "$duration_seconds"}
+        }},
+        {"$project": {
+            "date": "$_id",
+            "sessions_count": 1,
+            "unique_users_count": {"$size": "$unique_users"},
+            "total_duration": 1
+        }},
+        {"$sort": {"_id": -1}}
+    ]
+    
+    results = await db.workout_sessions.aggregate(pipeline).to_list(days)
+    
+    return {"daily_activity": results}
 
 
 
