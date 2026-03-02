@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import json
+import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict
@@ -14,6 +15,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 from passlib.context import CryptContext
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+import resend
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -24,6 +26,11 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Resend Email setup
+resend.api_key = os.environ.get('RESEND_API_KEY', '')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+APP_URL = os.environ.get('APP_URL', 'https://fitmax-gains.preview.emergentagent.com')
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -1793,6 +1800,290 @@ async def toggle_reminder(reminder_id: str, user: User = Depends(get_current_use
     )
     
     return {"is_active": new_status, "message": f"Reminder {'activated' if new_status else 'deactivated'}"}
+
+
+# ==================== ROUTINES (ÉCHAUFFEMENT & ÉTIREMENTS) ====================
+
+@api_router.get("/routines/{routine_type}")
+async def get_routine(routine_type: str, language: str = "en"):
+    """Récupérer une routine (warmup ou stretching)"""
+    if routine_type not in ["warmup", "stretching"]:
+        raise HTTPException(status_code=400, detail="Invalid routine type. Use 'warmup' or 'stretching'")
+    
+    routine_id = f"{routine_type}_{language}"
+    routine = await db.routines.find_one({"routine_id": routine_id}, {"_id": 0})
+    
+    if not routine:
+        # Fallback to English if not found
+        routine = await db.routines.find_one({"routine_id": f"{routine_type}_en"}, {"_id": 0})
+    
+    return routine if routine else {"exercises": [], "title": routine_type.capitalize()}
+
+@api_router.get("/admin/routines")
+async def admin_get_all_routines(admin: User = Depends(verify_admin)):
+    """Admin: Récupérer toutes les routines"""
+    routines = await db.routines.find({}, {"_id": 0}).to_list(10)
+    return {"routines": routines}
+
+class RoutineExerciseUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    duration: Optional[str] = None
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+@api_router.put("/admin/routines/{routine_id}/exercises/{exercise_index}")
+async def admin_update_routine_exercise(
+    routine_id: str,
+    exercise_index: int,
+    update: RoutineExerciseUpdate,
+    admin: User = Depends(verify_admin)
+):
+    """Admin: Mettre à jour un exercice d'une routine"""
+    routine = await db.routines.find_one({"routine_id": routine_id})
+    if not routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+    
+    exercises = routine.get("exercises", [])
+    if exercise_index < 0 or exercise_index >= len(exercises):
+        raise HTTPException(status_code=400, detail="Invalid exercise index")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    
+    for key, value in update_data.items():
+        exercises[exercise_index][key] = value
+    
+    await db.routines.update_one(
+        {"routine_id": routine_id},
+        {"$set": {"exercises": exercises}}
+    )
+    
+    return {"message": "Exercise updated successfully"}
+
+class NewRoutineExercise(BaseModel):
+    name: str
+    description: str
+    duration: str
+    image_url: Optional[str] = ""
+    video_url: Optional[str] = ""
+
+@api_router.post("/admin/routines/{routine_id}/exercises")
+async def admin_add_routine_exercise(
+    routine_id: str,
+    exercise: NewRoutineExercise,
+    admin: User = Depends(verify_admin)
+):
+    """Admin: Ajouter un exercice à une routine"""
+    routine = await db.routines.find_one({"routine_id": routine_id})
+    if not routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+    
+    new_exercise = {
+        "name": exercise.name,
+        "description": exercise.description,
+        "duration": exercise.duration,
+        "sets": 1,
+        "image_url": exercise.image_url or "",
+        "video_url": exercise.video_url or ""
+    }
+    
+    await db.routines.update_one(
+        {"routine_id": routine_id},
+        {"$push": {"exercises": new_exercise}}
+    )
+    
+    return {"message": "Exercise added successfully"}
+
+@api_router.delete("/admin/routines/{routine_id}/exercises/{exercise_index}")
+async def admin_delete_routine_exercise(
+    routine_id: str,
+    exercise_index: int,
+    admin: User = Depends(verify_admin)
+):
+    """Admin: Supprimer un exercice d'une routine"""
+    routine = await db.routines.find_one({"routine_id": routine_id})
+    if not routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+    
+    exercises = routine.get("exercises", [])
+    if exercise_index < 0 or exercise_index >= len(exercises):
+        raise HTTPException(status_code=400, detail="Invalid exercise index")
+    
+    exercises.pop(exercise_index)
+    
+    await db.routines.update_one(
+        {"routine_id": routine_id},
+        {"$set": {"exercises": exercises}}
+    )
+    
+    return {"message": "Exercise deleted successfully"}
+
+# ==================== ROUTINE SESSION TRACKING ====================
+
+@api_router.post("/routine/start")
+async def start_routine_session(
+    routine_type: str, 
+    workout_session_id: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    """Démarrer une session de routine (échauffement ou étirement)"""
+    if routine_type not in ["warmup", "stretching"]:
+        raise HTTPException(status_code=400, detail="Invalid routine type")
+    
+    session_id = str(uuid.uuid4())
+    
+    session_data = {
+        "session_id": session_id,
+        "user_id": user.user_id,
+        "routine_type": routine_type,
+        "workout_session_id": workout_session_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "ended_at": None,
+        "completed": False,
+        "duration_seconds": 0
+    }
+    
+    await db.routine_sessions.insert_one(session_data)
+    
+    return {
+        "session_id": session_id,
+        "routine_type": routine_type,
+        "message": f"{routine_type.capitalize()} session started"
+    }
+
+@api_router.post("/routine/end")
+async def end_routine_session(
+    session_id: str,
+    completed: bool = True,
+    user: User = Depends(get_current_user)
+):
+    """Terminer une session de routine"""
+    session = await db.routine_sessions.find_one(
+        {"session_id": session_id, "user_id": user.user_id}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Routine session not found")
+    
+    started_at = session.get("started_at")
+    if isinstance(started_at, str):
+        started_at = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+    
+    ended_at = datetime.now(timezone.utc)
+    duration_seconds = int((ended_at - started_at).total_seconds())
+    
+    await db.routine_sessions.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "ended_at": ended_at.isoformat(),
+            "completed": completed,
+            "duration_seconds": duration_seconds
+        }}
+    )
+    
+    return {
+        "session_id": session_id,
+        "duration_seconds": duration_seconds,
+        "duration_formatted": f"{duration_seconds // 60}m {duration_seconds % 60}s",
+        "completed": completed
+    }
+
+# ==================== EMAIL REMINDERS ====================
+
+async def send_reminder_email(user_email: str, user_name: str, workout_title: str, reminder_time: str, day_name: str):
+    """Envoyer un email de rappel"""
+    try:
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #09090b; color: white; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #121212; border-radius: 10px; padding: 30px;">
+                <h1 style="color: #EF4444; text-align: center;">FitMaxPro</h1>
+                <h2 style="text-align: center;">Rappel d'Entraînement</h2>
+                
+                <p style="font-size: 18px;">Bonjour {user_name},</p>
+                
+                <p>C'est l'heure de votre séance !</p>
+                
+                <div style="background-color: #1a1a1a; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #EF4444;">
+                    <h3 style="margin: 0 0 10px 0; color: #EF4444;">{workout_title}</h3>
+                    <p style="margin: 5px 0; color: #888;">📅 {day_name}</p>
+                    <p style="margin: 5px 0; color: #888;">⏰ {reminder_time}</p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="{APP_URL}/workouts" style="background-color: #EF4444; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                        COMMENCER LA SÉANCE
+                    </a>
+                </div>
+                
+                <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px;">
+                    FitMaxPro - Transformez votre corps<br>
+                    Pour désactiver ces rappels, rendez-vous dans l'application.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        params = {
+            "from": SENDER_EMAIL,
+            "to": [user_email],
+            "subject": f"⏰ Rappel: {workout_title} - {day_name} {reminder_time}",
+            "html": html_content
+        }
+        
+        email = resend.Emails.send(params)
+        return {"success": True, "email_id": email.get("id")}
+    except Exception as e:
+        logging.error(f"Error sending email: {e}")
+        return {"success": False, "error": str(e)}
+
+@api_router.post("/reminders/{reminder_id}/send-email")
+async def send_reminder_email_now(reminder_id: str, user: User = Depends(get_current_user)):
+    """Envoyer un email de rappel maintenant (test)"""
+    reminder = await db.reminders.find_one(
+        {"reminder_id": reminder_id, "user_id": user.user_id}
+    )
+    
+    if not reminder:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    
+    days_en = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_name = days_en[reminder.get("day_of_week", 0)]
+    
+    result = await send_reminder_email(
+        user_email=user.email,
+        user_name=user.name,
+        workout_title=reminder.get("workout_title", "Workout"),
+        reminder_time=reminder.get("time", "08:00"),
+        day_name=day_name
+    )
+    
+    if result.get("success"):
+        return {"message": "Email sent successfully", "email_id": result.get("email_id")}
+    else:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {result.get('error')}")
+
+@api_router.put("/reminders/{reminder_id}/email-settings")
+async def update_reminder_email_settings(
+    reminder_id: str, 
+    send_email: bool,
+    user: User = Depends(get_current_user)
+):
+    """Activer/Désactiver les emails pour un rappel"""
+    reminder = await db.reminders.find_one(
+        {"reminder_id": reminder_id, "user_id": user.user_id}
+    )
+    
+    if not reminder:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    
+    await db.reminders.update_one(
+        {"reminder_id": reminder_id},
+        {"$set": {"send_email": send_email}}
+    )
+    
+    return {"message": f"Email notifications {'enabled' if send_email else 'disabled'}"}
 
 
 logging.basicConfig(
