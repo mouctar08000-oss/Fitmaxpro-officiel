@@ -35,7 +35,10 @@ import {
   VideoIcon,
   Flame,
   Sparkles,
-  LineChart
+  LineChart,
+  Mail,
+  Bell,
+  AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -113,6 +116,11 @@ const AdminPage = () => {
   const [evolutionData, setEvolutionData] = useState([]);
   const [selectedUserEvolution, setSelectedUserEvolution] = useState(null);
   const [selectedWorkoutAnalytics, setSelectedWorkoutAnalytics] = useState(null);
+  
+  // All subscribers evolution states
+  const [allSubscribersEvolution, setAllSubscribersEvolution] = useState([]);
+  const [sendingAlerts, setSendingAlerts] = useState(false);
+  const [alertsHistory, setAlertsHistory] = useState([]);
   
   // New workout creation states
   const [showCreateWorkout, setShowCreateWorkout] = useState(false);
@@ -259,6 +267,45 @@ const AdminPage = () => {
       console.error('Error fetching workout analytics:', error);
       toast.error(isFr ? 'Erreur' : 'Error');
     }
+  };
+
+  const fetchAllSubscribersEvolution = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/all-subscribers-evolution`, { headers: getAuthHeaders() });
+      setAllSubscribersEvolution(response.data.subscribers || []);
+    } catch (error) {
+      console.error('Error fetching all subscribers evolution:', error);
+    }
+  }, []);
+
+  const fetchAlertsHistory = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/inactivity-alerts`, { headers: getAuthHeaders() });
+      setAlertsHistory(response.data.alerts || []);
+    } catch (error) {
+      console.error('Error fetching alerts history:', error);
+    }
+  }, []);
+
+  const sendInactivityAlerts = async (daysThreshold = 3) => {
+    setSendingAlerts(true);
+    try {
+      const response = await axios.post(
+        `${API}/admin/send-inactivity-alerts?days_threshold=${daysThreshold}`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      toast.success(isFr 
+        ? `${response.data.sent} alertes envoyées, ${response.data.already_sent_recently} déjà envoyées récemment`
+        : `${response.data.sent} alerts sent, ${response.data.already_sent_recently} already sent recently`
+      );
+      fetchAlertsHistory();
+      fetchAllSubscribersEvolution();
+    } catch (error) {
+      console.error('Error sending alerts:', error);
+      toast.error(isFr ? 'Erreur lors de l\'envoi' : 'Error sending alerts');
+    }
+    setSendingAlerts(false);
   };
 
   const fetchUserSessions = async (userId) => {
@@ -540,12 +587,14 @@ const AdminPage = () => {
         fetchRoutines(),
         fetchRoutineStats(),
         fetchRoutineSessions(),
-        fetchEvolutionData()
+        fetchEvolutionData(),
+        fetchAllSubscribersEvolution(),
+        fetchAlertsHistory()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory]);
 
   // Check if user is admin
   useEffect(() => {
@@ -652,6 +701,7 @@ const AdminPage = () => {
             {[
               { id: 'dashboard', icon: BarChart3, label: isFr ? 'Tableau de bord' : 'Dashboard' },
               { id: 'subscribers', icon: Users, label: isFr ? 'Abonnés' : 'Subscribers' },
+              { id: 'coaching', icon: UserCog, label: isFr ? 'Coaching' : 'Coaching' },
               { id: 'progress', icon: TrendingUp, label: isFr ? 'Progrès' : 'Progress' },
               { id: 'discipline', icon: Timer, label: isFr ? 'Discipline' : 'Discipline' },
               { id: 'messages', icon: MessageCircle, label: isFr ? 'Messages' : 'Messages', badge: unreadCount },
@@ -1020,6 +1070,233 @@ const AdminPage = () => {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Coaching Tab - All Subscribers Evolution & Alerts */}
+          {activeTab === 'coaching' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <UserCog className="w-5 h-5 text-blue-400" />
+                  {isFr ? 'Coaching - Suivi des Abonnés' : 'Coaching - Subscriber Tracking'}
+                </h2>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => sendInactivityAlerts(3)}
+                    disabled={sendingAlerts}
+                    className="bg-orange-500 hover:bg-orange-600"
+                  >
+                    {sendingAlerts ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Mail className="w-4 h-4 mr-2" />
+                    )}
+                    {isFr ? 'Alerter inactifs (3j+)' : 'Alert inactive (3d+)'}
+                  </Button>
+                  <Button
+                    onClick={() => sendInactivityAlerts(7)}
+                    disabled={sendingAlerts}
+                    variant="outline"
+                    className="border-red-500 text-red-400 hover:bg-red-500/10"
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    {isFr ? 'Alerter (7j+)' : 'Alert (7d+)'}
+                  </Button>
+                </div>
+              </div>
+
+              <p className="text-gray-400 text-sm">
+                {isFr 
+                  ? 'Suivez l\'évolution de tous vos abonnés, identifiez ceux qui ont besoin d\'encouragement et envoyez des alertes automatiques.'
+                  : 'Track all your subscribers\' progress, identify those who need encouragement, and send automatic alerts.'}
+              </p>
+
+              {/* Subscribers Overview Table */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg overflow-hidden">
+                <div className="p-4 border-b border-[#27272a] flex items-center justify-between">
+                  <h3 className="font-bold flex items-center gap-2">
+                    <Users className="w-5 h-5 text-[#EF4444]" />
+                    {isFr ? 'Tous les Abonnés' : 'All Subscribers'} ({allSubscribersEvolution.length})
+                  </h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={fetchAllSubscribersEvolution}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+                
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-[#1a1a1a] sticky top-0">
+                      <tr>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Abonné' : 'Subscriber'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Plan' : 'Plan'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Séances (30j)' : 'Workouts (30d)'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Échauff.' : 'Warm-Up'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Étir.' : 'Stretch'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Discipline' : 'Discipline'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Inactif' : 'Inactive'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Actions' : 'Actions'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allSubscribersEvolution.map((sub, idx) => (
+                        <tr key={idx} className={`border-t border-[#27272a] hover:bg-[#1a1a1a] ${
+                          sub.status === 'inactive' ? 'bg-red-500/5' : 
+                          sub.status === 'warning' ? 'bg-yellow-500/5' : ''
+                        }`}>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${
+                                sub.status === 'active' ? 'bg-green-500' :
+                                sub.status === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+                              }`} />
+                              <div>
+                                <p className="font-medium">{sub.name}</p>
+                                <p className="text-gray-500 text-xs">{sub.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${getSubscriptionColor(sub.subscription)}`}>
+                              {sub.subscription?.toUpperCase() || 'NONE'}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <span className="text-[#EF4444] font-bold">{sub.workouts_30d}</span>
+                          </td>
+                          <td className="p-3">
+                            <span className="text-orange-400">{sub.warmups_30d}</span>
+                          </td>
+                          <td className="p-3">
+                            <span className="text-purple-400">{sub.stretching_30d}</span>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 bg-[#27272a] rounded-full h-2">
+                                <div 
+                                  className={`h-2 rounded-full ${
+                                    sub.discipline_score >= 70 ? 'bg-green-500' :
+                                    sub.discipline_score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                                  }`}
+                                  style={{ width: `${sub.discipline_score}%` }}
+                                />
+                              </div>
+                              <span className={`text-sm font-bold ${
+                                sub.discipline_score >= 70 ? 'text-green-400' :
+                                sub.discipline_score >= 40 ? 'text-yellow-400' : 'text-red-400'
+                              }`}>
+                                {sub.discipline_score}%
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {sub.days_inactive < 999 ? (
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                sub.days_inactive <= 3 ? 'bg-green-500/20 text-green-400' :
+                                sub.days_inactive <= 7 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {sub.days_inactive}j
+                              </span>
+                            ) : (
+                              <span className="text-gray-500 text-xs">{isFr ? 'Jamais' : 'Never'}</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => fetchUserEvolution(sub.user_id)}
+                                className="text-green-400"
+                                title={isFr ? "Voir évolution" : "View evolution"}
+                              >
+                                <TrendingUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => fetchUserRoutineSessions(sub.user_id)}
+                                className="text-blue-400"
+                                title={isFr ? "Voir détails" : "View details"}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Selected User Evolution Chart */}
+              {selectedUserEvolution && (
+                <div className="bg-[#121212] border border-blue-500/30 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-blue-400" />
+                      {selectedUserEvolution.user?.name} - {isFr ? 'Évolution Mensuelle' : 'Monthly Evolution'}
+                    </h3>
+                    <Button variant="ghost" onClick={() => setSelectedUserEvolution(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  
+                  {selectedUserEvolution.evolution?.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <RechartsLineChart data={selectedUserEvolution.evolution}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                        <XAxis dataKey="week" stroke="#666" tickFormatter={(val) => val.slice(5)} />
+                        <YAxis stroke="#666" />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#121212', border: '1px solid #27272a', borderRadius: '8px' }}
+                          labelStyle={{ color: '#fff' }}
+                        />
+                        <Legend />
+                        <Line type="monotone" dataKey="discipline_score" name={isFr ? "Score Discipline %" : "Discipline Score %"} stroke="#22C55E" strokeWidth={3} dot={{ fill: '#22C55E' }} />
+                        <Line type="monotone" dataKey="workouts_completed" name={isFr ? "Séances" : "Workouts"} stroke="#EF4444" strokeWidth={2} />
+                        <Line type="monotone" dataKey="warmups_completed" name={isFr ? "Échauffements" : "Warm-Ups"} stroke="#F97316" strokeWidth={2} />
+                        <Line type="monotone" dataKey="stretching_completed" name={isFr ? "Étirements" : "Stretching"} stroke="#A855F7" strokeWidth={2} />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-gray-500 text-center py-8">{isFr ? 'Pas assez de données' : 'Not enough data'}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Alerts History */}
+              {alertsHistory.length > 0 && (
+                <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                  <h3 className="font-bold mb-4 flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-orange-400" />
+                    {isFr ? 'Historique des Alertes Envoyées' : 'Sent Alerts History'}
+                  </h3>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {alertsHistory.slice(0, 20).map((alert, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-[#09090b] rounded-lg p-3">
+                        <div className="flex items-center gap-3">
+                          <Mail className="w-4 h-4 text-orange-400" />
+                          <div>
+                            <p className="font-medium text-sm">{alert.user_email}</p>
+                            <p className="text-gray-500 text-xs">
+                              {new Date(alert.sent_at).toLocaleString(isFr ? 'fr-FR' : 'en-US')}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="bg-orange-500/20 text-orange-400 px-2 py-1 rounded text-xs">
+                          {alert.days_inactive}j {isFr ? 'inactif' : 'inactive'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

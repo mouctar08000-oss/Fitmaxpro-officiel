@@ -2426,6 +2426,339 @@ async def admin_get_workout_analytics(workout_id: str, admin: User = Depends(ver
     }
 
 
+# ==================== USER EVOLUTION (FOR SUBSCRIBERS) ====================
+
+@api_router.get("/user/evolution")
+async def get_user_evolution(current_user: User = Depends(get_current_user)):
+    """Get current user's evolution data for personal dashboard"""
+    from datetime import timedelta
+    
+    user_id = current_user.user_id
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=30)
+    
+    # Get workout sessions
+    workout_sessions = await db.workout_sessions.find({
+        "user_id": user_id,
+        "started_at": {"$gte": start_date.isoformat()}
+    }, {"_id": 0}).sort("started_at", 1).to_list(100)
+    
+    # Get routine sessions
+    routine_sessions = await db.routine_sessions.find({
+        "user_id": user_id,
+        "started_at": {"$gte": start_date.isoformat()}
+    }, {"_id": 0}).sort("started_at", 1).to_list(200)
+    
+    # Daily data for last 7 days
+    daily_data = []
+    for i in range(7):
+        day = (end_date - timedelta(days=6-i)).strftime("%Y-%m-%d")
+        day_name = (end_date - timedelta(days=6-i)).strftime("%a")
+        
+        day_workouts = [s for s in workout_sessions if s.get("started_at", "").startswith(day)]
+        day_warmups = [s for s in routine_sessions if s.get("started_at", "").startswith(day) and s.get("routine_type") == "warmup"]
+        day_stretching = [s for s in routine_sessions if s.get("started_at", "").startswith(day) and s.get("routine_type") == "stretching"]
+        
+        daily_data.append({
+            "date": day,
+            "day": day_name,
+            "workouts": len([s for s in day_workouts if s.get("completed")]),
+            "warmups": len([s for s in day_warmups if s.get("completed")]),
+            "stretching": len([s for s in day_stretching if s.get("completed")]),
+            "duration_minutes": round(sum(s.get("duration_seconds", 0) for s in day_workouts if s.get("completed")) / 60, 1)
+        })
+    
+    # Weekly data for last 4 weeks
+    weekly_data = []
+    for week_num in range(4):
+        week_start = end_date - timedelta(days=(3-week_num)*7 + end_date.weekday())
+        week_end = week_start + timedelta(days=7)
+        week_label = f"Sem {week_num + 1}"
+        
+        week_workouts = [s for s in workout_sessions 
+                        if week_start.strftime("%Y-%m-%d") <= s.get("started_at", "")[:10] < week_end.strftime("%Y-%m-%d")]
+        week_warmups = [s for s in routine_sessions 
+                       if week_start.strftime("%Y-%m-%d") <= s.get("started_at", "")[:10] < week_end.strftime("%Y-%m-%d") 
+                       and s.get("routine_type") == "warmup"]
+        week_stretching = [s for s in routine_sessions 
+                          if week_start.strftime("%Y-%m-%d") <= s.get("started_at", "")[:10] < week_end.strftime("%Y-%m-%d")
+                          and s.get("routine_type") == "stretching"]
+        
+        completed_workouts = len([s for s in week_workouts if s.get("completed")])
+        completed_warmups = len([s for s in week_warmups if s.get("completed")])
+        completed_stretching = len([s for s in week_stretching if s.get("completed")])
+        
+        discipline_score = 0
+        if completed_workouts > 0:
+            discipline_score = min(100, round((completed_warmups + completed_stretching) / (completed_workouts * 2) * 100, 1))
+        
+        weekly_data.append({
+            "week": week_label,
+            "workouts": completed_workouts,
+            "warmups": completed_warmups,
+            "stretching": completed_stretching,
+            "discipline_score": discipline_score,
+            "duration_minutes": round(sum(s.get("duration_seconds", 0) for s in week_workouts if s.get("completed")) / 60, 1)
+        })
+    
+    # Overall stats
+    total_workouts = len([s for s in workout_sessions if s.get("completed")])
+    total_warmups = len([s for s in routine_sessions if s.get("completed") and s.get("routine_type") == "warmup"])
+    total_stretching = len([s for s in routine_sessions if s.get("completed") and s.get("routine_type") == "stretching"])
+    total_duration = sum(s.get("duration_seconds", 0) for s in workout_sessions if s.get("completed"))
+    
+    overall_discipline = 0
+    if total_workouts > 0:
+        overall_discipline = min(100, round((total_warmups + total_stretching) / (total_workouts * 2) * 100, 1))
+    
+    # Streak calculation
+    streak = 0
+    for i in range(30):
+        day = (end_date - timedelta(days=i)).strftime("%Y-%m-%d")
+        day_has_workout = any(s.get("started_at", "").startswith(day) and s.get("completed") for s in workout_sessions)
+        if day_has_workout:
+            streak += 1
+        else:
+            break
+    
+    return {
+        "daily": daily_data,
+        "weekly": weekly_data,
+        "stats": {
+            "total_workouts": total_workouts,
+            "total_warmups": total_warmups,
+            "total_stretching": total_stretching,
+            "total_duration_minutes": round(total_duration / 60, 1),
+            "discipline_score": overall_discipline,
+            "current_streak": streak
+        }
+    }
+
+
+# ==================== ADMIN: ALL SUBSCRIBERS EVOLUTION ====================
+
+@api_router.get("/admin/all-subscribers-evolution")
+async def admin_get_all_subscribers_evolution(admin: User = Depends(verify_admin)):
+    """Admin: Get evolution data for all subscribers"""
+    from datetime import timedelta
+    
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=30)
+    
+    # Get all users with subscription
+    users = await db.users.find(
+        {"subscription": {"$exists": True, "$ne": None}},
+        {"_id": 0, "user_id": 1, "name": 1, "email": 1, "subscription": 1}
+    ).to_list(100)
+    
+    subscribers_data = []
+    
+    for user in users:
+        user_id = user.get("user_id")
+        
+        # Get last activity
+        last_workout = await db.workout_sessions.find_one(
+            {"user_id": user_id},
+            {"_id": 0, "started_at": 1}
+        , sort=[("started_at", -1)])
+        
+        # Count sessions
+        workout_count = await db.workout_sessions.count_documents({
+            "user_id": user_id,
+            "completed": True,
+            "started_at": {"$gte": start_date.isoformat()}
+        })
+        
+        warmup_count = await db.routine_sessions.count_documents({
+            "user_id": user_id,
+            "routine_type": "warmup",
+            "completed": True,
+            "started_at": {"$gte": start_date.isoformat()}
+        })
+        
+        stretching_count = await db.routine_sessions.count_documents({
+            "user_id": user_id,
+            "routine_type": "stretching",
+            "completed": True,
+            "started_at": {"$gte": start_date.isoformat()}
+        })
+        
+        # Calculate discipline score
+        discipline_score = 0
+        if workout_count > 0:
+            discipline_score = min(100, round((warmup_count + stretching_count) / (workout_count * 2) * 100, 1))
+        
+        # Calculate days since last activity
+        days_inactive = 999
+        if last_workout:
+            last_date = datetime.fromisoformat(last_workout["started_at"].replace('Z', '+00:00'))
+            days_inactive = (end_date - last_date).days
+        
+        subscribers_data.append({
+            "user_id": user_id,
+            "name": user.get("name", "Unknown"),
+            "email": user.get("email", ""),
+            "subscription": user.get("subscription", {}).get("plan", "none"),
+            "workouts_30d": workout_count,
+            "warmups_30d": warmup_count,
+            "stretching_30d": stretching_count,
+            "discipline_score": discipline_score,
+            "days_inactive": days_inactive,
+            "last_activity": last_workout.get("started_at") if last_workout else None,
+            "status": "active" if days_inactive <= 3 else "warning" if days_inactive <= 7 else "inactive"
+        })
+    
+    # Sort by days inactive (most inactive first)
+    subscribers_data.sort(key=lambda x: (-x["days_inactive"] if x["days_inactive"] < 999 else 0, -x["discipline_score"]))
+    
+    return {"subscribers": subscribers_data}
+
+
+# ==================== AUTOMATIC INACTIVITY ALERTS ====================
+
+@api_router.post("/admin/send-inactivity-alerts")
+async def admin_send_inactivity_alerts(
+    days_threshold: int = 3,
+    admin: User = Depends(verify_admin)
+):
+    """Admin: Send email alerts to inactive subscribers"""
+    from datetime import timedelta
+    
+    end_date = datetime.now(timezone.utc)
+    threshold_date = end_date - timedelta(days=days_threshold)
+    
+    # Get all active subscribers
+    users = await db.users.find(
+        {"subscription": {"$exists": True, "$ne": None}},
+        {"_id": 0, "user_id": 1, "name": 1, "email": 1}
+    ).to_list(100)
+    
+    sent_count = 0
+    failed_count = 0
+    already_sent = 0
+    
+    for user in users:
+        user_id = user.get("user_id")
+        user_email = user.get("email")
+        user_name = user.get("name", "Membre")
+        
+        # Check last workout
+        last_workout = await db.workout_sessions.find_one(
+            {"user_id": user_id},
+            {"_id": 0, "started_at": 1}
+        , sort=[("started_at", -1)])
+        
+        # If no workout or last workout is older than threshold
+        should_alert = False
+        days_inactive = 0
+        
+        if not last_workout:
+            should_alert = True
+            days_inactive = 30  # Assume very inactive
+        else:
+            last_date = datetime.fromisoformat(last_workout["started_at"].replace('Z', '+00:00'))
+            days_inactive = (end_date - last_date).days
+            if days_inactive >= days_threshold:
+                should_alert = True
+        
+        if should_alert:
+            # Check if we already sent an alert recently (within 3 days)
+            recent_alert = await db.inactivity_alerts.find_one({
+                "user_id": user_id,
+                "sent_at": {"$gte": (end_date - timedelta(days=3)).isoformat()}
+            })
+            
+            if recent_alert:
+                already_sent += 1
+                continue
+            
+            # Send email
+            try:
+                email_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; background-color: #09090b; color: #ffffff; padding: 20px; }}
+                        .container {{ max-width: 600px; margin: 0 auto; background: #121212; border-radius: 12px; padding: 30px; }}
+                        .header {{ text-align: center; margin-bottom: 30px; }}
+                        .logo {{ font-size: 28px; font-weight: bold; color: #EF4444; }}
+                        .message {{ font-size: 16px; line-height: 1.6; color: #d1d5db; }}
+                        .highlight {{ color: #EF4444; font-weight: bold; }}
+                        .cta-button {{ display: inline-block; background: linear-gradient(to right, #EF4444, #DC2626); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 20px 0; }}
+                        .stats {{ background: #1a1a1a; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+                        .footer {{ text-align: center; color: #6b7280; font-size: 12px; margin-top: 30px; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <div class="logo">FITMAXPRO</div>
+                        </div>
+                        <div class="message">
+                            <p>Salut <strong>{user_name}</strong> 👋</p>
+                            <p>Nous avons remarqué que tu n'as pas fait d'entraînement depuis <span class="highlight">{days_inactive} jours</span>.</p>
+                            <p>Ton corps a besoin de bouger ! Même 15 minutes d'exercice peuvent faire une grande différence. 💪</p>
+                            <div class="stats">
+                                <p>🔥 <strong>Rappel :</strong> La régularité est la clé du succès !</p>
+                                <p>📈 Ne laisse pas ta progression s'arrêter maintenant.</p>
+                            </div>
+                            <p style="text-align: center;">
+                                <a href="{BACKEND_URL.replace('/api', '')}/workouts" class="cta-button">
+                                    Reprendre l'entraînement
+                                </a>
+                            </p>
+                            <p>Ton coach est là pour t'aider. N'hésite pas à lui envoyer un message si tu as besoin de conseils !</p>
+                        </div>
+                        <div class="footer">
+                            <p>© 2026 FitMaxPro - Ton partenaire fitness</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                email_response = resend.Emails.send({
+                    "from": f"FitMaxPro <{os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')}>",
+                    "to": [user_email],
+                    "subject": f"💪 {user_name}, tu nous manques ! Reprends ton entraînement",
+                    "html": email_html
+                })
+                
+                # Log the alert
+                await db.inactivity_alerts.insert_one({
+                    "user_id": user_id,
+                    "user_email": user_email,
+                    "days_inactive": days_inactive,
+                    "sent_at": end_date.isoformat(),
+                    "email_id": email_response.get("id")
+                })
+                
+                sent_count += 1
+                
+            except Exception as e:
+                print(f"Failed to send alert to {user_email}: {e}")
+                failed_count += 1
+    
+    return {
+        "message": f"Alertes envoyées",
+        "sent": sent_count,
+        "failed": failed_count,
+        "already_sent_recently": already_sent,
+        "threshold_days": days_threshold
+    }
+
+@api_router.get("/admin/inactivity-alerts")
+async def admin_get_inactivity_alerts(admin: User = Depends(verify_admin)):
+    """Admin: Get history of inactivity alerts sent"""
+    alerts = await db.inactivity_alerts.find(
+        {},
+        {"_id": 0}
+    ).sort("sent_at", -1).to_list(100)
+    
+    return {"alerts": alerts}
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
