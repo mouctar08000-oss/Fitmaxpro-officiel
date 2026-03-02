@@ -32,7 +32,9 @@ import {
   Send,
   Timer,
   Phone,
-  VideoIcon
+  VideoIcon,
+  Flame,
+  Sparkles
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -74,6 +76,18 @@ const AdminPage = () => {
   const [conversationMessages, setConversationMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Routines states
+  const [routines, setRoutines] = useState([]);
+  const [expandedRoutine, setExpandedRoutine] = useState(null);
+  const [editingRoutineExercise, setEditingRoutineExercise] = useState(null);
+  const [newRoutineExercise, setNewRoutineExercise] = useState({
+    name: '',
+    description: '',
+    duration: '30 secondes',
+    image_url: '',
+    video_url: ''
+  });
   
   // New workout creation states
   const [showCreateWorkout, setShowCreateWorkout] = useState(false);
@@ -156,6 +170,15 @@ const AdminPage = () => {
     }
   }, []);
 
+  const fetchRoutines = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/routines`, { headers: getAuthHeaders() });
+      setRoutines(response.data.routines || []);
+    } catch (error) {
+      console.error('Error fetching routines:', error);
+    }
+  }, []);
+
   const fetchUserSessions = async (userId) => {
     try {
       const response = await axios.get(`${API}/admin/user/${userId}/sessions`, { headers: getAuthHeaders() });
@@ -210,6 +233,68 @@ const AdminPage = () => {
       toast.success(isFr ? 'Message envoyé!' : 'Message sent!');
     } catch (error) {
       console.error('Error sending message:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  // Routine management functions
+  const updateRoutineExercise = async (routineId, exerciseIndex, updates) => {
+    setSaving(true);
+    try {
+      await axios.put(
+        `${API}/admin/routines/${routineId}/exercises/${exerciseIndex}`,
+        updates,
+        { headers: getAuthHeaders() }
+      );
+      toast.success(isFr ? 'Exercice mis à jour!' : 'Exercise updated!');
+      setEditingRoutineExercise(null);
+      fetchRoutines();
+    } catch (error) {
+      console.error('Error updating routine exercise:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setSaving(false);
+  };
+
+  const addRoutineExercise = async (routineId) => {
+    if (!newRoutineExercise.name) {
+      toast.error(isFr ? 'Veuillez entrer le nom de l\'exercice' : 'Please enter exercise name');
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post(
+        `${API}/admin/routines/${routineId}/exercises`,
+        newRoutineExercise,
+        { headers: getAuthHeaders() }
+      );
+      toast.success(isFr ? 'Exercice ajouté!' : 'Exercise added!');
+      setNewRoutineExercise({
+        name: '',
+        description: '',
+        duration: '30 secondes',
+        image_url: '',
+        video_url: ''
+      });
+      fetchRoutines();
+    } catch (error) {
+      console.error('Error adding routine exercise:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setSaving(false);
+  };
+
+  const deleteRoutineExercise = async (routineId, exerciseIndex) => {
+    if (!window.confirm(isFr ? 'Supprimer cet exercice ?' : 'Delete this exercise?')) return;
+    try {
+      await axios.delete(
+        `${API}/admin/routines/${routineId}/exercises/${exerciseIndex}`,
+        { headers: getAuthHeaders() }
+      );
+      toast.success(isFr ? 'Exercice supprimé' : 'Exercise deleted');
+      fetchRoutines();
+    } catch (error) {
+      console.error('Error deleting routine exercise:', error);
       toast.error(isFr ? 'Erreur' : 'Error');
     }
   };
@@ -369,12 +454,13 @@ const AdminPage = () => {
         fetchSupplements(),
         fetchUserProgress(),
         fetchUsersWithMessages(),
-        fetchUnreadCount()
+        fetchUnreadCount(),
+        fetchRoutines()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines]);
 
   // Check if user is admin
   useEffect(() => {
@@ -485,6 +571,7 @@ const AdminPage = () => {
               { id: 'messages', icon: MessageCircle, label: isFr ? 'Messages' : 'Messages', badge: unreadCount },
               { id: 'analytics', icon: Activity, label: isFr ? 'Analytiques' : 'Analytics' },
               { id: 'workouts', icon: Dumbbell, label: isFr ? 'Séances' : 'Workouts' },
+              { id: 'routines', icon: Flame, label: isFr ? 'Échauffement/Étirements' : 'Warm-Up/Stretching' },
               { id: 'create-workout', icon: Plus, label: isFr ? 'Créer Séance' : 'Create Workout' },
               { id: 'supplements', icon: Pill, label: isFr ? 'Nutrition' : 'Nutrition' }
             ].map(tab => (
@@ -1640,6 +1727,221 @@ const AdminPage = () => {
                   </Button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Routines Tab */}
+          {activeTab === 'routines' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Flame className="w-5 h-5 text-orange-400" />
+                {isFr ? 'Gestion Échauffement & Étirements' : 'Warm-Up & Stretching Management'}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {isFr 
+                  ? 'Gérez les exercices d\'échauffement (avant la séance) et d\'étirements (après la séance). Ces routines sont automatiquement affichées sur chaque page de séance.'
+                  : 'Manage warm-up exercises (before workout) and stretching exercises (after workout). These routines are automatically displayed on each workout page.'}
+              </p>
+
+              {routines.length === 0 ? (
+                <div className="bg-[#121212] border border-[#27272a] rounded-lg p-8 text-center">
+                  <Sparkles className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400">
+                    {isFr ? 'Aucune routine trouvée. Exécutez le script de seeding.' : 'No routines found. Run the seeding script.'}
+                  </p>
+                </div>
+              ) : (
+                routines.map(routine => {
+                  const isWarmup = routine.type === 'warmup';
+                  const Icon = isWarmup ? Flame : Sparkles;
+                  const colorClass = isWarmup ? 'text-orange-400' : 'text-purple-400';
+                  const bgClass = isWarmup ? 'bg-orange-500/10 border-orange-500/30' : 'bg-purple-500/10 border-purple-500/30';
+                  
+                  return (
+                    <div key={routine.routine_id} className={`border rounded-lg overflow-hidden ${bgClass}`}>
+                      <div 
+                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5"
+                        onClick={() => setExpandedRoutine(expandedRoutine === routine.routine_id ? null : routine.routine_id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className={`w-6 h-6 ${colorClass}`} />
+                          <div>
+                            <h3 className={`font-bold ${colorClass}`}>{routine.title}</h3>
+                            <p className="text-gray-400 text-sm">
+                              {routine.exercises?.length || 0} {isFr ? 'exercices' : 'exercises'} • {routine.duration} • {routine.language?.toUpperCase()}
+                            </p>
+                          </div>
+                        </div>
+                        {expandedRoutine === routine.routine_id ? <ChevronUp /> : <ChevronDown />}
+                      </div>
+
+                      {expandedRoutine === routine.routine_id && (
+                        <div className="border-t border-[#27272a] p-4 space-y-4">
+                          {/* Exercises List */}
+                          <div className="space-y-3">
+                            {routine.exercises?.map((exercise, idx) => (
+                              <div key={idx} className="bg-[#09090b] rounded-lg p-4">
+                                {editingRoutineExercise === `${routine.routine_id}-${idx}` ? (
+                                  <div className="space-y-3">
+                                    <Input
+                                      placeholder={isFr ? "Nom de l'exercice" : "Exercise name"}
+                                      defaultValue={exercise.name}
+                                      id={`routine-ex-name-${routine.routine_id}-${idx}`}
+                                      className="bg-[#121212] border-[#27272a]"
+                                    />
+                                    <Input
+                                      placeholder="Description"
+                                      defaultValue={exercise.description}
+                                      id={`routine-ex-desc-${routine.routine_id}-${idx}`}
+                                      className="bg-[#121212] border-[#27272a]"
+                                    />
+                                    <Input
+                                      placeholder={isFr ? "Durée (ex: 30 secondes)" : "Duration (e.g., 30 seconds)"}
+                                      defaultValue={exercise.duration}
+                                      id={`routine-ex-duration-${routine.routine_id}-${idx}`}
+                                      className="bg-[#121212] border-[#27272a]"
+                                    />
+                                    <Input
+                                      placeholder="Image URL"
+                                      defaultValue={exercise.image_url}
+                                      id={`routine-ex-image-${routine.routine_id}-${idx}`}
+                                      className="bg-[#121212] border-[#27272a]"
+                                    />
+                                    <Input
+                                      placeholder="Video URL (YouTube embed)"
+                                      defaultValue={exercise.video_url}
+                                      id={`routine-ex-video-${routine.routine_id}-${idx}`}
+                                      className="bg-[#121212] border-[#27272a]"
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        onClick={() => {
+                                          const updates = {
+                                            name: document.getElementById(`routine-ex-name-${routine.routine_id}-${idx}`).value,
+                                            description: document.getElementById(`routine-ex-desc-${routine.routine_id}-${idx}`).value,
+                                            duration: document.getElementById(`routine-ex-duration-${routine.routine_id}-${idx}`).value,
+                                            image_url: document.getElementById(`routine-ex-image-${routine.routine_id}-${idx}`).value,
+                                            video_url: document.getElementById(`routine-ex-video-${routine.routine_id}-${idx}`).value
+                                          };
+                                          updateRoutineExercise(routine.routine_id, idx, updates);
+                                        }}
+                                        className="bg-green-500 hover:bg-green-600"
+                                        disabled={saving}
+                                      >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {isFr ? 'Sauvegarder' : 'Save'}
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        onClick={() => setEditingRoutineExercise(null)}
+                                        className="border-[#27272a]"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-start gap-4">
+                                    {exercise.image_url && (
+                                      <img 
+                                        src={exercise.image_url} 
+                                        alt={exercise.name}
+                                        className="w-20 h-20 rounded object-cover"
+                                      />
+                                    )}
+                                    <div className="flex-1">
+                                      <h4 className="font-bold">{exercise.name}</h4>
+                                      <p className="text-gray-500 text-sm">{exercise.description}</p>
+                                      <div className="flex items-center gap-4 mt-2 text-sm">
+                                        <span className={`${colorClass} flex items-center gap-1`}>
+                                          <Clock className="w-3 h-3" />
+                                          {exercise.duration}
+                                        </span>
+                                        {exercise.video_url && (
+                                          <span className="text-red-400 flex items-center gap-1">
+                                            <Video className="w-3 h-3" />
+                                            {isFr ? 'Vidéo' : 'Video'} ✓
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setEditingRoutineExercise(`${routine.routine_id}-${idx}`)}
+                                        className="border-[#27272a]"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => deleteRoutineExercise(routine.routine_id, idx)}
+                                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Add New Exercise Form */}
+                          <div className="bg-[#1a1a1a] rounded-lg p-4 border border-dashed border-[#27272a]">
+                            <h4 className={`font-bold mb-3 ${colorClass}`}>
+                              <Plus className="w-4 h-4 inline mr-2" />
+                              {isFr ? 'Ajouter un exercice' : 'Add Exercise'}
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <Input
+                                placeholder={isFr ? "Nom de l'exercice *" : "Exercise name *"}
+                                value={newRoutineExercise.name}
+                                onChange={(e) => setNewRoutineExercise({...newRoutineExercise, name: e.target.value})}
+                                className="bg-[#121212] border-[#27272a]"
+                              />
+                              <Input
+                                placeholder={isFr ? "Durée (ex: 30 secondes)" : "Duration (e.g., 30 seconds)"}
+                                value={newRoutineExercise.duration}
+                                onChange={(e) => setNewRoutineExercise({...newRoutineExercise, duration: e.target.value})}
+                                className="bg-[#121212] border-[#27272a]"
+                              />
+                              <Input
+                                placeholder="Description"
+                                value={newRoutineExercise.description}
+                                onChange={(e) => setNewRoutineExercise({...newRoutineExercise, description: e.target.value})}
+                                className="bg-[#121212] border-[#27272a] md:col-span-2"
+                              />
+                              <Input
+                                placeholder="Image URL"
+                                value={newRoutineExercise.image_url}
+                                onChange={(e) => setNewRoutineExercise({...newRoutineExercise, image_url: e.target.value})}
+                                className="bg-[#121212] border-[#27272a]"
+                              />
+                              <Input
+                                placeholder="Video URL (YouTube embed)"
+                                value={newRoutineExercise.video_url}
+                                onChange={(e) => setNewRoutineExercise({...newRoutineExercise, video_url: e.target.value})}
+                                className="bg-[#121212] border-[#27272a]"
+                              />
+                            </div>
+                            <Button
+                              onClick={() => addRoutineExercise(routine.routine_id)}
+                              className={isWarmup ? "mt-3 bg-orange-500 hover:bg-orange-600" : "mt-3 bg-purple-500 hover:bg-purple-600"}
+                              disabled={saving}
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              {isFr ? 'Ajouter' : 'Add'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
 
