@@ -1291,20 +1291,142 @@ const AdminPage = () => {
                     {expandedSupplement === supplement.supplement_id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </div>
 
-                  {expandedSupplement === supplement.supplement_id && supplement.meals && (
+                  {expandedSupplement === supplement.supplement_id && (
                     <div className="border-t border-[#27272a] p-4 space-y-4">
-                      {supplement.meals.map((meal, idx) => (
-                        <div key={idx} className="bg-[#09090b] p-4 rounded-lg">
+                      {/* Add New Meal Section */}
+                      <div className="bg-gradient-to-r from-green-500/10 to-transparent border border-green-500/30 rounded-lg p-4">
+                        <h4 className="font-bold text-green-400 mb-3 flex items-center gap-2">
+                          <Plus className="w-5 h-5" />
+                          {isFr ? 'Ajouter un Nouveau Repas' : 'Add New Meal'}
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <Input
+                            placeholder={isFr ? "Nom du repas *" : "Meal name *"}
+                            id={`new-meal-name-${supplement.supplement_id}`}
+                            className="bg-[#09090b] border-[#27272a]"
+                          />
+                          <Input
+                            placeholder={isFr ? "Description" : "Description"}
+                            id={`new-meal-desc-${supplement.supplement_id}`}
+                            className="bg-[#09090b] border-[#27272a]"
+                          />
+                          <Input
+                            placeholder="Calories (ex: 450)"
+                            type="number"
+                            id={`new-meal-cal-${supplement.supplement_id}`}
+                            className="bg-[#09090b] border-[#27272a]"
+                          />
+                          <Input
+                            placeholder={isFr ? "Protéines g" : "Protein g"}
+                            type="number"
+                            id={`new-meal-prot-${supplement.supplement_id}`}
+                            className="bg-[#09090b] border-[#27272a]"
+                          />
+                          <Input
+                            placeholder={isFr ? "Glucides g" : "Carbs g"}
+                            type="number"
+                            id={`new-meal-carbs-${supplement.supplement_id}`}
+                            className="bg-[#09090b] border-[#27272a]"
+                          />
+                          <Input
+                            placeholder={isFr ? "Lipides g" : "Fat g"}
+                            type="number"
+                            id={`new-meal-fat-${supplement.supplement_id}`}
+                            className="bg-[#09090b] border-[#27272a]"
+                          />
+                          <Input
+                            placeholder="Image URL (optionnel)"
+                            id={`new-meal-img-${supplement.supplement_id}`}
+                            className="bg-[#09090b] border-[#27272a] md:col-span-2"
+                          />
+                        </div>
+                        <Button
+                          onClick={async () => {
+                            const name = document.getElementById(`new-meal-name-${supplement.supplement_id}`).value;
+                            if (!name) {
+                              toast.error(isFr ? 'Veuillez entrer le nom du repas' : 'Please enter meal name');
+                              return;
+                            }
+                            setSaving(true);
+                            try {
+                              await axios.post(`${API}/admin/supplements/${supplement.supplement_id}/meals`, {
+                                name,
+                                description: document.getElementById(`new-meal-desc-${supplement.supplement_id}`).value || '',
+                                calories: parseInt(document.getElementById(`new-meal-cal-${supplement.supplement_id}`).value) || 0,
+                                protein: parseInt(document.getElementById(`new-meal-prot-${supplement.supplement_id}`).value) || 0,
+                                carbs: parseInt(document.getElementById(`new-meal-carbs-${supplement.supplement_id}`).value) || 0,
+                                fat: parseInt(document.getElementById(`new-meal-fat-${supplement.supplement_id}`).value) || 0,
+                                image_url: document.getElementById(`new-meal-img-${supplement.supplement_id}`).value || ''
+                              }, { headers: getAuthHeaders() });
+                              toast.success(isFr ? 'Repas ajouté!' : 'Meal added!');
+                              // Clear fields
+                              document.getElementById(`new-meal-name-${supplement.supplement_id}`).value = '';
+                              document.getElementById(`new-meal-desc-${supplement.supplement_id}`).value = '';
+                              document.getElementById(`new-meal-cal-${supplement.supplement_id}`).value = '';
+                              document.getElementById(`new-meal-prot-${supplement.supplement_id}`).value = '';
+                              document.getElementById(`new-meal-carbs-${supplement.supplement_id}`).value = '';
+                              document.getElementById(`new-meal-fat-${supplement.supplement_id}`).value = '';
+                              document.getElementById(`new-meal-img-${supplement.supplement_id}`).value = '';
+                              fetchSupplements();
+                            } catch (error) {
+                              toast.error(isFr ? 'Erreur lors de l\'ajout' : 'Error adding meal');
+                            }
+                            setSaving(false);
+                          }}
+                          disabled={saving}
+                          className="mt-3 bg-green-600 hover:bg-green-700"
+                        >
+                          {saving ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                          {isFr ? 'Ajouter le Repas' : 'Add Meal'}
+                        </Button>
+                      </div>
+
+                      {/* Existing Meals */}
+                      <h4 className="font-bold text-white flex items-center gap-2 pt-2">
+                        <Pill className="w-5 h-5 text-green-400" />
+                        {isFr ? 'Repas Existants' : 'Existing Meals'} ({supplement.meals?.length || 0})
+                      </h4>
+                      {supplement.meals?.map((meal, idx) => (
+                        <div key={`${supplement.supplement_id}-meal-${idx}`} className="bg-[#09090b] p-4 rounded-lg">
                           <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium">{meal.name}</h4>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEditingMeal(editingMeal === `${supplement.supplement_id}-${idx}` ? null : `${supplement.supplement_id}-${idx}`)}
-                              className="text-gray-400 hover:text-white"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-3">
+                              {meal.image_url && (
+                                <img src={meal.image_url} alt={meal.name} className="w-12 h-12 rounded object-cover" />
+                              )}
+                              <div>
+                                <h4 className="font-medium">{meal.name}</h4>
+                                <p className="text-gray-500 text-xs">
+                                  {meal.calories}cal • {meal.protein}g prot • {meal.carbs}g carbs • {meal.fat}g fat
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setEditingMeal(editingMeal === `${supplement.supplement_id}-${idx}` ? null : `${supplement.supplement_id}-${idx}`)}
+                                className="text-gray-400 hover:text-white"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={async () => {
+                                  if (!window.confirm(isFr ? 'Supprimer ce repas?' : 'Delete this meal?')) return;
+                                  try {
+                                    await axios.delete(`${API}/admin/supplements/${supplement.supplement_id}/meals/${idx}`, { headers: getAuthHeaders() });
+                                    toast.success(isFr ? 'Repas supprimé' : 'Meal deleted');
+                                    fetchSupplements();
+                                  } catch (error) {
+                                    toast.error(isFr ? 'Erreur' : 'Error');
+                                  }
+                                }}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
 
                           {editingMeal === `${supplement.supplement_id}-${idx}` ? (
@@ -1360,6 +1482,12 @@ const AdminPage = () => {
                                 <Video className="w-3 h-3" />
                                 {meal.video_url ? 'Video ✓' : 'No video'}
                               </span>
+                              {meal.recipe && (
+                                <span className="flex items-center gap-1 text-green-400">
+                                  <Check className="w-3 h-3" />
+                                  {isFr ? 'Recette ✓' : 'Recipe ✓'}
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>

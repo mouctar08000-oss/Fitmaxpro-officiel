@@ -1005,6 +1005,51 @@ async def admin_update_meal_recipe(
     
     return {"message": "Recipe updated successfully"}
 
+@api_router.post("/admin/supplements/{supplement_id}/meals")
+async def admin_add_meal(
+    supplement_id: str,
+    meal: MealUpdate,
+    admin: User = Depends(verify_admin)
+):
+    """Ajoute un nouveau repas à un plan nutritionnel"""
+    supplement = await db.supplements.find_one({"supplement_id": supplement_id})
+    if not supplement:
+        raise HTTPException(status_code=404, detail="Supplement not found")
+    
+    meals = supplement.get("meals", [])
+    meals.append(meal.model_dump())
+    
+    await db.supplements.update_one(
+        {"supplement_id": supplement_id},
+        {"$set": {"meals": meals}}
+    )
+    
+    return {"message": "Meal added successfully", "meal_index": len(meals) - 1}
+
+@api_router.delete("/admin/supplements/{supplement_id}/meals/{meal_index}")
+async def admin_delete_meal(
+    supplement_id: str,
+    meal_index: int,
+    admin: User = Depends(verify_admin)
+):
+    """Supprime un repas d'un plan nutritionnel"""
+    supplement = await db.supplements.find_one({"supplement_id": supplement_id})
+    if not supplement:
+        raise HTTPException(status_code=404, detail="Supplement not found")
+    
+    meals = supplement.get("meals", [])
+    if meal_index < 0 or meal_index >= len(meals):
+        raise HTTPException(status_code=400, detail="Invalid meal index")
+    
+    meals.pop(meal_index)
+    
+    await db.supplements.update_one(
+        {"supplement_id": supplement_id},
+        {"$set": {"meals": meals}}
+    )
+    
+    return {"message": "Meal deleted successfully"}
+
 # --- STATS ADMIN ---
 
 @api_router.get("/admin/stats")
