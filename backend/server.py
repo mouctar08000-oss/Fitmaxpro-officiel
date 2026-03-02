@@ -778,6 +778,100 @@ async def admin_update_exercise(
     
     return {"message": "Exercise updated successfully"}
 
+# --- CRÉATION ET GESTION COMPLÈTE DES WORKOUTS ---
+
+class NewWorkout(BaseModel):
+    title: str
+    description: str
+    level: str  # beginner, intermediate, advanced
+    program_type: str  # mass_gain, weight_loss, legs_glutes
+    duration: int
+    language: str
+    image_url: Optional[str] = None
+    exercises: List[Dict] = []
+
+class NewExercise(BaseModel):
+    name: str
+    description: str
+    sets: int
+    reps: str
+    rest: str
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+@api_router.post("/admin/workouts")
+async def admin_create_workout(workout: NewWorkout, admin: User = Depends(verify_admin)):
+    """Créer une nouvelle séance d'entraînement"""
+    workout_data = workout.model_dump()
+    workout_data["workout_id"] = f"workout_{uuid.uuid4().hex[:12]}"
+    
+    await db.workouts.insert_one(workout_data)
+    
+    return {"message": "Workout created successfully", "workout_id": workout_data["workout_id"]}
+
+@api_router.put("/admin/workouts/{workout_id}/full")
+async def admin_update_workout_full(workout_id: str, workout: NewWorkout, admin: User = Depends(verify_admin)):
+    """Mettre à jour une séance complète"""
+    result = await db.workouts.update_one(
+        {"workout_id": workout_id},
+        {"$set": workout.model_dump()}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    return {"message": "Workout updated successfully"}
+
+@api_router.delete("/admin/workouts/{workout_id}")
+async def admin_delete_workout(workout_id: str, admin: User = Depends(verify_admin)):
+    """Supprimer une séance"""
+    result = await db.workouts.delete_one({"workout_id": workout_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    return {"message": "Workout deleted successfully"}
+
+@api_router.post("/admin/workouts/{workout_id}/exercises")
+async def admin_add_exercise(workout_id: str, exercise: NewExercise, admin: User = Depends(verify_admin)):
+    """Ajouter un exercice à une séance"""
+    workout = await db.workouts.find_one({"workout_id": workout_id})
+    
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    exercises = workout.get("exercises", [])
+    exercises.append(exercise.model_dump())
+    
+    await db.workouts.update_one(
+        {"workout_id": workout_id},
+        {"$set": {"exercises": exercises}}
+    )
+    
+    return {"message": "Exercise added successfully", "exercise_index": len(exercises) - 1}
+
+@api_router.delete("/admin/workouts/{workout_id}/exercises/{exercise_index}")
+async def admin_delete_exercise(workout_id: str, exercise_index: int, admin: User = Depends(verify_admin)):
+    """Supprimer un exercice d'une séance"""
+    workout = await db.workouts.find_one({"workout_id": workout_id})
+    
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    exercises = workout.get("exercises", [])
+    
+    if exercise_index < 0 or exercise_index >= len(exercises):
+        raise HTTPException(status_code=400, detail="Invalid exercise index")
+    
+    exercises.pop(exercise_index)
+    
+    await db.workouts.update_one(
+        {"workout_id": workout_id},
+        {"$set": {"exercises": exercises}}
+    )
+    
+    return {"message": "Exercise deleted successfully"}
+
 # --- SUPPLEMENTS ADMIN ---
 
 @api_router.get("/admin/supplements")

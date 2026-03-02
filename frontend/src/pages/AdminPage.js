@@ -25,7 +25,9 @@ import {
   Trash2,
   Eye,
   UserCog,
-  BarChart3
+  BarChart3,
+  Plus,
+  Copy
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -55,6 +57,28 @@ const AdminPage = () => {
   const [editingMeal, setEditingMeal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState(null);
+  
+  // New workout creation states
+  const [showCreateWorkout, setShowCreateWorkout] = useState(false);
+  const [newWorkout, setNewWorkout] = useState({
+    title: '',
+    description: '',
+    level: 'beginner',
+    program_type: 'legs_glutes',
+    duration: 45,
+    language: 'fr',
+    image_url: '',
+    exercises: []
+  });
+  const [newExercise, setNewExercise] = useState({
+    name: '',
+    description: '',
+    sets: 3,
+    reps: '12',
+    rest: '60s',
+    image_url: '',
+    video_url: ''
+  });
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('session_token');
@@ -144,6 +168,109 @@ const AdminPage = () => {
       fetchStats();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error deleting user');
+    }
+  };
+
+  // Workout management functions
+  const createWorkout = async () => {
+    if (!newWorkout.title || !newWorkout.description) {
+      toast.error(isFr ? 'Veuillez remplir le titre et la description' : 'Please fill title and description');
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post(`${API}/admin/workouts`, newWorkout, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Séance créée avec succès!' : 'Workout created successfully!');
+      setShowCreateWorkout(false);
+      setNewWorkout({
+        title: '',
+        description: '',
+        level: 'beginner',
+        program_type: 'legs_glutes',
+        duration: 45,
+        language: 'fr',
+        image_url: '',
+        exercises: []
+      });
+      fetchWorkouts();
+    } catch (error) {
+      toast.error(isFr ? 'Erreur lors de la création' : 'Creation failed');
+    }
+    setSaving(false);
+  };
+
+  const deleteWorkout = async (workoutId) => {
+    if (!window.confirm(isFr ? 'Voulez-vous vraiment supprimer cette séance ?' : 'Are you sure you want to delete this workout?')) {
+      return;
+    }
+    try {
+      await axios.delete(`${API}/admin/workouts/${workoutId}`, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Séance supprimée' : 'Workout deleted');
+      fetchWorkouts();
+    } catch (error) {
+      toast.error(isFr ? 'Erreur lors de la suppression' : 'Delete failed');
+    }
+  };
+
+  const addExerciseToNewWorkout = () => {
+    if (!newExercise.name) {
+      toast.error(isFr ? 'Veuillez entrer le nom de l\'exercice' : 'Please enter exercise name');
+      return;
+    }
+    setNewWorkout(prev => ({
+      ...prev,
+      exercises: [...prev.exercises, { ...newExercise }]
+    }));
+    setNewExercise({
+      name: '',
+      description: '',
+      sets: 3,
+      reps: '12',
+      rest: '60s',
+      image_url: '',
+      video_url: ''
+    });
+    toast.success(isFr ? 'Exercice ajouté' : 'Exercise added');
+  };
+
+  const removeExerciseFromNewWorkout = (index) => {
+    setNewWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.filter((_, i) => i !== index)
+    }));
+  };
+
+  const addExerciseToExistingWorkout = async (workoutId) => {
+    if (!newExercise.name) {
+      toast.error(isFr ? 'Veuillez entrer le nom de l\'exercice' : 'Please enter exercise name');
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/workouts/${workoutId}/exercises`, newExercise, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Exercice ajouté!' : 'Exercise added!');
+      setNewExercise({
+        name: '',
+        description: '',
+        sets: 3,
+        reps: '12',
+        rest: '60s',
+        image_url: '',
+        video_url: ''
+      });
+      fetchWorkouts();
+    } catch (error) {
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  const deleteExerciseFromWorkout = async (workoutId, exerciseIndex) => {
+    if (!window.confirm(isFr ? 'Supprimer cet exercice ?' : 'Delete this exercise?')) return;
+    try {
+      await axios.delete(`${API}/admin/workouts/${workoutId}/exercises/${exerciseIndex}`, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Exercice supprimé' : 'Exercise deleted');
+      fetchWorkouts();
+    } catch (error) {
+      toast.error(isFr ? 'Erreur' : 'Error');
     }
   };
 
@@ -269,6 +396,7 @@ const AdminPage = () => {
               { id: 'subscribers', icon: Users, label: isFr ? 'Abonnés' : 'Subscribers' },
               { id: 'analytics', icon: TrendingUp, label: isFr ? 'Analytiques' : 'Analytics' },
               { id: 'workouts', icon: Dumbbell, label: isFr ? 'Séances' : 'Workouts' },
+              { id: 'create-workout', icon: Plus, label: isFr ? 'Créer Séance' : 'Create Workout' },
               { id: 'supplements', icon: Pill, label: isFr ? 'Nutrition' : 'Nutrition' }
             ].map(tab => (
               <Button
@@ -604,10 +732,16 @@ const AdminPage = () => {
           {/* Workouts Tab */}
           {activeTab === 'workouts' && (
             <div className="space-y-4">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Dumbbell className="w-5 h-5 text-[#EF4444]" />
-                {isFr ? 'Gestion des Séances' : 'Workout Management'}
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Dumbbell className="w-5 h-5 text-[#EF4444]" />
+                  {isFr ? 'Gestion des Séances' : 'Workout Management'} ({workouts.length})
+                </h2>
+                <Button onClick={() => setActiveTab('create-workout')} className="bg-[#EF4444]">
+                  <Plus className="w-4 h-4 mr-2" />
+                  {isFr ? 'Nouvelle Séance' : 'New Workout'}
+                </Button>
+              </div>
 
               {workouts.map(workout => (
                 <div key={workout.workout_id} className="bg-[#121212] border border-[#27272a] rounded-lg overflow-hidden">
@@ -615,11 +749,24 @@ const AdminPage = () => {
                     className="p-4 flex items-center justify-between cursor-pointer hover:bg-[#1a1a1a]"
                     onClick={() => setExpandedWorkout(expandedWorkout === workout.workout_id ? null : workout.workout_id)}
                   >
-                    <div>
+                    <div className="flex-1">
                       <h3 className="font-bold">{workout.title}</h3>
-                      <p className="text-gray-400 text-sm">{workout.level} • {workout.language}</p>
+                      <p className="text-gray-400 text-sm">{workout.level} • {workout.program_type} • {workout.language} • {workout.exercises?.length || 0} exercices</p>
                     </div>
-                    {expandedWorkout === workout.workout_id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteWorkout(workout.workout_id);
+                        }}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                      {expandedWorkout === workout.workout_id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </div>
                   </div>
 
                   {expandedWorkout === workout.workout_id && (
@@ -628,14 +775,24 @@ const AdminPage = () => {
                         <div key={idx} className="bg-[#09090b] p-4 rounded-lg">
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="font-medium">{exercise.name}</h4>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEditingExercise(editingExercise === `${workout.workout_id}-${idx}` ? null : `${workout.workout_id}-${idx}`)}
-                              className="text-gray-400 hover:text-white"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setEditingExercise(editingExercise === `${workout.workout_id}-${idx}` ? null : `${workout.workout_id}-${idx}`)}
+                                className="text-gray-400 hover:text-white"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => deleteExerciseFromWorkout(workout.workout_id, idx)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
 
                           {editingExercise === `${workout.workout_id}-${idx}` ? (
@@ -699,6 +856,232 @@ const AdminPage = () => {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Create Workout Tab */}
+          {activeTab === 'create-workout' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[#EF4444]" />
+                {isFr ? 'Créer une Nouvelle Séance' : 'Create New Workout'}
+              </h2>
+
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                {/* Workout Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="text-gray-400 text-sm block mb-2">{isFr ? 'Titre de la séance *' : 'Workout Title *'}</label>
+                    <Input
+                      value={newWorkout.title}
+                      onChange={(e) => setNewWorkout(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder={isFr ? 'Ex: Jambes & Fessiers - Débutant' : 'Ex: Legs & Glutes - Beginner'}
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-sm block mb-2">{isFr ? 'Durée (minutes)' : 'Duration (minutes)'}</label>
+                    <Input
+                      type="number"
+                      value={newWorkout.duration}
+                      onChange={(e) => setNewWorkout(prev => ({ ...prev, duration: parseInt(e.target.value) || 45 }))}
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-sm block mb-2">{isFr ? 'Niveau' : 'Level'}</label>
+                    <select
+                      value={newWorkout.level}
+                      onChange={(e) => setNewWorkout(prev => ({ ...prev, level: e.target.value }))}
+                      className="w-full bg-[#09090b] border border-[#27272a] rounded-md px-3 py-2 text-white"
+                    >
+                      <option value="beginner">{isFr ? 'Débutant' : 'Beginner'}</option>
+                      <option value="intermediate">{isFr ? 'Intermédiaire' : 'Intermediate'}</option>
+                      <option value="advanced">{isFr ? 'Avancé' : 'Advanced'}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-sm block mb-2">{isFr ? 'Type de programme' : 'Program Type'}</label>
+                    <select
+                      value={newWorkout.program_type}
+                      onChange={(e) => setNewWorkout(prev => ({ ...prev, program_type: e.target.value }))}
+                      className="w-full bg-[#09090b] border border-[#27272a] rounded-md px-3 py-2 text-white"
+                    >
+                      <option value="legs_glutes">{isFr ? 'Jambes & Fessiers' : 'Legs & Glutes'}</option>
+                      <option value="mass_gain">{isFr ? 'Prise de masse' : 'Mass Gain'}</option>
+                      <option value="weight_loss">{isFr ? 'Perte de poids' : 'Weight Loss'}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-sm block mb-2">{isFr ? 'Langue' : 'Language'}</label>
+                    <select
+                      value={newWorkout.language}
+                      onChange={(e) => setNewWorkout(prev => ({ ...prev, language: e.target.value }))}
+                      className="w-full bg-[#09090b] border border-[#27272a] rounded-md px-3 py-2 text-white"
+                    >
+                      <option value="fr">Français</option>
+                      <option value="en">English</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-sm block mb-2">{isFr ? 'Image URL (optionnel)' : 'Image URL (optional)'}</label>
+                    <Input
+                      value={newWorkout.image_url}
+                      onChange={(e) => setNewWorkout(prev => ({ ...prev, image_url: e.target.value }))}
+                      placeholder="https://..."
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-gray-400 text-sm block mb-2">{isFr ? 'Description *' : 'Description *'}</label>
+                    <textarea
+                      value={newWorkout.description}
+                      onChange={(e) => setNewWorkout(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder={isFr ? 'Décrivez cette séance...' : 'Describe this workout...'}
+                      className="w-full bg-[#09090b] border border-[#27272a] rounded-md px-3 py-2 text-white min-h-[100px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Add Exercise Section */}
+                <div className="border-t border-[#27272a] pt-6 mb-6">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <Dumbbell className="w-5 h-5 text-[#EF4444]" />
+                    {isFr ? 'Ajouter des Exercices' : 'Add Exercises'}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="text-gray-400 text-xs block mb-1">{isFr ? 'Nom de l\'exercice *' : 'Exercise Name *'}</label>
+                      <Input
+                        value={newExercise.name}
+                        onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder={isFr ? 'Ex: Squats' : 'Ex: Squats'}
+                        className="bg-[#09090b] border-[#27272a]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs block mb-1">Séries</label>
+                      <Input
+                        type="number"
+                        value={newExercise.sets}
+                        onChange={(e) => setNewExercise(prev => ({ ...prev, sets: parseInt(e.target.value) || 3 }))}
+                        className="bg-[#09090b] border-[#27272a]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs block mb-1">Reps</label>
+                      <Input
+                        value={newExercise.reps}
+                        onChange={(e) => setNewExercise(prev => ({ ...prev, reps: e.target.value }))}
+                        placeholder="12"
+                        className="bg-[#09090b] border-[#27272a]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs block mb-1">Repos</label>
+                      <Input
+                        value={newExercise.rest}
+                        onChange={(e) => setNewExercise(prev => ({ ...prev, rest: e.target.value }))}
+                        placeholder="60s"
+                        className="bg-[#09090b] border-[#27272a]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs block mb-1">Video YouTube URL</label>
+                      <Input
+                        value={newExercise.video_url}
+                        onChange={(e) => setNewExercise(prev => ({ ...prev, video_url: e.target.value }))}
+                        placeholder="https://www.youtube.com/embed/..."
+                        className="bg-[#09090b] border-[#27272a]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs block mb-1">Image URL</label>
+                      <Input
+                        value={newExercise.image_url}
+                        onChange={(e) => setNewExercise(prev => ({ ...prev, image_url: e.target.value }))}
+                        placeholder="https://..."
+                        className="bg-[#09090b] border-[#27272a]"
+                      />
+                    </div>
+                    <div className="lg:col-span-3">
+                      <label className="text-gray-400 text-xs block mb-1">Description</label>
+                      <Input
+                        value={newExercise.description}
+                        onChange={(e) => setNewExercise(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder={isFr ? 'Instructions pour l\'exercice...' : 'Exercise instructions...'}
+                        className="bg-[#09090b] border-[#27272a]"
+                      />
+                    </div>
+                  </div>
+                  
+                  <Button onClick={addExerciseToNewWorkout} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    {isFr ? 'Ajouter cet exercice' : 'Add this exercise'}
+                  </Button>
+                </div>
+
+                {/* Exercise List */}
+                {newWorkout.exercises.length > 0 && (
+                  <div className="border-t border-[#27272a] pt-6 mb-6">
+                    <h4 className="font-bold mb-4">{isFr ? 'Exercices ajoutés' : 'Added Exercises'} ({newWorkout.exercises.length})</h4>
+                    <div className="space-y-2">
+                      {newWorkout.exercises.map((ex, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-[#09090b] p-3 rounded">
+                          <div className="flex items-center gap-3">
+                            <span className="w-6 h-6 bg-[#EF4444] rounded-full flex items-center justify-center text-sm font-bold">{idx + 1}</span>
+                            <div>
+                              <span className="font-medium">{ex.name}</span>
+                              <span className="text-gray-400 text-sm ml-2">{ex.sets}x{ex.reps} - {ex.rest}</span>
+                            </div>
+                            {ex.video_url && <Video className="w-4 h-4 text-green-400" />}
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => removeExerciseFromNewWorkout(idx)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Create Button */}
+                <div className="flex gap-4">
+                  <Button 
+                    onClick={createWorkout} 
+                    disabled={saving || !newWorkout.title || !newWorkout.description}
+                    className="bg-[#EF4444] hover:bg-[#DC2626] flex-1"
+                  >
+                    {saving ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                    {isFr ? 'Créer la Séance' : 'Create Workout'}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setNewWorkout({
+                        title: '',
+                        description: '',
+                        level: 'beginner',
+                        program_type: 'legs_glutes',
+                        duration: 45,
+                        language: 'fr',
+                        image_url: '',
+                        exercises: []
+                      });
+                    }}
+                    className="border-[#27272a]"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    {isFr ? 'Réinitialiser' : 'Reset'}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
