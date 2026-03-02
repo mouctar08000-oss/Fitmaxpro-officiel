@@ -824,9 +824,27 @@ const AdminPage = () => {
               {workouts.map(workout => (
                 <div key={workout.workout_id} className="bg-[#121212] border border-[#27272a] rounded-lg overflow-hidden">
                   <div 
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-[#1a1a1a]"
+                    className="p-4 flex items-center gap-4 cursor-pointer hover:bg-[#1a1a1a]"
                     onClick={() => setExpandedWorkout(expandedWorkout === workout.workout_id ? null : workout.workout_id)}
                   >
+                    {/* Image de couverture miniature */}
+                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-[#09090b] flex-shrink-0 relative group">
+                      {workout.image_url ? (
+                        <img 
+                          src={workout.image_url} 
+                          alt={workout.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Image className="w-8 h-8 text-gray-600" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Edit className="w-5 h-5 text-white" />
+                      </div>
+                    </div>
+                    
                     <div className="flex-1">
                       <h3 className="font-bold">{workout.title}</h3>
                       <p className="text-gray-400 text-sm">{workout.level} • {workout.program_type} • {workout.language} • {workout.exercises?.length || 0} exercices</p>
@@ -849,10 +867,99 @@ const AdminPage = () => {
 
                   {expandedWorkout === workout.workout_id && (
                     <div className="border-t border-[#27272a] p-4 space-y-4">
+                      
+                      {/* Section Image de Couverture */}
+                      <div className="bg-gradient-to-r from-[#EF4444]/10 to-transparent border border-[#EF4444]/30 rounded-lg p-4">
+                        <h4 className="font-bold text-[#EF4444] mb-3 flex items-center gap-2">
+                          <Image className="w-5 h-5" />
+                          {isFr ? 'Photo de Couverture de la Séance' : 'Workout Cover Photo'}
+                        </h4>
+                        
+                        <div className="flex gap-4 items-start">
+                          {/* Preview Image */}
+                          <div className="w-40 h-24 rounded-lg overflow-hidden bg-[#09090b] flex-shrink-0">
+                            {workout.image_url ? (
+                              <img 
+                                src={workout.image_url} 
+                                alt={workout.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-600">
+                                <Image className="w-10 h-10" />
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Edit Image URL */}
+                          <div className="flex-1">
+                            <label className="text-gray-400 text-sm block mb-2">
+                              {isFr ? 'URL de votre photo (collez le lien de votre image)' : 'Your photo URL (paste your image link)'}
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                id={`cover-img-${workout.workout_id}`}
+                                defaultValue={workout.image_url || ''}
+                                placeholder="https://votre-image.jpg"
+                                className="bg-[#09090b] border-[#27272a] flex-1"
+                              />
+                              <Button
+                                onClick={async () => {
+                                  const newUrl = document.getElementById(`cover-img-${workout.workout_id}`).value;
+                                  setSaving(true);
+                                  try {
+                                    await axios.put(
+                                      `${API}/admin/workouts/${workout.workout_id}/full`,
+                                      { ...workout, image_url: newUrl },
+                                      { headers: getAuthHeaders() }
+                                    );
+                                    toast.success(isFr ? 'Photo mise à jour !' : 'Photo updated!');
+                                    fetchWorkouts();
+                                  } catch (error) {
+                                    toast.error(isFr ? 'Erreur de mise à jour' : 'Update failed');
+                                  }
+                                  setSaving(false);
+                                }}
+                                disabled={saving}
+                                className="bg-[#EF4444] hover:bg-[#DC2626]"
+                              >
+                                {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-gray-500 text-xs mt-2">
+                              {isFr 
+                                ? '💡 Astuce: Uploadez votre photo sur imgbb.com ou imgur.com et collez le lien ici' 
+                                : '💡 Tip: Upload your photo to imgbb.com or imgur.com and paste the link here'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section Exercices */}
+                      <h4 className="font-bold text-white mt-4 flex items-center gap-2">
+                        <Dumbbell className="w-5 h-5 text-[#EF4444]" />
+                        {isFr ? 'Exercices' : 'Exercises'} ({workout.exercises?.length || 0})
+                      </h4>
+                      
                       {workout.exercises?.map((exercise, idx) => (
                         <div key={idx} className="bg-[#09090b] p-4 rounded-lg">
                           <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium">{exercise.name}</h4>
+                            <div className="flex items-center gap-3">
+                              {/* Mini image exercice */}
+                              <div className="w-12 h-12 rounded overflow-hidden bg-[#121212] flex-shrink-0">
+                                {exercise.image_url ? (
+                                  <img src={exercise.image_url} alt={exercise.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Image className="w-5 h-5 text-gray-600" />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="font-medium">{exercise.name}</h4>
+                                <p className="text-gray-500 text-xs">{exercise.sets}x{exercise.reps} - {exercise.rest}</p>
+                              </div>
+                            </div>
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
