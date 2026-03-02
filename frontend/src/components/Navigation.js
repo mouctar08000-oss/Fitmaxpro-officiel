@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe, Settings } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
@@ -84,6 +84,26 @@ const Navigation = () => {
                   }`}
                 >
                   {t('nav.supplements')}
+                </button>
+                <button
+                  data-testid="nav-progress"
+                  onClick={() => navigate('/my-progress')}
+                  className={`flex items-center gap-1 hover:text-[#EF4444] transition-colors ${
+                    isActive('/my-progress') ? 'text-[#EF4444]' : 'text-gray-400'
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Évolution' : 'Progress'}
+                </button>
+                <button
+                  data-testid="nav-messages"
+                  onClick={() => navigate('/messages')}
+                  className={`flex items-center gap-1 hover:text-green-400 transition-colors ${
+                    isActive('/messages') ? 'text-green-400' : 'text-gray-400'
+                  }`}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Coach' : 'Coach'}
                 </button>
               </>
             )}
@@ -192,6 +212,20 @@ const Navigation = () => {
                   className="block w-full text-left text-gray-400 hover:text-white transition-colors"
                 >
                   {t('nav.supplements')}
+                </button>
+                <button
+                  onClick={() => { navigate('/my-progress'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-[#EF4444] hover:text-white transition-colors"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Mon Évolution' : 'My Progress'}
+                </button>
+                <button
+                  onClick={() => { navigate('/messages'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-green-400 hover:text-white transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Contacter Coach' : 'Contact Coach'}
                 </button>
               </>
             )}

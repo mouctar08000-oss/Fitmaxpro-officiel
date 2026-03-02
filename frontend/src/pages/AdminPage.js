@@ -27,7 +27,12 @@ import {
   UserCog,
   BarChart3,
   Plus,
-  Copy
+  Copy,
+  MessageCircle,
+  Send,
+  Timer,
+  Phone,
+  VideoIcon
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -57,6 +62,18 @@ const AdminPage = () => {
   const [editingMeal, setEditingMeal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState(null);
+  
+  // User Progress states
+  const [userProgress, setUserProgress] = useState([]);
+  const [selectedUserProgress, setSelectedUserProgress] = useState(null);
+  
+  // Messaging states
+  const [messages, setMessages] = useState([]);
+  const [usersWithMessages, setUsersWithMessages] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [conversationMessages, setConversationMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
   
   // New workout creation states
   const [showCreateWorkout, setShowCreateWorkout] = useState(false);
@@ -129,6 +146,73 @@ const AdminPage = () => {
       console.error('Error fetching supplements:', error);
     }
   }, []);
+
+  const fetchUserProgress = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/all-user-progress`, { headers: getAuthHeaders() });
+      setUserProgress(response.data.user_progress || []);
+    } catch (error) {
+      console.error('Error fetching user progress:', error);
+    }
+  }, []);
+
+  const fetchUserSessions = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/user/${userId}/sessions`, { headers: getAuthHeaders() });
+      setSelectedUserProgress(response.data);
+    } catch (error) {
+      console.error('Error fetching user sessions:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  const fetchUsersWithMessages = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/messages/users-with-messages`, { headers: getAuthHeaders() });
+      setUsersWithMessages(response.data.users || []);
+    } catch (error) {
+      console.error('Error fetching users with messages:', error);
+    }
+  }, []);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/messages/unread-count`, { headers: getAuthHeaders() });
+      setUnreadCount(response.data.unread_count || 0);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  }, []);
+
+  const fetchConversation = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/messages/conversation/${userId}`, { headers: getAuthHeaders() });
+      setSelectedConversation(response.data.user);
+      setConversationMessages(response.data.messages || []);
+      fetchUnreadCount();
+      fetchUsersWithMessages();
+    } catch (error) {
+      console.error('Error fetching conversation:', error);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation) return;
+    
+    try {
+      await axios.post(`${API}/messages/send`, {
+        content: newMessage,
+        recipient_id: selectedConversation.user_id
+      }, { headers: getAuthHeaders() });
+      
+      setNewMessage('');
+      fetchConversation(selectedConversation.user_id);
+      toast.success(isFr ? 'Message envoyé!' : 'Message sent!');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
 
   const fetchUserDetails = async (userId) => {
     try {
@@ -282,12 +366,15 @@ const AdminPage = () => {
         fetchSubscribers(),
         fetchWorkoutAnalytics(),
         fetchWorkouts(),
-        fetchSupplements()
+        fetchSupplements(),
+        fetchUserProgress(),
+        fetchUsersWithMessages(),
+        fetchUnreadCount()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount]);
 
   // Check if user is admin
   useEffect(() => {
@@ -394,7 +481,9 @@ const AdminPage = () => {
             {[
               { id: 'dashboard', icon: BarChart3, label: isFr ? 'Tableau de bord' : 'Dashboard' },
               { id: 'subscribers', icon: Users, label: isFr ? 'Abonnés' : 'Subscribers' },
-              { id: 'analytics', icon: TrendingUp, label: isFr ? 'Analytiques' : 'Analytics' },
+              { id: 'progress', icon: TrendingUp, label: isFr ? 'Progrès' : 'Progress' },
+              { id: 'messages', icon: MessageCircle, label: isFr ? 'Messages' : 'Messages', badge: unreadCount },
+              { id: 'analytics', icon: Activity, label: isFr ? 'Analytiques' : 'Analytics' },
               { id: 'workouts', icon: Dumbbell, label: isFr ? 'Séances' : 'Workouts' },
               { id: 'create-workout', icon: Plus, label: isFr ? 'Créer Séance' : 'Create Workout' },
               { id: 'supplements', icon: Pill, label: isFr ? 'Nutrition' : 'Nutrition' }
@@ -404,7 +493,7 @@ const AdminPage = () => {
                 data-testid={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
                 variant={activeTab === tab.id ? 'default' : 'outline'}
-                className={`flex items-center gap-2 ${
+                className={`flex items-center gap-2 relative ${
                   activeTab === tab.id 
                     ? 'bg-[#EF4444] text-white' 
                     : 'border-[#27272a] text-gray-400 hover:text-white'
@@ -412,6 +501,11 @@ const AdminPage = () => {
               >
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
+                {tab.badge > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {tab.badge}
+                  </span>
+                )}
               </Button>
             ))}
           </div>
@@ -803,6 +897,285 @@ const AdminPage = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* User Progress Tab */}
+          {activeTab === 'progress' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Users Progress List */}
+              <div className="lg:col-span-2 space-y-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-[#EF4444]" />
+                  {isFr ? 'Progrès des Abonnés' : 'Subscriber Progress'}
+                </h2>
+
+                <div className="bg-[#121212] border border-[#27272a] rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-[#1a1a1a]">
+                      <tr>
+                        <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Utilisateur' : 'User'}</th>
+                        <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Séances' : 'Sessions'}</th>
+                        <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Taux' : 'Rate'}</th>
+                        <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Temps Total' : 'Total Time'}</th>
+                        <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Durée Moy.' : 'Avg Duration'}</th>
+                        <th className="text-left p-4 text-gray-400 text-sm">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {userProgress.length > 0 ? userProgress.map((up, idx) => (
+                        <tr 
+                          key={up.user_id || idx} 
+                          className={`border-t border-[#27272a] hover:bg-[#1a1a1a] cursor-pointer ${
+                            selectedUserProgress?.user?.user_id === up.user_id ? 'bg-[#1a1a1a]' : ''
+                          }`}
+                          onClick={() => fetchUserSessions(up.user_id)}
+                        >
+                          <td className="p-4">
+                            <div className="font-medium">{up.user_name}</div>
+                            <div className="text-gray-500 text-xs">{up.user_email}</div>
+                          </td>
+                          <td className="p-4">
+                            <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-sm">
+                              {up.total_sessions}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 rounded text-sm ${
+                              parseFloat(up.completion_rate) >= 80 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : parseFloat(up.completion_rate) >= 50 
+                                  ? 'bg-yellow-500/20 text-yellow-400'
+                                  : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {up.completion_rate}
+                            </span>
+                          </td>
+                          <td className="p-4 text-purple-400">{up.total_duration_formatted}</td>
+                          <td className="p-4 text-gray-400">{up.avg_duration_formatted}</td>
+                          <td className="p-4">
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fetchUserSessions(up.user_id);
+                              }}
+                              className="text-[#EF4444] hover:text-white"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="6" className="p-8 text-center text-gray-400">
+                            {isFr ? 'Aucune donnée de progression disponible' : 'No progress data available'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* User Sessions Detail */}
+              <div className="space-y-4">
+                {selectedUserProgress ? (
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[#27272a]">
+                      <div className="p-3 bg-[#EF4444]/20 rounded-full">
+                        <Timer className="w-6 h-6 text-[#EF4444]" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold">{selectedUserProgress.user?.name}</h3>
+                        <p className="text-gray-400 text-sm">{selectedUserProgress.user?.email}</p>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="bg-[#09090b] p-3 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-blue-400">{selectedUserProgress.stats?.total_sessions}</p>
+                        <p className="text-gray-500 text-xs">{isFr ? 'Séances' : 'Sessions'}</p>
+                      </div>
+                      <div className="bg-[#09090b] p-3 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-green-400">{selectedUserProgress.stats?.completion_rate}</p>
+                        <p className="text-gray-500 text-xs">{isFr ? 'Taux' : 'Rate'}</p>
+                      </div>
+                      <div className="bg-[#09090b] p-3 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-purple-400">{selectedUserProgress.stats?.total_duration_formatted}</p>
+                        <p className="text-gray-500 text-xs">{isFr ? 'Temps Total' : 'Total Time'}</p>
+                      </div>
+                      <div className="bg-[#09090b] p-3 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-yellow-400">{selectedUserProgress.stats?.avg_session_duration}</p>
+                        <p className="text-gray-500 text-xs">{isFr ? 'Durée Moy.' : 'Avg Duration'}</p>
+                      </div>
+                    </div>
+
+                    {/* Sessions List */}
+                    <h4 className="font-bold text-gray-400 text-sm mb-2">{isFr ? 'Historique des Séances' : 'Session History'}</h4>
+                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                      {selectedUserProgress.sessions?.map((session, idx) => (
+                        <div key={idx} className="bg-[#09090b] p-3 rounded flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {session.completed ? 
+                              <Check className="w-4 h-4 text-green-400" /> : 
+                              <X className="w-4 h-4 text-red-400" />
+                            }
+                            <div>
+                              <p className="text-sm font-medium truncate max-w-[150px]">{session.workout_title}</p>
+                              <p className="text-gray-500 text-xs">{formatDate(session.started_at)}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold">{formatDuration(session.duration_seconds)}</p>
+                            {session.total_pause_seconds > 0 && (
+                              <p className="text-yellow-400 text-xs">
+                                {isFr ? 'Pause:' : 'Pause:'} {formatDuration(session.total_pause_seconds)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 text-center text-gray-400">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                    <p>{isFr ? 'Sélectionnez un utilisateur' : 'Select a user to view details'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Messages Tab */}
+          {activeTab === 'messages' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Users with Messages List */}
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-[#EF4444]" />
+                  {isFr ? 'Conversations' : 'Conversations'}
+                </h2>
+
+                <div className="space-y-2">
+                  {usersWithMessages.length > 0 ? usersWithMessages.map((u, idx) => (
+                    <div 
+                      key={u.user_id || idx}
+                      onClick={() => fetchConversation(u.user_id)}
+                      className={`bg-[#121212] border rounded-lg p-4 cursor-pointer transition-colors ${
+                        selectedConversation?.user_id === u.user_id 
+                          ? 'border-[#EF4444]' 
+                          : 'border-[#27272a] hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold">{u.sender_name}</h3>
+                        {u.unread_count > 0 && (
+                          <span className="bg-[#EF4444] text-white text-xs rounded-full px-2 py-0.5">
+                            {u.unread_count}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-400 text-xs mb-1">{u.sender_email}</p>
+                      <p className="text-gray-500 text-sm truncate">{u.last_content}</p>
+                      <p className="text-gray-600 text-xs mt-1">{formatDate(u.last_message)}</p>
+                    </div>
+                  )) : (
+                    <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 text-center text-gray-400">
+                      <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                      <p>{isFr ? 'Aucun message' : 'No messages yet'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Conversation */}
+              <div className="lg:col-span-2">
+                {selectedConversation ? (
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg overflow-hidden h-[600px] flex flex-col">
+                    {/* Header */}
+                    <div className="p-4 border-b border-[#27272a] flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-[#EF4444]/20 rounded-full">
+                          <MessageCircle className="w-5 h-5 text-[#EF4444]" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold">{selectedConversation.name}</h3>
+                          <p className="text-gray-400 text-sm">{selectedConversation.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
+                          onClick={() => toast.info(isFr ? 'Fonctionnalité d\'appel à venir!' : 'Call feature coming soon!')}
+                        >
+                          <Phone className="w-4 h-4 mr-1" />
+                          {isFr ? 'Appeler' : 'Call'}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white"
+                          onClick={() => toast.info(isFr ? 'Fonctionnalité vidéo à venir!' : 'Video feature coming soon!')}
+                        >
+                          <VideoIcon className="w-4 h-4 mr-1" />
+                          {isFr ? 'Vidéo' : 'Video'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {conversationMessages.map((msg, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`flex ${msg.is_from_admin ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div className={`max-w-[70%] p-3 rounded-lg ${
+                            msg.is_from_admin 
+                              ? 'bg-[#EF4444] text-white' 
+                              : 'bg-[#27272a] text-white'
+                          }`}>
+                            <p className="text-sm">{msg.content}</p>
+                            <p className={`text-xs mt-1 ${msg.is_from_admin ? 'text-white/60' : 'text-gray-500'}`}>
+                              {formatDate(msg.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Input */}
+                    <div className="p-4 border-t border-[#27272a] flex gap-2">
+                      <Input
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder={isFr ? "Écrivez votre message..." : "Write your message..."}
+                        className="bg-[#09090b] border-[#27272a]"
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                      />
+                      <Button 
+                        onClick={sendMessage} 
+                        className="bg-[#EF4444]"
+                        disabled={!newMessage.trim()}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-12 text-center text-gray-400 h-[600px] flex flex-col items-center justify-center">
+                    <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                    <p className="text-lg">{isFr ? 'Sélectionnez une conversation' : 'Select a conversation'}</p>
+                    <p className="text-sm mt-2">{isFr ? 'Répondez aux messages de vos abonnés' : 'Reply to your subscribers messages'}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

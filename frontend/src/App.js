@@ -15,6 +15,8 @@ import SupplementsPage from './pages/SupplementsPage';
 import SuccessPage from './pages/SuccessPage';
 import AdminPage from './pages/AdminPage';
 import QRCodePage from './pages/QRCodePage';
+import MyProgressPage from './pages/MyProgressPage';
+import MessagesPage from './pages/MessagesPage';
 import './i18n';
 import './App.css';
 
@@ -61,6 +63,18 @@ function AppRouter() {
       <Route path="/admin" element={
         <ProtectedRoute>
           <AdminPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/my-progress" element={
+        <ProtectedRoute>
+          <MyProgressPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/messages" element={
+        <ProtectedRoute>
+          <MessagesPage />
         </ProtectedRoute>
       } />
     </Routes>

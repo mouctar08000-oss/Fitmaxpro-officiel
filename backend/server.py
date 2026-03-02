@@ -1286,6 +1286,98 @@ async def get_my_sessions(user: User = Depends(get_current_user)):
         }
     }
 
+@api_router.post("/workout/pause/start")
+async def start_pause(session_id: str, user: User = Depends(get_current_user)):
+    """Démarrer une pause dans la séance"""
+    session = await db.workout_sessions.find_one(
+        {"session_id": session_id, "user_id": user.user_id},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    pause_id = str(uuid.uuid4())
+    pause_data = {
+        "pause_id": pause_id,
+        "started_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Ajouter la pause au tableau des pauses
+    await db.workout_sessions.update_one(
+        {"session_id": session_id},
+        {
+            "$push": {"pauses": pause_data},
+            "$set": {"is_paused": True, "current_pause_id": pause_id}
+        }
+    )
+    
+    return {"pause_id": pause_id, "message": "Pause started"}
+
+@api_router.post("/workout/pause/end")
+async def end_pause(session_id: str, pause_id: str, user: User = Depends(get_current_user)):
+    """Terminer une pause dans la séance"""
+    session = await db.workout_sessions.find_one(
+        {"session_id": session_id, "user_id": user.user_id},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    pauses = session.get("pauses", [])
+    pause_found = None
+    pause_index = -1
+    
+    for i, pause in enumerate(pauses):
+        if pause.get("pause_id") == pause_id:
+            pause_found = pause
+            pause_index = i
+            break
+    
+    if not pause_found:
+        raise HTTPException(status_code=404, detail="Pause not found")
+    
+    started_at = pause_found.get("started_at")
+    if isinstance(started_at, str):
+        started_at = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+    
+    ended_at = datetime.now(timezone.utc)
+    duration_seconds = int((ended_at - started_at).total_seconds())
+    
+    # Mettre à jour la pause
+    await db.workout_sessions.update_one(
+        {"session_id": session_id},
+        {
+            "$set": {
+                f"pauses.{pause_index}.ended_at": ended_at.isoformat(),
+                f"pauses.{pause_index}.duration_seconds": duration_seconds,
+                "is_paused": False,
+                "current_pause_id": None
+            },
+            "$inc": {"total_pause_seconds": duration_seconds}
+        }
+    )
+    
+    return {
+        "message": "Pause ended",
+        "pause_duration_seconds": duration_seconds,
+        "pause_duration_formatted": f"{duration_seconds // 60}m {duration_seconds % 60}s"
+    }
+
+@api_router.get("/workout/session/{session_id}")
+async def get_session_details(session_id: str, user: User = Depends(get_current_user)):
+    """Récupérer les détails d'une séance en cours ou terminée"""
+    session = await db.workout_sessions.find_one(
+        {"session_id": session_id, "user_id": user.user_id},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return session
+
 # ==================== ADMIN - STATISTIQUES AVANCÉES ====================
 
 @api_router.get("/admin/workout-analytics")
@@ -1339,6 +1431,204 @@ async def admin_get_daily_activity(days: int = 30, admin: User = Depends(verify_
     
     return {"daily_activity": results}
 
+# ==================== ADMIN - STATISTIQUES PAR UTILISATEUR ====================
+
+@api_router.get("/admin/user/{user_id}/sessions")
+async def admin_get_user_sessions(user_id: str, admin: User = Depends(verify_admin)):
+    """Récupérer toutes les séances d'un utilisateur spécifique"""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    sessions = await db.workout_sessions.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("started_at", -1).to_list(100)
+    
+    total_duration = sum(s.get("duration_seconds", 0) for s in sessions)
+    completed_count = sum(1 for s in sessions if s.get("completed"))
+    total_pause = sum(s.get("total_pause_seconds", 0) for s in sessions)
+    
+    # Calculate average session duration
+    avg_duration = total_duration / len(sessions) if sessions else 0
+    
+    return {
+        "user": {
+            "user_id": user.get("user_id"),
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "subscription_tier": user.get("subscription_tier")
+        },
+        "sessions": sessions,
+        "stats": {
+            "total_sessions": len(sessions),
+            "completed_sessions": completed_count,
+            "completion_rate": f"{(completed_count / len(sessions) * 100):.1f}%" if sessions else "0%",
+            "total_duration_seconds": total_duration,
+            "total_duration_formatted": f"{total_duration // 3600}h {(total_duration % 3600) // 60}m",
+            "avg_session_duration": f"{int(avg_duration // 60)}m {int(avg_duration % 60)}s",
+            "total_pause_time": f"{total_pause // 60}m {total_pause % 60}s"
+        }
+    }
+
+@api_router.get("/admin/all-user-progress")
+async def admin_get_all_user_progress(admin: User = Depends(verify_admin)):
+    """Récupérer les statistiques de progression de tous les utilisateurs"""
+    pipeline = [
+        {"$group": {
+            "_id": "$user_id",
+            "total_sessions": {"$sum": 1},
+            "completed_sessions": {"$sum": {"$cond": ["$completed", 1, 0]}},
+            "total_duration": {"$sum": "$duration_seconds"},
+            "total_pause": {"$sum": {"$ifNull": ["$total_pause_seconds", 0]}},
+            "avg_duration": {"$avg": "$duration_seconds"},
+            "last_session": {"$max": "$started_at"}
+        }},
+        {"$sort": {"total_sessions": -1}}
+    ]
+    
+    results = await db.workout_sessions.aggregate(pipeline).to_list(100)
+    
+    # Enrichir avec les infos utilisateur
+    for r in results:
+        user = await db.users.find_one({"user_id": r["_id"]}, {"_id": 0})
+        if user:
+            r["user_name"] = user.get("name", "Unknown")
+            r["user_email"] = user.get("email", "")
+            r["subscription_tier"] = user.get("subscription_tier", "free")
+        else:
+            r["user_name"] = "Unknown"
+            r["user_email"] = ""
+            r["subscription_tier"] = "free"
+        
+        r["user_id"] = r.pop("_id")
+        r["avg_duration_formatted"] = f"{int(r['avg_duration'] // 60)}m {int(r['avg_duration'] % 60)}s" if r['avg_duration'] else "0m"
+        r["total_duration_formatted"] = f"{r['total_duration'] // 3600}h {(r['total_duration'] % 3600) // 60}m"
+        r["completion_rate"] = f"{(r['completed_sessions'] / r['total_sessions'] * 100):.1f}%" if r['total_sessions'] > 0 else "0%"
+    
+    return {"user_progress": results}
+
+# ==================== MESSAGERIE ====================
+
+class MessageCreate(BaseModel):
+    content: str
+    recipient_id: Optional[str] = None  # None = message to admin
+
+@api_router.post("/messages/send")
+async def send_message(message: MessageCreate, user: User = Depends(get_current_user)):
+    """Envoyer un message (utilisateur -> admin ou admin -> utilisateur)"""
+    message_id = str(uuid.uuid4())
+    
+    # Déterminer si c'est un admin qui envoie
+    is_admin = user.subscription_tier == 'vip'
+    
+    message_data = {
+        "message_id": message_id,
+        "sender_id": user.user_id,
+        "sender_name": user.name,
+        "sender_email": user.email,
+        "recipient_id": message.recipient_id if is_admin else "admin",
+        "content": message.content,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "read": False,
+        "is_from_admin": is_admin
+    }
+    
+    await db.messages.insert_one(message_data)
+    
+    return {"message_id": message_id, "status": "sent"}
+
+@api_router.get("/messages/inbox")
+async def get_inbox(user: User = Depends(get_current_user)):
+    """Récupérer mes messages (inbox)"""
+    is_admin = user.subscription_tier == 'vip'
+    
+    if is_admin:
+        # Admin voit tous les messages envoyés à "admin"
+        messages = await db.messages.find(
+            {"recipient_id": "admin"},
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(100)
+    else:
+        # Utilisateur voit ses messages avec l'admin
+        messages = await db.messages.find(
+            {"$or": [
+                {"sender_id": user.user_id},
+                {"recipient_id": user.user_id}
+            ]},
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(100)
+    
+    unread_count = sum(1 for m in messages if not m.get("read") and m.get("recipient_id") == user.user_id)
+    
+    return {"messages": messages, "unread_count": unread_count}
+
+@api_router.get("/messages/conversation/{user_id}")
+async def get_conversation(user_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Récupérer la conversation avec un utilisateur spécifique"""
+    messages = await db.messages.find(
+        {"$or": [
+            {"sender_id": user_id, "recipient_id": "admin"},
+            {"sender_id": admin.user_id, "recipient_id": user_id}
+        ]},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(100)
+    
+    # Marquer comme lus
+    await db.messages.update_many(
+        {"sender_id": user_id, "recipient_id": "admin", "read": False},
+        {"$set": {"read": True}}
+    )
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    
+    return {
+        "user": {
+            "user_id": user_id,
+            "name": user.get("name") if user else "Unknown",
+            "email": user.get("email") if user else ""
+        },
+        "messages": messages
+    }
+
+@api_router.post("/messages/mark-read/{message_id}")
+async def mark_message_read(message_id: str, user: User = Depends(get_current_user)):
+    """Marquer un message comme lu"""
+    await db.messages.update_one(
+        {"message_id": message_id},
+        {"$set": {"read": True}}
+    )
+    return {"status": "marked as read"}
+
+@api_router.get("/admin/messages/unread-count")
+async def admin_get_unread_count(admin: User = Depends(verify_admin)):
+    """Admin: Compter les messages non lus"""
+    count = await db.messages.count_documents({"recipient_id": "admin", "read": False})
+    return {"unread_count": count}
+
+@api_router.get("/admin/messages/users-with-messages")
+async def admin_get_users_with_messages(admin: User = Depends(verify_admin)):
+    """Admin: Liste des utilisateurs qui ont envoyé des messages"""
+    pipeline = [
+        {"$match": {"recipient_id": "admin"}},
+        {"$group": {
+            "_id": "$sender_id",
+            "sender_name": {"$first": "$sender_name"},
+            "sender_email": {"$first": "$sender_email"},
+            "message_count": {"$sum": 1},
+            "unread_count": {"$sum": {"$cond": ["$read", 0, 1]}},
+            "last_message": {"$max": "$created_at"},
+            "last_content": {"$last": "$content"}
+        }},
+        {"$sort": {"last_message": -1}}
+    ]
+    
+    results = await db.messages.aggregate(pipeline).to_list(50)
+    
+    for r in results:
+        r["user_id"] = r.pop("_id")
+    
+    return {"users": results}
 
 
 logging.basicConfig(
