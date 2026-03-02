@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import { Button } from '../components/ui/button.jsx';
-import { Pill, Play, X, Utensils, Flame } from 'lucide-react';
+import { Pill, Play, X, Utensils, Flame, ChefHat, Clock, Users, ChevronRight, BookOpen } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,6 +18,8 @@ const SupplementsPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeTab, setActiveTab] = useState({});
+  const [activeRecipe, setActiveRecipe] = useState(null);
+  const isFr = i18n.language?.startsWith('fr');
 
   const fetchSupplements = async () => {
     setLoading(true);
@@ -236,7 +238,7 @@ const SupplementsPage = () => {
                               <p className="text-sm text-gray-400 mb-3">{meal.description}</p>
                               
                               {/* Macros */}
-                              <div className="grid grid-cols-4 gap-2 text-center">
+                              <div className="grid grid-cols-4 gap-2 text-center mb-4">
                                 <div className="bg-[#121212] p-2 rounded-sm">
                                   <Flame className="w-4 h-4 mx-auto mb-1 text-orange-500" />
                                   <span className="text-xs text-gray-400 block">Cal</span>
@@ -255,6 +257,19 @@ const SupplementsPage = () => {
                                   <span className="font-bold text-yellow-500">{meal.fats}g</span>
                                 </div>
                               </div>
+
+                              {/* Recipe Button */}
+                              {meal.recipe && (
+                                <Button
+                                  data-testid={`recipe-btn-${index}`}
+                                  onClick={() => setActiveRecipe({ ...meal.recipe, mealName: meal.name, mealImage: meal.image_url })}
+                                  className="w-full bg-gradient-to-r from-[#EF4444] to-[#DC2626] hover:from-[#DC2626] hover:to-[#B91C1C] text-white font-bold rounded-sm flex items-center justify-center gap-2"
+                                >
+                                  <ChefHat className="w-4 h-4" />
+                                  {isFr ? 'Voir la recette' : 'View Recipe'}
+                                  <ChevronRight className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -309,6 +324,129 @@ const SupplementsPage = () => {
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Recette */}
+          {activeRecipe && (
+            <div 
+              className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto"
+              onClick={() => setActiveRecipe(null)}
+            >
+              <div 
+                className="relative w-full max-w-2xl bg-[#121212] rounded-lg overflow-hidden my-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header avec image */}
+                <div className="relative">
+                  {activeRecipe.mealImage && (
+                    <div className="h-48 overflow-hidden">
+                      <img 
+                        src={activeRecipe.mealImage} 
+                        alt={activeRecipe.mealName}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#121212] to-transparent" />
+                    </div>
+                  )}
+                  <button
+                    data-testid="close-recipe-modal"
+                    onClick={() => setActiveRecipe(null)}
+                    className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                  <div className="absolute bottom-4 left-6 right-6">
+                    <div className="flex items-center gap-2 text-[#EF4444] mb-2">
+                      <ChefHat className="w-5 h-5" />
+                      <span className="text-sm font-bold uppercase">{isFr ? 'Recette' : 'Recipe'}</span>
+                    </div>
+                    <h2 className="text-2xl font-bold" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      {activeRecipe.mealName}
+                    </h2>
+                  </div>
+                </div>
+
+                {/* Info temps et portions */}
+                <div className="px-6 py-4 border-b border-[#27272a]">
+                  <div className="flex flex-wrap gap-4">
+                    {activeRecipe.prep_time && (
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Clock className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm">
+                          <span className="text-gray-500">{isFr ? 'Préparation:' : 'Prep:'}</span>{' '}
+                          <span className="text-white font-medium">{activeRecipe.prep_time}</span>
+                        </span>
+                      </div>
+                    )}
+                    {activeRecipe.cook_time && (
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Flame className="w-4 h-4 text-orange-400" />
+                        <span className="text-sm">
+                          <span className="text-gray-500">{isFr ? 'Cuisson:' : 'Cook:'}</span>{' '}
+                          <span className="text-white font-medium">{activeRecipe.cook_time}</span>
+                        </span>
+                      </div>
+                    )}
+                    {activeRecipe.servings && (
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Users className="w-4 h-4 text-green-400" />
+                        <span className="text-sm">
+                          <span className="text-gray-500">{isFr ? 'Portions:' : 'Servings:'}</span>{' '}
+                          <span className="text-white font-medium">{activeRecipe.servings}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contenu de la recette */}
+                <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+                  {/* Ingrédients */}
+                  <div>
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-[#EF4444]">
+                      <Utensils className="w-5 h-5" />
+                      {isFr ? 'Ingrédients' : 'Ingredients'}
+                    </h3>
+                    <ul className="space-y-2">
+                      {activeRecipe.ingredients?.map((ingredient, idx) => (
+                        <li key={idx} className="flex items-start gap-3">
+                          <span className="w-2 h-2 bg-[#EF4444] rounded-full mt-2 flex-shrink-0" />
+                          <span className="text-gray-300">{ingredient}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Étapes */}
+                  <div>
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-[#EF4444]">
+                      <BookOpen className="w-5 h-5" />
+                      {isFr ? 'Préparation' : 'Instructions'}
+                    </h3>
+                    <ol className="space-y-4">
+                      {activeRecipe.steps?.map((step, idx) => (
+                        <li key={idx} className="flex gap-4">
+                          <span className="w-8 h-8 bg-[#EF4444] rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm">
+                            {idx + 1}
+                          </span>
+                          <p className="text-gray-300 pt-1">{step}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-[#27272a] bg-[#09090b]">
+                  <Button
+                    onClick={() => setActiveRecipe(null)}
+                    className="w-full bg-[#EF4444] hover:bg-[#DC2626] text-white font-bold rounded-sm"
+                  >
+                    {isFr ? 'Fermer' : 'Close'}
+                  </Button>
                 </div>
               </div>
             </div>

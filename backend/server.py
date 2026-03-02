@@ -88,6 +88,17 @@ class Supplement(BaseModel):
     image_url: Optional[str] = None
     video_url: Optional[str] = None
 
+# Model for recipe
+class Recipe(BaseModel):
+    ingredients: List[str] = []
+    steps: List[str] = []
+    prep_time: Optional[str] = None
+    cook_time: Optional[str] = None
+    servings: Optional[int] = None
+
+class MealRecipeUpdate(BaseModel):
+    recipe: Recipe
+
 class CheckoutRequest(BaseModel):
     tier: str
     billing_cycle: str
@@ -872,6 +883,33 @@ async def admin_update_meal(
     )
     
     return {"message": "Meal updated successfully"}
+
+@api_router.put("/admin/supplements/{supplement_id}/meal/{meal_index}/recipe")
+async def admin_update_meal_recipe(
+    supplement_id: str,
+    meal_index: int,
+    recipe_data: MealRecipeUpdate,
+    admin: User = Depends(verify_admin)
+):
+    """Met à jour la recette d'un repas spécifique"""
+    supplement = await db.supplements.find_one({"supplement_id": supplement_id})
+    
+    if not supplement:
+        raise HTTPException(status_code=404, detail="Supplement not found")
+    
+    meals = supplement.get("meals", [])
+    if meal_index < 0 or meal_index >= len(meals):
+        raise HTTPException(status_code=400, detail="Invalid meal index")
+    
+    # Add recipe to the meal
+    meals[meal_index]["recipe"] = recipe_data.recipe.model_dump()
+    
+    await db.supplements.update_one(
+        {"supplement_id": supplement_id},
+        {"$set": {"meals": meals}}
+    )
+    
+    return {"message": "Recipe updated successfully"}
 
 # --- STATS ADMIN ---
 
