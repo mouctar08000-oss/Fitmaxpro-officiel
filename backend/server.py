@@ -2215,6 +2215,216 @@ async def admin_get_user_routine_sessions(user_id: str, admin: User = Depends(ve
         }
     }
 
+@api_router.get("/admin/analytics/evolution")
+async def admin_get_evolution_data(admin: User = Depends(verify_admin)):
+    """Admin: Données d'évolution pour les graphiques (7 derniers jours)"""
+    from datetime import timedelta
+    
+    # Get last 7 days
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=7)
+    
+    # Aggregate workout sessions by day
+    workout_pipeline = [
+        {"$match": {"started_at": {"$gte": start_date.isoformat()}}},
+        {"$addFields": {
+            "date": {"$dateToString": {"format": "%Y-%m-%d", "date": {"$dateFromString": {"dateString": "$started_at"}}}}
+        }},
+        {"$group": {
+            "_id": "$date",
+            "total_sessions": {"$sum": 1},
+            "completed_sessions": {"$sum": {"$cond": ["$completed", 1, 0]}},
+            "total_duration": {"$sum": "$duration_seconds"}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    
+    workout_data = await db.workout_sessions.aggregate(workout_pipeline).to_list(30)
+    
+    # Aggregate routine sessions by day
+    routine_pipeline = [
+        {"$match": {"started_at": {"$gte": start_date.isoformat()}}},
+        {"$addFields": {
+            "date": {"$dateToString": {"format": "%Y-%m-%d", "date": {"$dateFromString": {"dateString": "$started_at"}}}}
+        }},
+        {"$group": {
+            "_id": {"date": "$date", "type": "$routine_type"},
+            "total": {"$sum": 1},
+            "completed": {"$sum": {"$cond": ["$completed", 1, 0]}}
+        }},
+        {"$sort": {"_id.date": 1}}
+    ]
+    
+    routine_data = await db.routine_sessions.aggregate(routine_pipeline).to_list(60)
+    
+    # Format data for charts
+    days = []
+    for i in range(7):
+        day = (start_date + timedelta(days=i+1)).strftime("%Y-%m-%d")
+        day_name = (start_date + timedelta(days=i+1)).strftime("%a")
+        
+        workout_day = next((w for w in workout_data if w["_id"] == day), None)
+        warmup_day = next((r for r in routine_data if r["_id"]["date"] == day and r["_id"]["type"] == "warmup"), None)
+        stretching_day = next((r for r in routine_data if r["_id"]["date"] == day and r["_id"]["type"] == "stretching"), None)
+        
+        days.append({
+            "date": day,
+            "day": day_name,
+            "workouts": workout_day["total_sessions"] if workout_day else 0,
+            "workouts_completed": workout_day["completed_sessions"] if workout_day else 0,
+            "warmups": warmup_day["total"] if warmup_day else 0,
+            "warmups_completed": warmup_day["completed"] if warmup_day else 0,
+            "stretching": stretching_day["total"] if stretching_day else 0,
+            "stretching_completed": stretching_day["completed"] if stretching_day else 0,
+            "duration_minutes": round(workout_day["total_duration"] / 60, 1) if workout_day else 0
+        })
+    
+    return {"evolution": days}
+
+@api_router.get("/admin/user/{user_id}/evolution")
+async def admin_get_user_evolution(user_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Données d'évolution d'un utilisateur spécifique"""
+    from datetime import timedelta
+    
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=30)
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    
+    # Get all workout sessions for this user
+    workout_sessions = await db.workout_sessions.find({
+        "user_id": user_id,
+        "started_at": {"$gte": start_date.isoformat()}
+    }, {"_id": 0}).sort("started_at", 1).to_list(100)
+    
+    # Get all routine sessions for this user
+    routine_sessions = await db.routine_sessions.find({
+        "user_id": user_id,
+        "started_at": {"$gte": start_date.isoformat()}
+    }, {"_id": 0}).sort("started_at", 1).to_list(200)
+    
+    # Aggregate by week
+    weeks_data = {}
+    for session in workout_sessions:
+        date = datetime.fromisoformat(session["started_at"].replace('Z', '+00:00'))
+        week_start = (date - timedelta(days=date.weekday())).strftime("%Y-%m-%d")
+        
+        if week_start not in weeks_data:
+            weeks_data[week_start] = {
+                "week": week_start,
+                "workouts": 0,
+                "workouts_completed": 0,
+                "warmups": 0,
+                "warmups_completed": 0,
+                "stretching": 0,
+                "stretching_completed": 0,
+                "total_duration": 0,
+                "discipline_score": 0
+            }
+        
+        weeks_data[week_start]["workouts"] += 1
+        if session.get("completed"):
+            weeks_data[week_start]["workouts_completed"] += 1
+            weeks_data[week_start]["total_duration"] += session.get("duration_seconds", 0)
+    
+    for session in routine_sessions:
+        date = datetime.fromisoformat(session["started_at"].replace('Z', '+00:00'))
+        week_start = (date - timedelta(days=date.weekday())).strftime("%Y-%m-%d")
+        
+        if week_start not in weeks_data:
+            weeks_data[week_start] = {
+                "week": week_start,
+                "workouts": 0,
+                "workouts_completed": 0,
+                "warmups": 0,
+                "warmups_completed": 0,
+                "stretching": 0,
+                "stretching_completed": 0,
+                "total_duration": 0,
+                "discipline_score": 0
+            }
+        
+        if session.get("routine_type") == "warmup":
+            weeks_data[week_start]["warmups"] += 1
+            if session.get("completed"):
+                weeks_data[week_start]["warmups_completed"] += 1
+        else:
+            weeks_data[week_start]["stretching"] += 1
+            if session.get("completed"):
+                weeks_data[week_start]["stretching_completed"] += 1
+    
+    # Calculate discipline score per week
+    for week in weeks_data.values():
+        if week["workouts_completed"] > 0:
+            week["discipline_score"] = min(100, round(
+                (week["warmups_completed"] + week["stretching_completed"]) / (week["workouts_completed"] * 2) * 100, 1
+            ))
+        week["total_duration"] = round(week["total_duration"] / 60, 1)  # Convert to minutes
+    
+    return {
+        "user": user,
+        "evolution": sorted(weeks_data.values(), key=lambda x: x["week"])
+    }
+
+@api_router.get("/admin/workout/{workout_id}/analytics")
+async def admin_get_workout_analytics(workout_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Analytiques détaillées d'une séance spécifique"""
+    workout = await db.workouts.find_one({"workout_id": workout_id}, {"_id": 0})
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    # Get all sessions for this workout
+    sessions = await db.workout_sessions.find(
+        {"workout_id": workout_id}, 
+        {"_id": 0}
+    ).sort("started_at", -1).to_list(200)
+    
+    # Aggregate stats
+    total_sessions = len(sessions)
+    completed_sessions = len([s for s in sessions if s.get("completed")])
+    total_duration = sum(s.get("duration_seconds", 0) for s in sessions if s.get("completed"))
+    avg_duration = round(total_duration / completed_sessions, 0) if completed_sessions > 0 else 0
+    
+    # Users who did this workout
+    user_ids = list(set(s.get("user_id") for s in sessions))
+    users_stats = []
+    
+    for uid in user_ids[:20]:  # Limit to 20 users
+        user = await db.users.find_one({"user_id": uid}, {"_id": 0, "name": 1, "email": 1})
+        user_sessions = [s for s in sessions if s.get("user_id") == uid]
+        user_completed = len([s for s in user_sessions if s.get("completed")])
+        user_duration = sum(s.get("duration_seconds", 0) for s in user_sessions if s.get("completed"))
+        
+        users_stats.append({
+            "user_id": uid,
+            "name": user.get("name", "Unknown") if user else "Unknown",
+            "email": user.get("email", "") if user else "",
+            "total_sessions": len(user_sessions),
+            "completed": user_completed,
+            "total_duration_minutes": round(user_duration / 60, 1)
+        })
+    
+    # Sort by completed sessions
+    users_stats.sort(key=lambda x: x["completed"], reverse=True)
+    
+    return {
+        "workout": {
+            "workout_id": workout_id,
+            "title": workout.get("title", ""),
+            "level": workout.get("level", ""),
+            "duration": workout.get("duration", 0)
+        },
+        "stats": {
+            "total_sessions": total_sessions,
+            "completed_sessions": completed_sessions,
+            "completion_rate": round(completed_sessions / total_sessions * 100, 1) if total_sessions > 0 else 0,
+            "avg_duration_seconds": avg_duration,
+            "total_duration_minutes": round(total_duration / 60, 1)
+        },
+        "users": users_stats,
+        "recent_sessions": sessions[:20]
+    }
+
 
 logging.basicConfig(
     level=logging.INFO,

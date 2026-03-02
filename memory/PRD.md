@@ -73,6 +73,11 @@ Application de fitness nommée "FitMaxPro" avec:
 - **Top 5 abonnés les plus disciplinés** avec score et détails
 - **Historique complet** de toutes les sessions (type, début, durée, statut)
 - **Vue détaillée par abonné** avec score de discipline et historique
+- **Graphiques d'évolution** :
+  - Activité des 7 derniers jours (Séances, Échauffements, Étirements)
+  - Temps d'entraînement par jour (minutes)
+  - Évolution mensuelle par utilisateur (score discipline, séances complétées)
+- **Analytics détaillées par séance** : utilisateurs, taux de complétion, durées
 
 ### 9. Admin Features ✅
 - Onglet Progress: Voir les progrès de tous les abonnés
@@ -103,6 +108,9 @@ Application de fitness nommée "FitMaxPro" avec:
 | `/api/admin/routines/{id}/exercises` | POST | Ajouter un exercice |
 | `/api/admin/routines/{id}/exercises/{index}` | DELETE | Supprimer un exercice |
 | `/api/reminders/{id}/send-email` | POST | Envoyer un email de rappel |
+| `/api/admin/analytics/evolution` | GET | Données d'évolution (7 jours) pour graphiques |
+| `/api/admin/user/{id}/evolution` | GET | Évolution mensuelle d'un utilisateur |
+| `/api/admin/workout/{id}/analytics` | GET | Analytics détaillées d'une séance |
 
 ## Test Credentials
 - Admin Email: mouctar08000@hotmail.com

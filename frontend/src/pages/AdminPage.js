@@ -34,11 +34,26 @@ import {
   Phone,
   VideoIcon,
   Flame,
-  Sparkles
+  Sparkles,
+  LineChart
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { 
+  LineChart as RechartsLineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Area,
+  AreaChart
+} from 'recharts';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -93,6 +108,11 @@ const AdminPage = () => {
   const [routineStats, setRoutineStats] = useState(null);
   const [routineSessions, setRoutineSessions] = useState([]);
   const [selectedUserRoutines, setSelectedUserRoutines] = useState(null);
+  
+  // Evolution/Charts states
+  const [evolutionData, setEvolutionData] = useState([]);
+  const [selectedUserEvolution, setSelectedUserEvolution] = useState(null);
+  const [selectedWorkoutAnalytics, setSelectedWorkoutAnalytics] = useState(null);
   
   // New workout creation states
   const [showCreateWorkout, setShowCreateWorkout] = useState(false);
@@ -208,6 +228,35 @@ const AdminPage = () => {
       setSelectedUserRoutines(response.data);
     } catch (error) {
       console.error('Error fetching user routine sessions:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  const fetchEvolutionData = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/analytics/evolution`, { headers: getAuthHeaders() });
+      setEvolutionData(response.data.evolution || []);
+    } catch (error) {
+      console.error('Error fetching evolution data:', error);
+    }
+  }, []);
+
+  const fetchUserEvolution = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/user/${userId}/evolution`, { headers: getAuthHeaders() });
+      setSelectedUserEvolution(response.data);
+    } catch (error) {
+      console.error('Error fetching user evolution:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  const fetchWorkoutDetailedAnalytics = async (workoutId) => {
+    try {
+      const response = await axios.get(`${API}/admin/workout/${workoutId}/analytics`, { headers: getAuthHeaders() });
+      setSelectedWorkoutAnalytics(response.data);
+    } catch (error) {
+      console.error('Error fetching workout analytics:', error);
       toast.error(isFr ? 'Erreur' : 'Error');
     }
   };
@@ -490,12 +539,13 @@ const AdminPage = () => {
         fetchUnreadCount(),
         fetchRoutines(),
         fetchRoutineStats(),
-        fetchRoutineSessions()
+        fetchRoutineSessions(),
+        fetchEvolutionData()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData]);
 
   // Check if user is admin
   useEffect(() => {
@@ -991,6 +1041,7 @@ const AdminPage = () => {
                       <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Taux' : 'Rate'}</th>
                       <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Durée Moy.' : 'Avg Duration'}</th>
                       <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Temps Total' : 'Total Time'}</th>
+                      <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Détails' : 'Details'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1010,10 +1061,20 @@ const AdminPage = () => {
                         <td className="p-4 text-yellow-400">{wa.completion_rate}</td>
                         <td className="p-4 text-gray-400">{wa.avg_duration_formatted}</td>
                         <td className="p-4 text-purple-400">{wa.total_duration_formatted}</td>
+                        <td className="p-4">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => fetchWorkoutDetailedAnalytics(wa.workout_id)}
+                            className="text-blue-400"
+                          >
+                            <BarChart3 className="w-4 h-4" />
+                          </Button>
+                        </td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan="6" className="p-8 text-center text-gray-400">
+                        <td colSpan="7" className="p-8 text-center text-gray-400">
                           {isFr ? 'Aucune donnée disponible' : 'No data available'}
                         </td>
                       </tr>
@@ -1021,6 +1082,86 @@ const AdminPage = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Selected Workout Analytics Detail */}
+              {selectedWorkoutAnalytics && (
+                <div className="bg-[#121212] border border-blue-500/30 rounded-lg p-6 mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      <Dumbbell className="w-5 h-5 text-blue-400" />
+                      {selectedWorkoutAnalytics.workout?.title} - {isFr ? 'Détails' : 'Details'}
+                    </h3>
+                    <Button variant="ghost" onClick={() => setSelectedWorkoutAnalytics(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-400">{selectedWorkoutAnalytics.stats?.total_sessions}</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Sessions' : 'Sessions'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-green-400">{selectedWorkoutAnalytics.stats?.completed_sessions}</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Complétées' : 'Completed'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-yellow-400">{selectedWorkoutAnalytics.stats?.completion_rate}%</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Taux' : 'Rate'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold">{Math.floor(selectedWorkoutAnalytics.stats?.avg_duration_seconds / 60)}m</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Durée Moy.' : 'Avg Duration'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-purple-400">{selectedWorkoutAnalytics.stats?.total_duration_minutes}m</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Temps Total' : 'Total Time'}</p>
+                    </div>
+                  </div>
+
+                  {/* Users who did this workout */}
+                  <h4 className="font-bold mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-[#EF4444]" />
+                    {isFr ? 'Utilisateurs ayant fait cette séance' : 'Users who did this workout'}
+                  </h4>
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {selectedWorkoutAnalytics.users?.map((user, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-[#09090b] rounded-lg p-3">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                            idx === 0 ? 'bg-yellow-500 text-black' : 
+                            idx === 1 ? 'bg-gray-400 text-black' : 
+                            idx === 2 ? 'bg-amber-600 text-white' : 
+                            'bg-[#27272a] text-white'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <p className="font-medium">{user.name}</p>
+                            <p className="text-gray-500 text-xs">{user.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">
+                            <span className="text-green-400">{user.completed}</span>
+                            <span className="text-gray-500">/{user.total_sessions}</span>
+                          </p>
+                          <p className="text-gray-500 text-xs">{user.total_duration_minutes}m {isFr ? 'total' : 'total'}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => fetchUserEvolution(user.user_id)}
+                          className="text-green-400"
+                        >
+                          <TrendingUp className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1133,14 +1274,26 @@ const AdminPage = () => {
                                 <span className="text-orange-400">{user.warmup_count}</span> + <span className="text-purple-400">{user.stretching_count}</span>
                               </p>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => fetchUserRoutineSessions(user._id)}
-                              className="text-blue-400"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => fetchUserEvolution(user._id)}
+                                className="text-green-400"
+                                title={isFr ? "Voir évolution" : "View evolution"}
+                              >
+                                <TrendingUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => fetchUserRoutineSessions(user._id)}
+                                className="text-blue-400"
+                                title={isFr ? "Voir détails" : "View details"}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1148,6 +1301,104 @@ const AdminPage = () => {
                       <p className="text-gray-500 text-center py-4">{isFr ? 'Aucune donnée' : 'No data yet'}</p>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Evolution Charts */}
+              {evolutionData.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Weekly Activity Chart */}
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                    <h3 className="font-bold mb-4 flex items-center gap-2">
+                      <LineChart className="w-5 h-5 text-blue-400" />
+                      {isFr ? 'Activité des 7 Derniers Jours' : 'Last 7 Days Activity'}
+                    </h3>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <AreaChart data={evolutionData}>
+                        <defs>
+                          <linearGradient id="colorWorkouts" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#EF4444" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="colorWarmups" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#F97316" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#F97316" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="colorStretching" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#A855F7" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#A855F7" stopOpacity={0.1}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                        <XAxis dataKey="day" stroke="#666" />
+                        <YAxis stroke="#666" />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#121212', border: '1px solid #27272a', borderRadius: '8px' }}
+                          labelStyle={{ color: '#fff' }}
+                        />
+                        <Legend />
+                        <Area type="monotone" dataKey="workouts_completed" name={isFr ? "Séances" : "Workouts"} stroke="#EF4444" fillOpacity={1} fill="url(#colorWorkouts)" />
+                        <Area type="monotone" dataKey="warmups_completed" name={isFr ? "Échauffements" : "Warm-Ups"} stroke="#F97316" fillOpacity={1} fill="url(#colorWarmups)" />
+                        <Area type="monotone" dataKey="stretching_completed" name={isFr ? "Étirements" : "Stretching"} stroke="#A855F7" fillOpacity={1} fill="url(#colorStretching)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Duration Chart */}
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                    <h3 className="font-bold mb-4 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-green-400" />
+                      {isFr ? 'Temps d\'Entraînement (minutes)' : 'Training Time (minutes)'}
+                    </h3>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={evolutionData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                        <XAxis dataKey="day" stroke="#666" />
+                        <YAxis stroke="#666" />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#121212', border: '1px solid #27272a', borderRadius: '8px' }}
+                          labelStyle={{ color: '#fff' }}
+                        />
+                        <Bar dataKey="duration_minutes" name={isFr ? "Durée (min)" : "Duration (min)"} fill="#22C55E" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* User Evolution Detail Modal */}
+              {selectedUserEvolution && (
+                <div className="bg-[#121212] border border-blue-500/30 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-blue-400" />
+                      {selectedUserEvolution.user?.name} - {isFr ? 'Évolution Mensuelle' : 'Monthly Evolution'}
+                    </h3>
+                    <Button variant="ghost" onClick={() => setSelectedUserEvolution(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  
+                  {selectedUserEvolution.evolution?.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <RechartsLineChart data={selectedUserEvolution.evolution}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                        <XAxis dataKey="week" stroke="#666" tickFormatter={(val) => val.slice(5)} />
+                        <YAxis stroke="#666" />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#121212', border: '1px solid #27272a', borderRadius: '8px' }}
+                          labelStyle={{ color: '#fff' }}
+                        />
+                        <Legend />
+                        <Line type="monotone" dataKey="discipline_score" name={isFr ? "Score Discipline %" : "Discipline Score %"} stroke="#22C55E" strokeWidth={3} dot={{ fill: '#22C55E' }} />
+                        <Line type="monotone" dataKey="workouts_completed" name={isFr ? "Séances" : "Workouts"} stroke="#EF4444" strokeWidth={2} />
+                        <Line type="monotone" dataKey="warmups_completed" name={isFr ? "Échauffements" : "Warm-Ups"} stroke="#F97316" strokeWidth={2} />
+                        <Line type="monotone" dataKey="stretching_completed" name={isFr ? "Étirements" : "Stretching"} stroke="#A855F7" strokeWidth={2} />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-gray-500 text-center py-8">{isFr ? 'Pas assez de données' : 'Not enough data'}</p>
+                  )}
                 </div>
               )}
 
