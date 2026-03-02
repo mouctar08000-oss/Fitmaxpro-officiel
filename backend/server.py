@@ -2086,6 +2086,136 @@ async def update_reminder_email_settings(
     return {"message": f"Email notifications {'enabled' if send_email else 'disabled'}"}
 
 
+# ==================== ADMIN ROUTINE SESSIONS TRACKING ====================
+
+@api_router.get("/admin/routine-sessions")
+async def admin_get_all_routine_sessions(admin: User = Depends(verify_admin)):
+    """Admin: Récupérer toutes les sessions d'échauffement et d'étirements"""
+    sessions = await db.routine_sessions.find({}, {"_id": 0}).sort("started_at", -1).to_list(500)
+    
+    # Enrichir avec les informations utilisateur
+    enriched_sessions = []
+    for session in sessions:
+        user = await db.users.find_one({"user_id": session.get("user_id")}, {"_id": 0, "name": 1, "email": 1})
+        enriched_sessions.append({
+            **session,
+            "user_name": user.get("name", "Unknown") if user else "Unknown",
+            "user_email": user.get("email", "") if user else ""
+        })
+    
+    return {"routine_sessions": enriched_sessions}
+
+@api_router.get("/admin/routine-sessions/stats")
+async def admin_get_routine_stats(admin: User = Depends(verify_admin)):
+    """Admin: Statistiques globales des échauffements et étirements"""
+    # Total sessions
+    total_warmup = await db.routine_sessions.count_documents({"routine_type": "warmup"})
+    total_stretching = await db.routine_sessions.count_documents({"routine_type": "stretching"})
+    
+    # Completed sessions
+    completed_warmup = await db.routine_sessions.count_documents({"routine_type": "warmup", "completed": True})
+    completed_stretching = await db.routine_sessions.count_documents({"routine_type": "stretching", "completed": True})
+    
+    # Average duration
+    warmup_pipeline = [
+        {"$match": {"routine_type": "warmup", "completed": True, "duration_seconds": {"$gt": 0}}},
+        {"$group": {"_id": None, "avg_duration": {"$avg": "$duration_seconds"}}}
+    ]
+    stretching_pipeline = [
+        {"$match": {"routine_type": "stretching", "completed": True, "duration_seconds": {"$gt": 0}}},
+        {"$group": {"_id": None, "avg_duration": {"$avg": "$duration_seconds"}}}
+    ]
+    
+    warmup_avg = await db.routine_sessions.aggregate(warmup_pipeline).to_list(1)
+    stretching_avg = await db.routine_sessions.aggregate(stretching_pipeline).to_list(1)
+    
+    # Users with most completed routines (discipline score)
+    discipline_pipeline = [
+        {"$match": {"completed": True}},
+        {"$group": {
+            "_id": "$user_id",
+            "total_completed": {"$sum": 1},
+            "warmup_count": {"$sum": {"$cond": [{"$eq": ["$routine_type", "warmup"]}, 1, 0]}},
+            "stretching_count": {"$sum": {"$cond": [{"$eq": ["$routine_type", "stretching"]}, 1, 0]}},
+            "total_time": {"$sum": "$duration_seconds"}
+        }},
+        {"$sort": {"total_completed": -1}},
+        {"$limit": 10}
+    ]
+    
+    top_disciplined = await db.routine_sessions.aggregate(discipline_pipeline).to_list(10)
+    
+    # Enrich with user names
+    for entry in top_disciplined:
+        user = await db.users.find_one({"user_id": entry["_id"]}, {"name": 1, "email": 1})
+        entry["user_name"] = user.get("name", "Unknown") if user else "Unknown"
+        entry["user_email"] = user.get("email", "") if user else ""
+    
+    return {
+        "warmup": {
+            "total": total_warmup,
+            "completed": completed_warmup,
+            "completion_rate": round((completed_warmup / total_warmup * 100), 1) if total_warmup > 0 else 0,
+            "avg_duration_seconds": round(warmup_avg[0]["avg_duration"], 0) if warmup_avg else 0
+        },
+        "stretching": {
+            "total": total_stretching,
+            "completed": completed_stretching,
+            "completion_rate": round((completed_stretching / total_stretching * 100), 1) if total_stretching > 0 else 0,
+            "avg_duration_seconds": round(stretching_avg[0]["avg_duration"], 0) if stretching_avg else 0
+        },
+        "top_disciplined_users": top_disciplined
+    }
+
+@api_router.get("/admin/user/{user_id}/routine-sessions")
+async def admin_get_user_routine_sessions(user_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Récupérer les sessions d'échauffement et d'étirements d'un utilisateur"""
+    sessions = await db.routine_sessions.find(
+        {"user_id": user_id}, 
+        {"_id": 0}
+    ).sort("started_at", -1).to_list(100)
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    
+    # Calculer les statistiques
+    warmup_sessions = [s for s in sessions if s.get("routine_type") == "warmup"]
+    stretching_sessions = [s for s in sessions if s.get("routine_type") == "stretching"]
+    
+    warmup_completed = len([s for s in warmup_sessions if s.get("completed")])
+    stretching_completed = len([s for s in stretching_sessions if s.get("completed")])
+    
+    total_warmup_time = sum(s.get("duration_seconds", 0) for s in warmup_sessions if s.get("completed"))
+    total_stretching_time = sum(s.get("duration_seconds", 0) for s in stretching_sessions if s.get("completed"))
+    
+    # Score de discipline (% de séances complétées avec échauffement ET étirements)
+    workout_sessions = await db.workout_sessions.find({"user_id": user_id, "completed": True}).to_list(100)
+    total_workouts = len(workout_sessions)
+    
+    discipline_score = 0
+    if total_workouts > 0:
+        # Un utilisateur discipliné fait échauffement + étirements pour chaque séance
+        discipline_score = min(100, round((warmup_completed + stretching_completed) / (total_workouts * 2) * 100, 1))
+    
+    return {
+        "user": user,
+        "sessions": sessions,
+        "stats": {
+            "warmup": {
+                "total": len(warmup_sessions),
+                "completed": warmup_completed,
+                "total_time_seconds": total_warmup_time
+            },
+            "stretching": {
+                "total": len(stretching_sessions),
+                "completed": stretching_completed,
+                "total_time_seconds": total_stretching_time
+            },
+            "discipline_score": discipline_score,
+            "total_workouts": total_workouts
+        }
+    }
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'

@@ -67,7 +67,14 @@ Application de fitness nommée "FitMaxPro" avec:
 - **Ajout** de nouveaux exercices
 - **Suppression** d'exercices existants
 
-### 8. Admin Features ✅
+### 8. Admin Discipline Tracking ✅ NEW (March 2026)
+- **Onglet "Discipline"** dans le panneau admin
+- **Statistiques globales** échauffements et étirements (total, complétés, taux, durée moyenne)
+- **Top 5 abonnés les plus disciplinés** avec score et détails
+- **Historique complet** de toutes les sessions (type, début, durée, statut)
+- **Vue détaillée par abonné** avec score de discipline et historique
+
+### 9. Admin Features ✅
 - Onglet Progress: Voir les progrès de tous les abonnés
 - Onglet Messages: Recevoir et répondre aux messages des abonnés
 - Gestion complète des séances, nutrition, utilisateurs
@@ -129,13 +136,12 @@ Application de fitness nommée "FitMaxPro" avec:
 
 ## Known Issues
 - ⚠️ Export GitHub - Bug plateforme Emergent (en attente du support)
-- ⚠️ Emails - Clé Resend de démo (re_demo_key) - L'utilisateur doit configurer sa propre clé API
 
 ## 3rd Party Integrations
 | Service | Usage | Status |
 |---------|-------|--------|
 | Stripe | Paiements | ✅ Configuré avec clé test |
-| Resend | Emails de rappel | ⚠️ Clé de démo (MOCKED) |
+| Resend | Emails de rappel | ✅ Configuré et fonctionnel |
 | YouTube | Vidéos exercices | ✅ Embeds fonctionnels |
 | Pexels | Images stock | ✅ URLs utilisées |
 

@@ -89,6 +89,11 @@ const AdminPage = () => {
     video_url: ''
   });
   
+  // Discipline tracking states
+  const [routineStats, setRoutineStats] = useState(null);
+  const [routineSessions, setRoutineSessions] = useState([]);
+  const [selectedUserRoutines, setSelectedUserRoutines] = useState(null);
+  
   // New workout creation states
   const [showCreateWorkout, setShowCreateWorkout] = useState(false);
   const [newWorkout, setNewWorkout] = useState({
@@ -178,6 +183,34 @@ const AdminPage = () => {
       console.error('Error fetching routines:', error);
     }
   }, []);
+
+  const fetchRoutineStats = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/routine-sessions/stats`, { headers: getAuthHeaders() });
+      setRoutineStats(response.data);
+    } catch (error) {
+      console.error('Error fetching routine stats:', error);
+    }
+  }, []);
+
+  const fetchRoutineSessions = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/routine-sessions`, { headers: getAuthHeaders() });
+      setRoutineSessions(response.data.routine_sessions || []);
+    } catch (error) {
+      console.error('Error fetching routine sessions:', error);
+    }
+  }, []);
+
+  const fetchUserRoutineSessions = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/user/${userId}/routine-sessions`, { headers: getAuthHeaders() });
+      setSelectedUserRoutines(response.data);
+    } catch (error) {
+      console.error('Error fetching user routine sessions:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
 
   const fetchUserSessions = async (userId) => {
     try {
@@ -455,12 +488,14 @@ const AdminPage = () => {
         fetchUserProgress(),
         fetchUsersWithMessages(),
         fetchUnreadCount(),
-        fetchRoutines()
+        fetchRoutines(),
+        fetchRoutineStats(),
+        fetchRoutineSessions()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions]);
 
   // Check if user is admin
   useEffect(() => {
@@ -568,6 +603,7 @@ const AdminPage = () => {
               { id: 'dashboard', icon: BarChart3, label: isFr ? 'Tableau de bord' : 'Dashboard' },
               { id: 'subscribers', icon: Users, label: isFr ? 'Abonnés' : 'Subscribers' },
               { id: 'progress', icon: TrendingUp, label: isFr ? 'Progrès' : 'Progress' },
+              { id: 'discipline', icon: Timer, label: isFr ? 'Discipline' : 'Discipline' },
               { id: 'messages', icon: MessageCircle, label: isFr ? 'Messages' : 'Messages', badge: unreadCount },
               { id: 'analytics', icon: Activity, label: isFr ? 'Analytiques' : 'Analytics' },
               { id: 'workouts', icon: Dumbbell, label: isFr ? 'Séances' : 'Workouts' },
@@ -984,6 +1020,297 @@ const AdminPage = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Discipline Tab - Warmup & Stretching Tracking */}
+          {activeTab === 'discipline' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Timer className="w-5 h-5 text-green-400" />
+                  {isFr ? 'Suivi de Discipline - Échauffements & Étirements' : 'Discipline Tracking - Warm-Up & Stretching'}
+                </h2>
+                <Button 
+                  onClick={() => { fetchRoutineStats(); fetchRoutineSessions(); }}
+                  variant="outline"
+                  className="border-[#27272a]"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {isFr ? 'Actualiser' : 'Refresh'}
+                </Button>
+              </div>
+
+              {/* Global Stats Cards */}
+              {routineStats && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Warmup Stats */}
+                  <div className="bg-gradient-to-br from-orange-500/20 to-orange-500/5 border border-orange-500/30 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Flame className="w-8 h-8 text-orange-400" />
+                      <div>
+                        <h3 className="font-bold text-orange-400">{isFr ? 'Échauffements' : 'Warm-Ups'}</h3>
+                        <p className="text-gray-400 text-xs">{isFr ? 'Sessions totales' : 'Total sessions'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Total' : 'Total'}</span>
+                        <span className="font-bold">{routineStats.warmup.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Complétés' : 'Completed'}</span>
+                        <span className="font-bold text-green-400">{routineStats.warmup.completed}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Taux' : 'Rate'}</span>
+                        <span className="font-bold text-orange-400">{routineStats.warmup.completion_rate}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Durée moy.' : 'Avg duration'}</span>
+                        <span className="font-bold">{Math.floor(routineStats.warmup.avg_duration_seconds / 60)}m {routineStats.warmup.avg_duration_seconds % 60}s</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stretching Stats */}
+                  <div className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border border-purple-500/30 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Sparkles className="w-8 h-8 text-purple-400" />
+                      <div>
+                        <h3 className="font-bold text-purple-400">{isFr ? 'Étirements' : 'Stretching'}</h3>
+                        <p className="text-gray-400 text-xs">{isFr ? 'Sessions totales' : 'Total sessions'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Total' : 'Total'}</span>
+                        <span className="font-bold">{routineStats.stretching.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Complétés' : 'Completed'}</span>
+                        <span className="font-bold text-green-400">{routineStats.stretching.completed}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Taux' : 'Rate'}</span>
+                        <span className="font-bold text-purple-400">{routineStats.stretching.completion_rate}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">{isFr ? 'Durée moy.' : 'Avg duration'}</span>
+                        <span className="font-bold">{Math.floor(routineStats.stretching.avg_duration_seconds / 60)}m {routineStats.stretching.avg_duration_seconds % 60}s</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top Disciplined Users */}
+                  <div className="md:col-span-2 bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                    <h3 className="font-bold text-green-400 mb-4 flex items-center gap-2">
+                      <Crown className="w-5 h-5" />
+                      {isFr ? 'Top 5 Abonnés les Plus Disciplinés' : 'Top 5 Most Disciplined Subscribers'}
+                    </h3>
+                    {routineStats.top_disciplined_users?.length > 0 ? (
+                      <div className="space-y-3">
+                        {routineStats.top_disciplined_users.slice(0, 5).map((user, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-[#09090b] rounded-lg p-3">
+                            <div className="flex items-center gap-3">
+                              <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                                idx === 0 ? 'bg-yellow-500 text-black' : 
+                                idx === 1 ? 'bg-gray-400 text-black' : 
+                                idx === 2 ? 'bg-amber-600 text-white' : 
+                                'bg-[#27272a] text-white'
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <p className="font-medium">{user.user_name}</p>
+                                <p className="text-gray-500 text-xs">{user.user_email}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-green-400">{user.total_completed} {isFr ? 'routines' : 'routines'}</p>
+                              <p className="text-gray-500 text-xs">
+                                <span className="text-orange-400">{user.warmup_count}</span> + <span className="text-purple-400">{user.stretching_count}</span>
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => fetchUserRoutineSessions(user._id)}
+                              className="text-blue-400"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">{isFr ? 'Aucune donnée' : 'No data yet'}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected User Details */}
+              {selectedUserRoutines && (
+                <div className="bg-[#121212] border border-green-500/30 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      <UserCog className="w-5 h-5 text-green-400" />
+                      {selectedUserRoutines.user?.name || 'Unknown'} - {isFr ? 'Détails Discipline' : 'Discipline Details'}
+                    </h3>
+                    <Button variant="ghost" onClick={() => setSelectedUserRoutines(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* User Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-3xl font-bold text-green-400">{selectedUserRoutines.stats.discipline_score}%</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Score Discipline' : 'Discipline Score'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold">{selectedUserRoutines.stats.total_workouts}</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Séances Totales' : 'Total Workouts'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center border border-orange-500/30">
+                      <p className="text-2xl font-bold text-orange-400">{selectedUserRoutines.stats.warmup.completed}</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Échauffements' : 'Warm-Ups'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center border border-purple-500/30">
+                      <p className="text-2xl font-bold text-purple-400">{selectedUserRoutines.stats.stretching.completed}</p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Étirements' : 'Stretching'}</p>
+                    </div>
+                    <div className="bg-[#09090b] rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-400">
+                        {Math.floor((selectedUserRoutines.stats.warmup.total_time_seconds + selectedUserRoutines.stats.stretching.total_time_seconds) / 60)}m
+                      </p>
+                      <p className="text-gray-500 text-xs">{isFr ? 'Temps Total' : 'Total Time'}</p>
+                    </div>
+                  </div>
+
+                  {/* Sessions History */}
+                  <h4 className="font-bold mb-3">{isFr ? 'Historique des Sessions' : 'Sessions History'}</h4>
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {selectedUserRoutines.sessions?.length > 0 ? selectedUserRoutines.sessions.map((session, idx) => (
+                      <div key={idx} className={`flex items-center justify-between p-3 rounded-lg ${
+                        session.routine_type === 'warmup' ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-purple-500/10 border border-purple-500/20'
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          {session.routine_type === 'warmup' ? (
+                            <Flame className="w-5 h-5 text-orange-400" />
+                          ) : (
+                            <Sparkles className="w-5 h-5 text-purple-400" />
+                          )}
+                          <div>
+                            <p className={`font-medium ${session.routine_type === 'warmup' ? 'text-orange-400' : 'text-purple-400'}`}>
+                              {session.routine_type === 'warmup' ? (isFr ? 'Échauffement' : 'Warm-Up') : (isFr ? 'Étirements' : 'Stretching')}
+                            </p>
+                            <p className="text-gray-500 text-xs">
+                              {new Date(session.started_at).toLocaleString(isFr ? 'fr-FR' : 'en-US')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`font-bold ${session.completed ? 'text-green-400' : 'text-red-400'}`}>
+                            {session.completed ? (isFr ? 'Complété' : 'Completed') : (isFr ? 'Abandonné' : 'Abandoned')}
+                          </p>
+                          <p className="text-gray-500 text-xs">
+                            {Math.floor(session.duration_seconds / 60)}m {session.duration_seconds % 60}s
+                          </p>
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-gray-500 text-center py-4">{isFr ? 'Aucune session' : 'No sessions'}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Sessions Table */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg overflow-hidden">
+                <h3 className="font-bold p-4 border-b border-[#27272a] flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-[#EF4444]" />
+                  {isFr ? 'Sessions Récentes (Échauffements & Étirements)' : 'Recent Sessions (Warm-Up & Stretching)'}
+                </h3>
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-[#1a1a1a] sticky top-0">
+                      <tr>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Abonné' : 'Subscriber'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Type' : 'Type'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Début' : 'Started'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Durée' : 'Duration'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Statut' : 'Status'}</th>
+                        <th className="text-left p-3 text-gray-400 text-sm">{isFr ? 'Action' : 'Action'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {routineSessions.length > 0 ? routineSessions.slice(0, 50).map((session, idx) => (
+                        <tr key={idx} className="border-t border-[#27272a] hover:bg-[#1a1a1a]">
+                          <td className="p-3">
+                            <p className="font-medium">{session.user_name}</p>
+                            <p className="text-gray-500 text-xs">{session.user_email}</p>
+                          </td>
+                          <td className="p-3">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm ${
+                              session.routine_type === 'warmup' 
+                                ? 'bg-orange-500/20 text-orange-400' 
+                                : 'bg-purple-500/20 text-purple-400'
+                            }`}>
+                              {session.routine_type === 'warmup' ? (
+                                <><Flame className="w-3 h-3" /> {isFr ? 'Échauffement' : 'Warm-Up'}</>
+                              ) : (
+                                <><Sparkles className="w-3 h-3" /> {isFr ? 'Étirements' : 'Stretching'}</>
+                              )}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-400 text-sm">
+                            {new Date(session.started_at).toLocaleString(isFr ? 'fr-FR' : 'en-US', {
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="p-3">
+                            <span className="font-mono">{Math.floor(session.duration_seconds / 60)}m {session.duration_seconds % 60}s</span>
+                          </td>
+                          <td className="p-3">
+                            {session.completed ? (
+                              <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-sm flex items-center gap-1 w-fit">
+                                <Check className="w-3 h-3" />
+                                {isFr ? 'Complété' : 'Completed'}
+                              </span>
+                            ) : (
+                              <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded text-sm flex items-center gap-1 w-fit">
+                                <X className="w-3 h-3" />
+                                {isFr ? 'Abandonné' : 'Abandoned'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => fetchUserRoutineSessions(session.user_id)}
+                              className="text-blue-400"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="6" className="p-8 text-center text-gray-400">
+                            {isFr ? 'Aucune session d\'échauffement ou d\'étirement enregistrée' : 'No warm-up or stretching sessions recorded'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
