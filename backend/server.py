@@ -2921,6 +2921,484 @@ async def admin_delete_review(review_id: str, admin: User = Depends(verify_admin
     return {"message": "Review deleted"}
 
 
+# ==================== INACTIVE USER ALERTS SYSTEM ====================
+
+class InactiveAlertSettings(BaseModel):
+    inactive_days_threshold: int = 7  # Days without activity
+    email_enabled: bool = True
+    push_enabled: bool = True
+    custom_message_fr: Optional[str] = None
+    custom_message_en: Optional[str] = None
+
+@api_router.get("/admin/inactive-users")
+async def get_inactive_users(days: int = 7, admin: User = Depends(verify_admin)):
+    """Admin: Get list of inactive users"""
+    threshold_date = datetime.now(timezone.utc) - timedelta(days=days)
+    
+    # Get all active subscribers
+    users = await db.users.find(
+        {"subscription_status": "active"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(1000)
+    
+    inactive_users = []
+    for user in users:
+        # Check last activity (workout, running, login)
+        last_workout = await db.workout_history.find_one(
+            {"user_id": user["user_id"]},
+            sort=[("completed_at", -1)]
+        )
+        last_run = await db.running_sessions.find_one(
+            {"user_id": user["user_id"]},
+            sort=[("start_time", -1)]
+        )
+        last_session = await db.user_sessions.find_one(
+            {"user_id": user["user_id"]},
+            sort=[("created_at", -1)]
+        )
+        
+        # Find most recent activity
+        activities = []
+        if last_workout and last_workout.get("completed_at"):
+            activities.append(last_workout["completed_at"])
+        if last_run and last_run.get("start_time"):
+            activities.append(last_run["start_time"])
+        if last_session and last_session.get("created_at"):
+            activities.append(last_session["created_at"])
+        
+        if activities:
+            # Parse dates and find most recent
+            last_activity = None
+            for act in activities:
+                if isinstance(act, str):
+                    act_date = datetime.fromisoformat(act.replace('Z', '+00:00'))
+                else:
+                    act_date = act
+                if act_date.tzinfo is None:
+                    act_date = act_date.replace(tzinfo=timezone.utc)
+                if last_activity is None or act_date > last_activity:
+                    last_activity = act_date
+            
+            if last_activity < threshold_date:
+                days_inactive = (datetime.now(timezone.utc) - last_activity).days
+                inactive_users.append({
+                    "user_id": user["user_id"],
+                    "name": user["name"],
+                    "email": user["email"],
+                    "subscription_tier": user.get("subscription_tier", "standard"),
+                    "last_activity": last_activity.isoformat(),
+                    "days_inactive": days_inactive
+                })
+        else:
+            # No activity found at all
+            created_at = user.get("created_at")
+            if isinstance(created_at, str):
+                created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            else:
+                created_date = created_at or datetime.now(timezone.utc)
+            
+            if created_date.tzinfo is None:
+                created_date = created_date.replace(tzinfo=timezone.utc)
+            
+            if created_date < threshold_date:
+                days_inactive = (datetime.now(timezone.utc) - created_date).days
+                inactive_users.append({
+                    "user_id": user["user_id"],
+                    "name": user["name"],
+                    "email": user["email"],
+                    "subscription_tier": user.get("subscription_tier", "standard"),
+                    "last_activity": None,
+                    "days_inactive": days_inactive
+                })
+    
+    # Sort by days inactive (most inactive first)
+    inactive_users.sort(key=lambda x: x["days_inactive"], reverse=True)
+    
+    return {
+        "inactive_users": inactive_users,
+        "total_count": len(inactive_users),
+        "threshold_days": days
+    }
+
+@api_router.post("/admin/inactive-users/send-reminder")
+async def send_inactive_reminder(user_ids: List[str], message_fr: str = None, message_en: str = None, admin: User = Depends(verify_admin)):
+    """Admin: Send reminder to inactive users"""
+    results = {"sent": 0, "failed": 0, "emails": []}
+    
+    default_message_fr = "Vous nous manquez ! Revenez sur FitMaxPro pour continuer votre progression. Vos objectifs vous attendent !"
+    default_message_en = "We miss you! Come back to FitMaxPro to continue your progress. Your goals are waiting!"
+    
+    for user_id in user_ids:
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if user and user.get("email"):
+            try:
+                # Try to send email via Resend if configured
+                resend_api_key = os.environ.get('RESEND_API_KEY')
+                if resend_api_key:
+                    import resend
+                    resend.api_key = resend_api_key
+                    
+                    # Detect user language preference (default to French)
+                    is_french = True  # Could check user preference
+                    subject = "On vous attend sur FitMaxPro !" if is_french else "We're waiting for you on FitMaxPro!"
+                    message = message_fr or default_message_fr if is_french else message_en or default_message_en
+                    
+                    html_content = f"""
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: white; padding: 40px;">
+                        <h1 style="color: #EF4444; text-align: center;">FITMAXPRO</h1>
+                        <h2 style="text-align: center;">{"Salut" if is_french else "Hey"} {user.get("name", "Champion")} !</h2>
+                        <p style="font-size: 16px; line-height: 1.6; text-align: center;">{message}</p>
+                        <div style="text-align: center; margin-top: 30px;">
+                            <a href="{APP_URL}/dashboard" style="background: #EF4444; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                                {"Reprendre l'entraînement" if is_french else "Resume Training"}
+                            </a>
+                        </div>
+                        <p style="text-align: center; margin-top: 30px; color: #888; font-size: 12px;">
+                            {"L'équipe FitMaxPro" if is_french else "The FitMaxPro Team"}
+                        </p>
+                    </div>
+                    """
+                    
+                    resend.Emails.send({
+                        "from": "FitMaxPro <noreply@fitmax-gains.com>",
+                        "to": user["email"],
+                        "subject": subject,
+                        "html": html_content
+                    })
+                    results["sent"] += 1
+                    results["emails"].append(user["email"])
+                else:
+                    # Log for manual sending
+                    await db.pending_emails.insert_one({
+                        "email_id": str(uuid.uuid4()),
+                        "to": user["email"],
+                        "user_name": user.get("name"),
+                        "type": "inactive_reminder",
+                        "message_fr": message_fr or default_message_fr,
+                        "message_en": message_en or default_message_en,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "status": "pending"
+                    })
+                    results["sent"] += 1
+                    results["emails"].append(user["email"])
+            except Exception as e:
+                print(f"Failed to send email to {user.get('email')}: {e}")
+                results["failed"] += 1
+    
+    return results
+
+@api_router.get("/admin/alert-settings")
+async def get_alert_settings(admin: User = Depends(verify_admin)):
+    """Get inactive alert settings"""
+    settings = await db.settings.find_one({"type": "inactive_alerts"}, {"_id": 0})
+    return settings or {
+        "type": "inactive_alerts",
+        "inactive_days_threshold": 7,
+        "email_enabled": True,
+        "push_enabled": True,
+        "auto_send_enabled": False,
+        "custom_message_fr": None,
+        "custom_message_en": None
+    }
+
+@api_router.put("/admin/alert-settings")
+async def update_alert_settings(settings: InactiveAlertSettings, admin: User = Depends(verify_admin)):
+    """Update inactive alert settings"""
+    await db.settings.update_one(
+        {"type": "inactive_alerts"},
+        {"$set": {
+            "type": "inactive_alerts",
+            **settings.dict()
+        }},
+        upsert=True
+    )
+    return {"message": "Settings updated"}
+
+
+# ==================== ANNUAL SUBSCRIPTION LOGIC ====================
+
+@api_router.get("/subscription/can-cancel")
+async def check_can_cancel(current_user: User = Depends(get_current_user)):
+    """Check if user can cancel their subscription"""
+    subscription = await db.subscriptions.find_one(
+        {"user_id": current_user.user_id, "status": "active"},
+        {"_id": 0}
+    )
+    
+    if not subscription:
+        return {"can_cancel": False, "reason": "No active subscription"}
+    
+    plan_type = subscription.get("plan_type", "monthly")
+    
+    # Monthly subscriptions can always be cancelled
+    if plan_type == "monthly":
+        return {
+            "can_cancel": True,
+            "plan_type": "monthly",
+            "message_fr": "Vous pouvez annuler à tout moment",
+            "message_en": "You can cancel anytime"
+        }
+    
+    # Annual subscriptions have restrictions
+    if plan_type == "annual":
+        start_date_str = subscription.get("start_date") or subscription.get("created_at")
+        if start_date_str:
+            if isinstance(start_date_str, str):
+                start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+            else:
+                start_date = start_date_str
+            
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            
+            # Calculate days remaining in commitment
+            commitment_end = start_date + timedelta(days=365)
+            now = datetime.now(timezone.utc)
+            
+            if now < commitment_end:
+                days_remaining = (commitment_end - now).days
+                return {
+                    "can_cancel": False,
+                    "plan_type": "annual",
+                    "commitment_end": commitment_end.isoformat(),
+                    "days_remaining": days_remaining,
+                    "message_fr": f"Votre engagement annuel se termine dans {days_remaining} jours. L'annulation sera possible après cette date.",
+                    "message_en": f"Your annual commitment ends in {days_remaining} days. Cancellation will be possible after this date."
+                }
+            else:
+                return {
+                    "can_cancel": True,
+                    "plan_type": "annual",
+                    "message_fr": "Votre période d'engagement est terminée. Vous pouvez annuler.",
+                    "message_en": "Your commitment period has ended. You can cancel."
+                }
+    
+    return {"can_cancel": True, "plan_type": plan_type}
+
+@api_router.post("/subscription/request-cancel")
+async def request_subscription_cancel(reason: str = None, current_user: User = Depends(get_current_user)):
+    """Request to cancel subscription"""
+    can_cancel_response = await check_can_cancel(current_user)
+    
+    if not can_cancel_response.get("can_cancel"):
+        raise HTTPException(
+            status_code=400, 
+            detail=can_cancel_response.get("message_en", "Cannot cancel subscription at this time")
+        )
+    
+    # Log cancellation request
+    await db.cancellation_requests.insert_one({
+        "request_id": str(uuid.uuid4()),
+        "user_id": current_user.user_id,
+        "user_email": current_user.email,
+        "reason": reason,
+        "plan_type": can_cancel_response.get("plan_type"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "pending"
+    })
+    
+    # Update subscription status
+    await db.subscriptions.update_one(
+        {"user_id": current_user.user_id, "status": "active"},
+        {"$set": {"status": "pending_cancellation", "cancel_requested_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {
+        "message": "Cancellation request submitted",
+        "message_fr": "Demande d'annulation soumise",
+        "message_en": "Cancellation request submitted"
+    }
+
+@api_router.get("/admin/cancellation-requests")
+async def get_cancellation_requests(admin: User = Depends(verify_admin)):
+    """Admin: Get all cancellation requests"""
+    requests = await db.cancellation_requests.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return {"requests": requests}
+
+@api_router.put("/admin/cancellation-requests/{request_id}/process")
+async def process_cancellation(request_id: str, action: str, admin: User = Depends(verify_admin)):
+    """Admin: Process a cancellation request (approve/reject)"""
+    request_doc = await db.cancellation_requests.find_one({"request_id": request_id})
+    if not request_doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    if action == "approve":
+        # Cancel the subscription
+        await db.subscriptions.update_one(
+            {"user_id": request_doc["user_id"]},
+            {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        await db.users.update_one(
+            {"user_id": request_doc["user_id"]},
+            {"$set": {"subscription_status": "inactive", "subscription_tier": "none"}}
+        )
+        await db.cancellation_requests.update_one(
+            {"request_id": request_id},
+            {"$set": {"status": "approved", "processed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"message": "Subscription cancelled"}
+    
+    elif action == "reject":
+        await db.subscriptions.update_one(
+            {"user_id": request_doc["user_id"], "status": "pending_cancellation"},
+            {"$set": {"status": "active"}}
+        )
+        await db.cancellation_requests.update_one(
+            {"request_id": request_id},
+            {"$set": {"status": "rejected", "processed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"message": "Cancellation rejected"}
+    
+    raise HTTPException(status_code=400, detail="Invalid action")
+
+
+# ==================== IN-APP PURCHASES PREPARATION (RevenueCat) ====================
+
+class IAPReceipt(BaseModel):
+    platform: str  # "ios" or "android"
+    receipt_data: str
+    product_id: str
+
+@api_router.post("/iap/verify-purchase")
+async def verify_iap_purchase(receipt: IAPReceipt, current_user: User = Depends(get_current_user)):
+    """Verify an in-app purchase receipt"""
+    # RevenueCat API integration placeholder
+    revenuecat_api_key = os.environ.get('REVENUECAT_API_KEY')
+    
+    if not revenuecat_api_key:
+        # Store for manual verification
+        await db.iap_receipts.insert_one({
+            "receipt_id": str(uuid.uuid4()),
+            "user_id": current_user.user_id,
+            "platform": receipt.platform,
+            "product_id": receipt.product_id,
+            "receipt_data": receipt.receipt_data,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "pending_verification",
+            "verified": False
+        })
+        return {
+            "status": "pending",
+            "message": "Receipt stored for verification",
+            "message_fr": "Reçu en attente de vérification"
+        }
+    
+    # TODO: Implement actual RevenueCat verification
+    # import requests
+    # response = requests.post(
+    #     f"https://api.revenuecat.com/v1/receipts",
+    #     headers={"Authorization": f"Bearer {revenuecat_api_key}"},
+    #     json={
+    #         "app_user_id": current_user.user_id,
+    #         "fetch_token": receipt.receipt_data,
+    #         "product_id": receipt.product_id
+    #     }
+    # )
+    
+    return {
+        "status": "pending",
+        "message": "RevenueCat integration pending API key",
+        "message_fr": "Intégration RevenueCat en attente de clé API"
+    }
+
+@api_router.get("/iap/products")
+async def get_iap_products():
+    """Get available in-app purchase products"""
+    return {
+        "products": [
+            {
+                "product_id": "fitmaxpro_standard_monthly",
+                "name_fr": "Abonnement Standard Mensuel",
+                "name_en": "Standard Monthly Subscription",
+                "price_tier": "standard",
+                "duration": "monthly",
+                "features": ["workouts", "nutrition", "progress_tracking"]
+            },
+            {
+                "product_id": "fitmaxpro_standard_annual",
+                "name_fr": "Abonnement Standard Annuel",
+                "name_en": "Standard Annual Subscription",
+                "price_tier": "standard",
+                "duration": "annual",
+                "discount_percent": 20,
+                "features": ["workouts", "nutrition", "progress_tracking"]
+            },
+            {
+                "product_id": "fitmaxpro_vip_monthly",
+                "name_fr": "Abonnement VIP Mensuel",
+                "name_en": "VIP Monthly Subscription",
+                "price_tier": "vip",
+                "duration": "monthly",
+                "features": ["all_workouts", "nutrition", "progress_tracking", "coaching", "live_streams", "priority_support"]
+            },
+            {
+                "product_id": "fitmaxpro_vip_annual",
+                "name_fr": "Abonnement VIP Annuel",
+                "name_en": "VIP Annual Subscription",
+                "price_tier": "vip",
+                "duration": "annual",
+                "discount_percent": 25,
+                "features": ["all_workouts", "nutrition", "progress_tracking", "coaching", "live_streams", "priority_support"]
+            }
+        ]
+    }
+
+@api_router.get("/admin/iap-receipts")
+async def get_iap_receipts(admin: User = Depends(verify_admin)):
+    """Admin: Get all IAP receipts for verification"""
+    receipts = await db.iap_receipts.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"receipts": receipts}
+
+@api_router.put("/admin/iap-receipts/{receipt_id}/verify")
+async def manual_verify_receipt(receipt_id: str, verified: bool, admin: User = Depends(verify_admin)):
+    """Admin: Manually verify an IAP receipt"""
+    receipt = await db.iap_receipts.find_one({"receipt_id": receipt_id})
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    
+    await db.iap_receipts.update_one(
+        {"receipt_id": receipt_id},
+        {"$set": {
+            "verified": verified,
+            "status": "verified" if verified else "rejected",
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "verified_by": admin.user_id
+        }}
+    )
+    
+    if verified:
+        # Activate subscription based on product_id
+        product_id = receipt.get("product_id", "")
+        tier = "vip" if "vip" in product_id else "standard"
+        plan_type = "annual" if "annual" in product_id else "monthly"
+        
+        await db.users.update_one(
+            {"user_id": receipt["user_id"]},
+            {"$set": {
+                "subscription_tier": tier,
+                "subscription_status": "active"
+            }}
+        )
+        
+        await db.subscriptions.update_one(
+            {"user_id": receipt["user_id"]},
+            {"$set": {
+                "user_id": receipt["user_id"],
+                "tier": tier,
+                "plan_type": plan_type,
+                "status": "active",
+                "source": "iap",
+                "start_date": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+    
+    return {"message": "Receipt verified" if verified else "Receipt rejected"}
+
+
 # ==================== SOCIAL MEDIA LINKS ====================
 
 @api_router.get("/social-links")

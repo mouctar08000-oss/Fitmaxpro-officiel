@@ -130,6 +130,17 @@ const AdminPage = () => {
   const [sendingAlerts, setSendingAlerts] = useState(false);
   const [alertsHistory, setAlertsHistory] = useState([]);
   
+  // Inactive users states
+  const [inactiveUsers, setInactiveUsers] = useState([]);
+  const [inactiveDaysThreshold, setInactiveDaysThreshold] = useState(7);
+  const [selectedInactiveUsers, setSelectedInactiveUsers] = useState([]);
+  const [loadingInactive, setLoadingInactive] = useState(false);
+  const [customReminderMessage, setCustomReminderMessage] = useState('');
+  
+  // Cancellation requests states
+  const [cancellationRequests, setCancellationRequests] = useState([]);
+  const [loadingCancellations, setLoadingCancellations] = useState(false);
+  
   // Reviews management states
   const [allReviews, setAllReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState(null);
@@ -452,6 +463,65 @@ const AdminPage = () => {
     setSavingSocial(false);
   };
 
+  // Inactive users management
+  const fetchInactiveUsers = useCallback(async () => {
+    setLoadingInactive(true);
+    try {
+      const response = await axios.get(`${API}/admin/inactive-users?days=${inactiveDaysThreshold}`, { headers: getAuthHeaders() });
+      setInactiveUsers(response.data.inactive_users || []);
+    } catch (error) {
+      console.error('Error fetching inactive users:', error);
+    }
+    setLoadingInactive(false);
+  }, [inactiveDaysThreshold]);
+
+  const sendRemindersToInactive = async () => {
+    if (selectedInactiveUsers.length === 0) {
+      toast.error(isFr ? 'Sélectionnez des utilisateurs' : 'Select users');
+      return;
+    }
+    setSendingAlerts(true);
+    try {
+      const response = await axios.post(`${API}/admin/inactive-users/send-reminder`, selectedInactiveUsers, {
+        headers: getAuthHeaders(),
+        params: { message_fr: customReminderMessage || undefined }
+      });
+      toast.success(isFr ? `${response.data.sent} rappels envoyés!` : `${response.data.sent} reminders sent!`);
+      setSelectedInactiveUsers([]);
+      setCustomReminderMessage('');
+    } catch (error) {
+      console.error('Error sending reminders:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setSendingAlerts(false);
+  };
+
+  // Cancellation requests management
+  const fetchCancellationRequests = useCallback(async () => {
+    setLoadingCancellations(true);
+    try {
+      const response = await axios.get(`${API}/admin/cancellation-requests`, { headers: getAuthHeaders() });
+      setCancellationRequests(response.data.requests || []);
+    } catch (error) {
+      console.error('Error fetching cancellation requests:', error);
+    }
+    setLoadingCancellations(false);
+  }, []);
+
+  const processCancellationRequest = async (requestId, action) => {
+    try {
+      await axios.put(`${API}/admin/cancellation-requests/${requestId}/process?action=${action}`, {}, { headers: getAuthHeaders() });
+      toast.success(isFr 
+        ? (action === 'approve' ? 'Annulation approuvée' : 'Annulation refusée')
+        : (action === 'approve' ? 'Cancellation approved' : 'Cancellation rejected')
+      );
+      fetchCancellationRequests();
+    } catch (error) {
+      console.error('Error processing cancellation:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
   // Progress photos management
   const fetchUsersProgressPhotos = useCallback(async () => {
     try {
@@ -748,12 +818,14 @@ const AdminPage = () => {
         fetchSocialLinks(),
         fetchUsersProgressPhotos(),
         fetchRunningStats(),
-        fetchAllRunningData()
+        fetchAllRunningData(),
+        fetchInactiveUsers(),
+        fetchCancellationRequests()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos, fetchRunningStats, fetchAllRunningData]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos, fetchRunningStats, fetchAllRunningData, fetchInactiveUsers, fetchCancellationRequests]);
 
   // Check if user is admin
   useEffect(() => {
@@ -867,6 +939,8 @@ const AdminPage = () => {
               { id: 'reviews', icon: MessageCircle, label: isFr ? 'Avis' : 'Reviews', badge: allReviews.length },
               { id: 'photos', icon: Image, label: isFr ? 'Photos Avant/Après' : 'Before/After Photos' },
               { id: 'messages', icon: MessageCircle, label: isFr ? 'Messages' : 'Messages', badge: unreadCount },
+              { id: 'alerts', icon: AlertTriangle, label: isFr ? 'Alertes Inactifs' : 'Inactive Alerts' },
+              { id: 'subscriptions', icon: Crown, label: isFr ? 'Abonnements' : 'Subscriptions' },
               { id: 'social', icon: Users, label: isFr ? 'Réseaux Sociaux' : 'Social Media' },
               { id: 'analytics', icon: Activity, label: isFr ? 'Analytiques' : 'Analytics' },
               { id: 'workouts', icon: Dumbbell, label: isFr ? 'Séances' : 'Workouts' },
@@ -1745,6 +1819,283 @@ const AdminPage = () => {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Inactive Alerts Tab */}
+          {activeTab === 'alerts' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-orange-400" />
+                {isFr ? 'Utilisateurs Inactifs' : 'Inactive Users'}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {isFr 
+                  ? 'Identifiez les abonnés inactifs et envoyez-leur des rappels pour les encourager à reprendre l\'entraînement.'
+                  : 'Identify inactive subscribers and send them reminders to encourage them to resume training.'}
+              </p>
+
+              {/* Threshold selector */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="text-sm text-gray-400">
+                    {isFr ? 'Inactifs depuis:' : 'Inactive for:'}
+                  </label>
+                  <div className="flex gap-2">
+                    {[3, 7, 14, 30].map(days => (
+                      <Button
+                        key={days}
+                        size="sm"
+                        variant={inactiveDaysThreshold === days ? 'default' : 'outline'}
+                        onClick={() => setInactiveDaysThreshold(days)}
+                        className={inactiveDaysThreshold === days ? 'bg-orange-500' : 'border-[#27272a]'}
+                      >
+                        {days} {isFr ? 'jours' : 'days'}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button onClick={fetchInactiveUsers} variant="outline" className="border-[#27272a] ml-auto">
+                    <RefreshCw className={`w-4 h-4 mr-2 ${loadingInactive ? 'animate-spin' : ''}`} />
+                    {isFr ? 'Actualiser' : 'Refresh'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Custom message */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4">
+                <label className="text-sm text-gray-400 mb-2 block">
+                  {isFr ? 'Message personnalisé (optionnel):' : 'Custom message (optional):'}
+                </label>
+                <Input
+                  value={customReminderMessage}
+                  onChange={(e) => setCustomReminderMessage(e.target.value)}
+                  placeholder={isFr ? "Vous nous manquez ! Revenez sur FitMaxPro..." : "We miss you! Come back to FitMaxPro..."}
+                  className="bg-[#09090b] border-[#27272a]"
+                />
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center">
+                  <p className="text-3xl font-bold text-orange-400">{inactiveUsers.length}</p>
+                  <p className="text-gray-400 text-sm">{isFr ? 'Utilisateurs inactifs' : 'Inactive users'}</p>
+                </div>
+                <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center">
+                  <p className="text-3xl font-bold text-yellow-400">{selectedInactiveUsers.length}</p>
+                  <p className="text-gray-400 text-sm">{isFr ? 'Sélectionnés' : 'Selected'}</p>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-4">
+                <Button
+                  onClick={() => setSelectedInactiveUsers(inactiveUsers.map(u => u.user_id))}
+                  variant="outline"
+                  className="border-[#27272a]"
+                >
+                  {isFr ? 'Tout sélectionner' : 'Select all'}
+                </Button>
+                <Button
+                  onClick={() => setSelectedInactiveUsers([])}
+                  variant="outline"
+                  className="border-[#27272a]"
+                >
+                  {isFr ? 'Tout désélectionner' : 'Deselect all'}
+                </Button>
+                <Button
+                  onClick={sendRemindersToInactive}
+                  className="bg-orange-500 hover:bg-orange-600 ml-auto"
+                  disabled={selectedInactiveUsers.length === 0 || sendingAlerts}
+                >
+                  {sendingAlerts ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4 mr-2" />
+                  )}
+                  {isFr ? `Envoyer rappel (${selectedInactiveUsers.length})` : `Send reminder (${selectedInactiveUsers.length})`}
+                </Button>
+              </div>
+
+              {/* Inactive users list */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-[#1a1a1a]">
+                    <tr>
+                      <th className="w-12 p-4"></th>
+                      <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Nom' : 'Name'}</th>
+                      <th className="text-left p-4 text-gray-400 text-sm">Email</th>
+                      <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Abonnement' : 'Subscription'}</th>
+                      <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Dernière activité' : 'Last activity'}</th>
+                      <th className="text-left p-4 text-gray-400 text-sm">{isFr ? 'Jours inactifs' : 'Days inactive'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inactiveUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="p-8 text-center text-gray-400">
+                          {loadingInactive ? (
+                            <RefreshCw className="w-6 h-6 animate-spin mx-auto" />
+                          ) : (
+                            isFr ? 'Aucun utilisateur inactif trouvé' : 'No inactive users found'
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      inactiveUsers.map(user => (
+                        <tr key={user.user_id} className="border-t border-[#27272a] hover:bg-[#1a1a1a]">
+                          <td className="p-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedInactiveUsers.includes(user.user_id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedInactiveUsers([...selectedInactiveUsers, user.user_id]);
+                                } else {
+                                  setSelectedInactiveUsers(selectedInactiveUsers.filter(id => id !== user.user_id));
+                                }
+                              }}
+                              className="w-4 h-4 rounded"
+                            />
+                          </td>
+                          <td className="p-4 font-medium">{user.name}</td>
+                          <td className="p-4 text-gray-400">{user.email}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 rounded text-xs ${getTierBadge(user.subscription_tier)}`}>
+                              {user.subscription_tier?.toUpperCase() || 'NONE'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-gray-400">
+                            {user.last_activity ? formatDate(user.last_activity) : (isFr ? 'Jamais' : 'Never')}
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              user.days_inactive > 14 ? 'bg-red-500/20 text-red-400' : 
+                              user.days_inactive > 7 ? 'bg-orange-500/20 text-orange-400' : 
+                              'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {user.days_inactive} {isFr ? 'jours' : 'days'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Subscriptions Tab */}
+          {activeTab === 'subscriptions' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Crown className="w-5 h-5 text-yellow-400" />
+                {isFr ? 'Gestion des Abonnements' : 'Subscription Management'}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {isFr 
+                  ? 'Gérez les demandes d\'annulation et les abonnements annuels.'
+                  : 'Manage cancellation requests and annual subscriptions.'}
+              </p>
+
+              {/* Cancellation Requests */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-400" />
+                    {isFr ? 'Demandes d\'annulation' : 'Cancellation Requests'}
+                  </h3>
+                  <Button onClick={fetchCancellationRequests} variant="ghost" size="sm">
+                    <RefreshCw className={`w-4 h-4 ${loadingCancellations ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+
+                {cancellationRequests.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Crown className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                    {isFr ? 'Aucune demande d\'annulation en attente' : 'No pending cancellation requests'}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {cancellationRequests.filter(r => r.status === 'pending').map(request => (
+                      <div key={request.request_id} className="bg-[#1a1a1a] border border-[#27272a] rounded-lg p-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-bold">{request.user_email}</p>
+                            <p className="text-sm text-gray-400">
+                              {isFr ? 'Plan:' : 'Plan:'} {request.plan_type?.toUpperCase() || 'N/A'}
+                            </p>
+                            <p className="text-sm text-gray-400">
+                              {isFr ? 'Date:' : 'Date:'} {formatDate(request.created_at)}
+                            </p>
+                            {request.reason && (
+                              <p className="text-sm text-orange-400 mt-2">
+                                {isFr ? 'Raison:' : 'Reason:'} {request.reason}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => processCancellationRequest(request.request_id, 'reject')}
+                              className="border-red-500/30 text-red-400"
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              {isFr ? 'Refuser' : 'Reject'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => processCancellationRequest(request.request_id, 'approve')}
+                              className="bg-green-500"
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              {isFr ? 'Approuver' : 'Approve'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Annual Subscription Info */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  {isFr ? 'Règles des Abonnements Annuels' : 'Annual Subscription Rules'}
+                </h3>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <p className="text-blue-400 text-sm">
+                    {isFr 
+                      ? '• Les abonnements annuels ont un engagement de 12 mois.\n• L\'annulation n\'est possible qu\'après la fin de la période d\'engagement.\n• Les demandes d\'annulation anticipées seront visibles ici pour traitement manuel.'
+                      : '• Annual subscriptions have a 12-month commitment.\n• Cancellation is only possible after the commitment period ends.\n• Early cancellation requests will be visible here for manual processing.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* History */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <h3 className="font-bold mb-4">{isFr ? 'Historique des annulations' : 'Cancellation History'}</h3>
+                <div className="space-y-2 max-h-60 overflow-auto">
+                  {cancellationRequests.filter(r => r.status !== 'pending').map(request => (
+                    <div key={request.request_id} className="flex items-center justify-between py-2 border-b border-[#27272a]">
+                      <span className="text-gray-400">{request.user_email}</span>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        request.status === 'approved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {request.status === 'approved' 
+                          ? (isFr ? 'Approuvée' : 'Approved') 
+                          : (isFr ? 'Refusée' : 'Rejected')}
+                      </span>
+                    </div>
+                  ))}
+                  {cancellationRequests.filter(r => r.status !== 'pending').length === 0 && (
+                    <p className="text-gray-500 text-center py-4">{isFr ? 'Aucun historique' : 'No history'}</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
