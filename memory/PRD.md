@@ -205,6 +205,20 @@ GET /api/workouts?program_type=yoga
   - +25 points bonus pour 5km+
   - +50 points bonus pour 10km+
 - ✅ **Nettoyage des faux avis** - Suppression des avis de test
+- ✅ **Améliorations P2 - Alertes Inactifs**
+  - Onglet Admin "Inactive Alerts" avec sélecteur de jours (3, 7, 14, 30)
+  - Message personnalisé pour les rappels
+  - Envoi de rappels email aux utilisateurs sélectionnés
+  - Tableau des utilisateurs inactifs avec détails
+- ✅ **Améliorations P2 - Abonnements Annuels**
+  - Logique d'engagement 12 mois pour abonnements annuels
+  - Vérification `can_cancel` avant annulation
+  - Demandes d'annulation avec approbation admin
+  - Onglet Admin "Subscriptions" avec gestion des demandes
+- ✅ **Améliorations P2 - Préparation In-App Purchases**
+  - 4 produits IAP définis (standard/vip × monthly/annual)
+  - Endpoint de vérification d'achat (RevenueCat prêt)
+  - Stockage des reçus pour vérification manuelle
 
 ### March 3, 2026 - Session 2
 - ✅ **Course à Pied** - Fonctionnalité complète (5 onglets)
@@ -227,6 +241,7 @@ GET /api/workouts?program_type=yoga
 - ✅ Total: 138 séances d'entraînement
 
 ## Test Reports
+- `/app/test_reports/iteration_9.json` - Tests P2 complets (100% pass)
 - `/app/test_reports/iteration_8.json` - Tests Avis complets avec likes et points (95-100% pass)
 - `/app/test_reports/iteration_7.json` - Tests Système d'Avis (100% pass)
 - `/app/test_reports/iteration_6.json` - Tests Course à Pied (100% pass)
