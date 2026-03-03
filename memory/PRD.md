@@ -190,12 +190,21 @@ GET /api/workouts?program_type=yoga
 ## Changelog
 
 ### March 3, 2026 - Session 3
-- ✅ **Système d'Avis Amélioré** - Visibilité maximale pour les abonnés
-  - Bouton "Donner un Avis" dans les actions rapides du Dashboard (jaune)
-  - Section "YOUR OPINION MATTERS!" avec stats (note moyenne, nombre d'avis)
-  - Lien "Avis/Reviews" dans la Navigation principale (desktop + mobile)
-  - Page /reviews avec formulaire interactif
-  - Admin: Onglet Reviews avec statistiques, répondre/supprimer
+- ✅ **Système d'Avis Amélioré** - Visibilité maximale pour tous
+  - Bouton "Voir tous les avis" sur la landing page (témoignages)
+  - Page /reviews accessible à TOUS (même non connectés)
+  - Badges "Verified" (abonné vérifié) et "VIP" affichés
+  - Bouton Like (coeur) avec compteur sur chaque avis
+  - Badge "Liked by Coach" quand l'admin a aimé
+  - Admin Panel: 3 boutons (❤️ Aimer, ✈️ Répondre, 🗑️ Supprimer)
+  - Seuls les abonnés actifs peuvent créer des avis (verified_subscriber=True)
+- ✅ **Automatisation des Points**
+  - +25 points pour chaque avis créé
+  - +10 points base pour chaque course
+  - +5 points par km parcouru
+  - +25 points bonus pour 5km+
+  - +50 points bonus pour 10km+
+- ✅ **Nettoyage des faux avis** - Suppression des avis de test
 
 ### March 3, 2026 - Session 2
 - ✅ **Course à Pied** - Fonctionnalité complète (5 onglets)
@@ -218,6 +227,7 @@ GET /api/workouts?program_type=yoga
 - ✅ Total: 138 séances d'entraînement
 
 ## Test Reports
+- `/app/test_reports/iteration_8.json` - Tests Avis complets avec likes et points (95-100% pass)
 - `/app/test_reports/iteration_7.json` - Tests Système d'Avis (100% pass)
 - `/app/test_reports/iteration_6.json` - Tests Course à Pied (100% pass)
 - `/app/test_reports/iteration_5.json` - Tests précédents
