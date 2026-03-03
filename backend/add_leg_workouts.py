@@ -1,19 +1,20 @@
 """
 Script pour ajouter des séances Jambes/Fessiers pour femmes et hommes
-Avec vidéos YouTube explicatives
+Avec vidéos YouTube explicatives - Uses UPSERT strategy with stable IDs
 """
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
-import uuid
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv('.env')
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
 
 # Séances Jambes/Fessiers en Français
 WORKOUTS_FR = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_beginner_fr_01",
         "title": "Jambes & Fessiers - Débutant",
         "description": "Programme complet pour développer les jambes et les fessiers. Idéal pour les débutants femmes et hommes qui veulent sculpter le bas du corps.",
         "level": "beginner",
@@ -79,7 +80,7 @@ WORKOUTS_FR = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_intermediate_fr_01",
         "title": "Jambes & Fessiers - Intermédiaire",
         "description": "Programme avancé pour développer la force et le volume des jambes et fessiers. Avec poids additionnels recommandés.",
         "level": "intermediate",
@@ -145,7 +146,7 @@ WORKOUTS_FR = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_advanced_fr_01",
         "title": "Jambes & Fessiers - Expert",
         "description": "Programme haute intensité pour des résultats maximaux. Pour les pratiquants expérimentés visant l'hypertrophie.",
         "level": "advanced",
@@ -220,7 +221,7 @@ WORKOUTS_FR = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_women_fr_01",
         "title": "Fessiers Bombés - Spécial Femmes",
         "description": "Programme spécialement conçu pour sculpter et galber les fessiers. Exercices ciblés pour un résultat optimal.",
         "level": "intermediate",
@@ -290,7 +291,7 @@ WORKOUTS_FR = [
 # Séances Jambes/Fessiers en Anglais
 WORKOUTS_EN = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_beginner_en_01",
         "title": "Legs & Glutes - Beginner",
         "description": "Complete program to develop legs and glutes. Perfect for beginners who want to sculpt their lower body.",
         "level": "beginner",
@@ -356,7 +357,7 @@ WORKOUTS_EN = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_intermediate_en_01",
         "title": "Legs & Glutes - Intermediate",
         "description": "Advanced program for building leg and glute strength and volume. Additional weights recommended.",
         "level": "intermediate",
@@ -422,7 +423,7 @@ WORKOUTS_EN = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_advanced_en_01",
         "title": "Legs & Glutes - Expert",
         "description": "High intensity program for maximum results. For experienced practitioners aiming for hypertrophy.",
         "level": "advanced",
@@ -497,7 +498,7 @@ WORKOUTS_EN = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_legs_women_en_01",
         "title": "Booty Builder - Women's Special",
         "description": "Program specially designed to sculpt and shape glutes. Targeted exercises for optimal results.",
         "level": "intermediate",
@@ -568,37 +569,64 @@ async def add_leg_workouts():
     client = AsyncIOMotorClient(os.environ['MONGO_URL'])
     db = client[os.environ['DB_NAME']]
     
+    print("=" * 60)
+    print("SEEDING LEGS/GLUTES WORKOUTS (UPSERT STRATEGY)")
+    print("=" * 60)
+    
+    # Count before
+    before_count = await db.workouts.count_documents({})
+    before_legs = await db.workouts.count_documents({"program_type": "legs_glutes"})
+    print(f"\nTotal workouts before: {before_count}")
+    print(f"Legs/Glutes workouts before: {before_legs}")
+    
+    inserted = 0
+    updated = 0
+    
     # Add French workouts
     for workout in WORKOUTS_FR:
-        existing = await db.workouts.find_one({"title": workout["title"], "language": "fr"})
-        if not existing:
-            await db.workouts.insert_one(workout)
-            print(f"✅ Added: {workout['title']}")
+        result = await db.workouts.update_one(
+            {"workout_id": workout["workout_id"]},
+            {"$set": workout},
+            upsert=True
+        )
+        if result.upserted_id:
+            inserted += 1
+            print(f"  + Inserted: {workout['title']} (FR)")
+        elif result.modified_count > 0:
+            updated += 1
+            print(f"  ~ Updated: {workout['title']} (FR)")
         else:
-            # Update existing
-            await db.workouts.update_one(
-                {"title": workout["title"], "language": "fr"},
-                {"$set": workout}
-            )
-            print(f"🔄 Updated: {workout['title']}")
+            print(f"  = Unchanged: {workout['title']} (FR)")
     
     # Add English workouts
     for workout in WORKOUTS_EN:
-        existing = await db.workouts.find_one({"title": workout["title"], "language": "en"})
-        if not existing:
-            await db.workouts.insert_one(workout)
-            print(f"✅ Added: {workout['title']}")
+        result = await db.workouts.update_one(
+            {"workout_id": workout["workout_id"]},
+            {"$set": workout},
+            upsert=True
+        )
+        if result.upserted_id:
+            inserted += 1
+            print(f"  + Inserted: {workout['title']} (EN)")
+        elif result.modified_count > 0:
+            updated += 1
+            print(f"  ~ Updated: {workout['title']} (EN)")
         else:
-            # Update existing
-            await db.workouts.update_one(
-                {"title": workout["title"], "language": "en"},
-                {"$set": workout}
-            )
-            print(f"🔄 Updated: {workout['title']}")
+            print(f"  = Unchanged: {workout['title']} (EN)")
     
-    # Count total
-    total = await db.workouts.count_documents({"program_type": "legs_glutes"})
-    print(f"\n🦵 Total Legs & Glutes workouts: {total}")
+    # Count after
+    after_count = await db.workouts.count_documents({})
+    after_legs = await db.workouts.count_documents({"program_type": "legs_glutes"})
+    
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"  Total processed: {len(WORKOUTS_FR) + len(WORKOUTS_EN)}")
+    print(f"  Inserted: {inserted}")
+    print(f"  Updated: {updated}")
+    print(f"  Total workouts before: {before_count} -> after: {after_count}")
+    print(f"  Legs/Glutes before: {before_legs} -> after: {after_legs}")
+    print("=" * 60)
     
     client.close()
 

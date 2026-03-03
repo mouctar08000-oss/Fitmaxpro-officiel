@@ -1,20 +1,22 @@
 """
 Script pour ajouter des séances spéciales femmes avec vidéos explicatives
 Pour tous les niveaux : Débutant, Intermédiaire, Avancé
+Uses UPSERT strategy with stable IDs
 """
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
-import uuid
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv('.env')
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
 
 # Séances Spéciales Femmes en Français
 WOMEN_WORKOUTS_FR = [
     # ========== DÉBUTANT FEMMES ==========
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_beginner_fr_01",
         "title": "Programme Femme - Débutant Complet",
         "description": "Programme d'initiation parfait pour les femmes qui débutent la musculation. Exercices doux mais efficaces pour tonifier tout le corps en toute sécurité.",
         "level": "beginner",
@@ -81,7 +83,7 @@ WOMEN_WORKOUTS_FR = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_beginner_fr_02",
         "title": "Femme Débutant - Bras & Épaules Toniques",
         "description": "Programme ciblé pour tonifier les bras et les épaules sans prendre de volume. Parfait pour des bras fermes et dessinés.",
         "level": "beginner",
@@ -141,7 +143,7 @@ WOMEN_WORKOUTS_FR = [
     
     # ========== INTERMÉDIAIRE FEMMES ==========
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_intermediate_fr_01",
         "title": "Programme Femme - Intermédiaire Full Body",
         "description": "Programme complet pour les femmes ayant déjà une base en fitness. Intensité modérée pour progresser en force et en définition musculaire.",
         "level": "intermediate",
@@ -217,7 +219,7 @@ WOMEN_WORKOUTS_FR = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_intermediate_fr_02",
         "title": "Femme Intermédiaire - Sculpter & Tonifier",
         "description": "Programme de sculpture corporelle pour femmes intermédiaires. Focus sur les zones clés : fessiers, cuisses, bras et ventre plat.",
         "level": "intermediate",
@@ -286,7 +288,7 @@ WOMEN_WORKOUTS_FR = [
     
     # ========== AVANCÉ FEMMES ==========
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_advanced_fr_01",
         "title": "Programme Femme - Avancé Haute Intensité",
         "description": "Programme intense pour femmes expérimentées. Combine force, cardio et gainage pour un corps athlétique et sculpté.",
         "level": "advanced",
@@ -371,7 +373,7 @@ WOMEN_WORKOUTS_FR = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_advanced_fr_02",
         "title": "Femme Avancé - Beach Body Sculptant",
         "description": "Programme ultime pour un corps de plage parfait. Exercices ciblés pour sculpter chaque muscle visible.",
         "level": "advanced",
@@ -451,7 +453,7 @@ WOMEN_WORKOUTS_FR = [
 # Versions anglaises
 WOMEN_WORKOUTS_EN = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_beginner_en_01",
         "title": "Women's Program - Complete Beginner",
         "description": "Perfect introduction program for women starting fitness. Gentle but effective exercises to tone the whole body safely.",
         "level": "beginner",
@@ -518,7 +520,7 @@ WOMEN_WORKOUTS_EN = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_intermediate_en_01",
         "title": "Women's Program - Intermediate Full Body",
         "description": "Complete program for women with fitness foundation. Moderate intensity for strength and muscle definition progress.",
         "level": "intermediate",
@@ -585,7 +587,7 @@ WOMEN_WORKOUTS_EN = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:12]}",
+        "workout_id": "workout_women_advanced_en_01",
         "title": "Women's Program - Advanced High Intensity",
         "description": "Intense program for experienced women. Combines strength, cardio and core for an athletic, sculpted body.",
         "level": "advanced",
@@ -657,40 +659,64 @@ async def add_women_workouts():
     client = AsyncIOMotorClient(os.environ['MONGO_URL'])
     db = client[os.environ['DB_NAME']]
     
-    added_count = 0
+    print("=" * 60)
+    print("SEEDING WOMEN'S WORKOUTS (UPSERT STRATEGY)")
+    print("=" * 60)
+    
+    # Count before
+    before_count = await db.workouts.count_documents({})
+    before_women = await db.workouts.count_documents({"program_type": "women_fitness"})
+    print(f"\nTotal workouts before: {before_count}")
+    print(f"Women's workouts before: {before_women}")
+    
+    inserted = 0
+    updated = 0
     
     # Add French workouts
     for workout in WOMEN_WORKOUTS_FR:
-        existing = await db.workouts.find_one({"title": workout["title"], "language": "fr"})
-        if not existing:
-            await db.workouts.insert_one(workout)
-            print(f"✅ Ajouté: {workout['title']} ({workout['level']})")
-            added_count += 1
+        result = await db.workouts.update_one(
+            {"workout_id": workout["workout_id"]},
+            {"$set": workout},
+            upsert=True
+        )
+        if result.upserted_id:
+            inserted += 1
+            print(f"  + Inserted: {workout['title']} (FR)")
+        elif result.modified_count > 0:
+            updated += 1
+            print(f"  ~ Updated: {workout['title']} (FR)")
         else:
-            await db.workouts.update_one(
-                {"title": workout["title"], "language": "fr"},
-                {"$set": workout}
-            )
-            print(f"🔄 Mis à jour: {workout['title']}")
+            print(f"  = Unchanged: {workout['title']} (FR)")
     
     # Add English workouts
     for workout in WOMEN_WORKOUTS_EN:
-        existing = await db.workouts.find_one({"title": workout["title"], "language": "en"})
-        if not existing:
-            await db.workouts.insert_one(workout)
-            print(f"✅ Added: {workout['title']} ({workout['level']})")
-            added_count += 1
+        result = await db.workouts.update_one(
+            {"workout_id": workout["workout_id"]},
+            {"$set": workout},
+            upsert=True
+        )
+        if result.upserted_id:
+            inserted += 1
+            print(f"  + Inserted: {workout['title']} (EN)")
+        elif result.modified_count > 0:
+            updated += 1
+            print(f"  ~ Updated: {workout['title']} (EN)")
         else:
-            await db.workouts.update_one(
-                {"title": workout["title"], "language": "en"},
-                {"$set": workout}
-            )
-            print(f"🔄 Updated: {workout['title']}")
+            print(f"  = Unchanged: {workout['title']} (EN)")
     
-    # Count total women workouts
-    total = await db.workouts.count_documents({"target_audience": "women"})
-    print(f"\n👩 Total Women's Workouts: {total}")
-    print(f"📝 Newly added: {added_count}")
+    # Count after
+    after_count = await db.workouts.count_documents({})
+    after_women = await db.workouts.count_documents({"program_type": "women_fitness"})
+    
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"  Total processed: {len(WOMEN_WORKOUTS_FR) + len(WOMEN_WORKOUTS_EN)}")
+    print(f"  Inserted: {inserted}")
+    print(f"  Updated: {updated}")
+    print(f"  Total workouts before: {before_count} -> after: {after_count}")
+    print(f"  Women's before: {before_women} -> after: {after_women}")
+    print("=" * 60)
     
     client.close()
 

@@ -1,9 +1,12 @@
+"""
+Script to seed detailed workout programs for FitMaxPro
+Uses UPSERT strategy to prevent data loss when re-running
+"""
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 from dotenv import load_dotenv
 from pathlib import Path
-import uuid
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -15,7 +18,7 @@ db = client[os.environ['DB_NAME']]
 # Programmes pour DÉBUTANTS - Prise de Masse
 debutant_masse_fr = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_beginner_fr_01",
         "title": "Full Body Débutant - Jour 1",
         "description": "Programme complet du corps pour débutants. Idéal pour apprendre les mouvements de base.",
         "level": "beginner",
@@ -34,7 +37,7 @@ debutant_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_beginner_fr_02",
         "title": "Full Body Débutant - Jour 2",
         "description": "Deuxième séance complète avec nouveaux exercices pour progresser.",
         "level": "beginner",
@@ -53,7 +56,7 @@ debutant_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_beginner_fr_03",
         "title": "Haut du Corps Débutant",
         "description": "Focus sur le développement du torse, dos et bras.",
         "level": "beginner",
@@ -71,7 +74,7 @@ debutant_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_beginner_fr_04",
         "title": "Bas du Corps Débutant",
         "description": "Développement des jambes et fessiers pour débutants.",
         "level": "beginner",
@@ -93,7 +96,7 @@ debutant_masse_fr = [
 # Programmes pour AMATEURS - Prise de Masse
 amateur_masse_fr = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_amateur_fr_01",
         "title": "Push (Poussée) - Amateur",
         "description": "Programme Push : pectoraux, épaules et triceps avec intensité progressive.",
         "level": "amateur",
@@ -112,7 +115,7 @@ amateur_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_amateur_fr_02",
         "title": "Pull (Traction) - Amateur",
         "description": "Programme Pull : dos, trapèzes et biceps pour un dos massif.",
         "level": "amateur",
@@ -131,7 +134,7 @@ amateur_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_amateur_fr_03",
         "title": "Legs (Jambes) - Amateur",
         "description": "Programme complet pour des jambes puissantes et massives.",
         "level": "amateur",
@@ -154,7 +157,7 @@ amateur_masse_fr = [
 # Programmes pour PRO - Prise de Masse
 pro_masse_fr = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_pro_fr_01",
         "title": "Pectoraux Pro - Volume",
         "description": "Programme avancé pour exploser les pectoraux avec volume et intensité.",
         "level": "pro",
@@ -173,7 +176,7 @@ pro_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_pro_fr_02",
         "title": "Dos Pro - Épaisseur & Largeur",
         "description": "Programme pro pour un dos massif : épaisseur, largeur et détails.",
         "level": "pro",
@@ -192,7 +195,7 @@ pro_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_pro_fr_03",
         "title": "Jambes Pro - Force & Masse",
         "description": "Programme destructeur pour des jambes énormes. Attention à l'intensité !",
         "level": "pro",
@@ -212,7 +215,7 @@ pro_masse_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_mass_pro_fr_04",
         "title": "Épaules & Bras Pro",
         "description": "Séance complète épaules et bras pour des mensurations impressionnantes.",
         "level": "pro",
@@ -237,7 +240,7 @@ pro_masse_fr = [
 # Programmes PERTE DE POIDS - Débutant
 debutant_perte_fr = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_loss_beginner_fr_01",
         "title": "Cardio Débutant - Faible Impact",
         "description": "Séance de cardio doux pour brûler des calories sans traumatiser les articulations.",
         "level": "beginner",
@@ -253,7 +256,7 @@ debutant_perte_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_loss_beginner_fr_02",
         "title": "Circuit Training Débutant",
         "description": "Circuit complet pour brûler des calories avec des exercices au poids du corps.",
         "level": "beginner",
@@ -276,7 +279,7 @@ debutant_perte_fr = [
 # Programmes PERTE DE POIDS - Amateur
 amateur_perte_fr = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_loss_amateur_fr_01",
         "title": "HIIT Amateur - Cardio Intense",
         "description": "Entraînement par intervalles à haute intensité pour maximiser la combustion.",
         "level": "amateur",
@@ -294,7 +297,7 @@ amateur_perte_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_loss_amateur_fr_02",
         "title": "Circuit Métabolique Amateur",
         "description": "Circuit complet pour augmenter le métabolisme et brûler des graisses.",
         "level": "amateur",
@@ -316,7 +319,7 @@ amateur_perte_fr = [
 # Programmes PERTE DE POIDS - Pro
 pro_perte_fr = [
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_loss_pro_fr_01",
         "title": "Tabata Pro - Maximum Burn",
         "description": "Protocole Tabata extrême : 20s effort maximum / 10s repos. Pour athlètes confirmés.",
         "level": "pro",
@@ -334,7 +337,7 @@ pro_perte_fr = [
         ]
     },
     {
-        "workout_id": f"workout_{uuid.uuid4().hex[:8]}",
+        "workout_id": "workout_loss_pro_fr_02",
         "title": "CrossFit Pro - WOD Brutal",
         "description": "Workout of the Day style CrossFit pour perte de graisse extrême.",
         "level": "pro",
@@ -354,49 +357,76 @@ pro_perte_fr = [
 ]
 
 async def seed_detailed_workouts():
-    print("🏋️ Ajout de programmes d'entraînement détaillés...")
+    print("=" * 60)
+    print("SEEDING DETAILED WORKOUTS (UPSERT STRATEGY)")
+    print("=" * 60)
     
-    # Supprimer uniquement les workouts mass_gain et weight_loss (pas abs, legs_glutes, women)
-    await db.workouts.delete_many({'program_type': {'$in': ['mass_gain', 'weight_loss']}})
-    print("✅ Anciens workouts masse/perte supprimés")
-    
-    # Combiner tous les programmes FR
+    # Combine all French workouts
     all_workouts_fr = (
         debutant_masse_fr + amateur_masse_fr + pro_masse_fr +
         debutant_perte_fr + amateur_perte_fr + pro_perte_fr
     )
     
-    # Créer les versions anglaises (simplifiées pour l'exemple)
+    # Create English versions
     all_workouts_en = []
     for workout in all_workouts_fr:
         en_workout = workout.copy()
+        en_workout['workout_id'] = workout['workout_id'].replace('_fr_', '_en_')
         en_workout['language'] = 'en'
-        en_workout['title'] = workout['title'].replace('Débutant', 'Beginner').replace('Amateur', 'Intermediate').replace('Pro', 'Advanced')
-        en_workout['description'] = workout['description']  # Garder FR pour simplifier
+        en_workout['title'] = (
+            workout['title']
+            .replace('Débutant', 'Beginner')
+            .replace('Amateur', 'Intermediate')
+            .replace('Pro', 'Advanced')
+            .replace('Prise de Masse', 'Mass Gain')
+            .replace('Perte de Poids', 'Weight Loss')
+        )
         all_workouts_en.append(en_workout)
     
-    # Insérer tous les workouts
     all_workouts = all_workouts_fr + all_workouts_en
-    await db.workouts.insert_many(all_workouts)
     
-    print(f"✅ {len(all_workouts_fr)} programmes FR ajoutés")
-    print(f"✅ {len(all_workouts_en)} programmes EN ajoutés")
-    print(f"✅ TOTAL: {len(all_workouts)} séances d'entraînement")
+    # Count before seeding
+    before_count = await db.workouts.count_documents({})
+    print(f"\nWorkouts in DB before seeding: {before_count}")
     
-    # Statistiques
-    stats = {
-        "Débutant Masse": len(debutant_masse_fr),
-        "Amateur Masse": len(amateur_masse_fr),
-        "Pro Masse": len(pro_masse_fr),
-        "Débutant Perte": len(debutant_perte_fr),
-        "Amateur Perte": len(amateur_perte_fr),
-        "Pro Perte": len(pro_perte_fr)
-    }
+    # UPSERT each workout (update if exists, insert if not)
+    inserted = 0
+    updated = 0
     
-    print("\n📊 Répartition des programmes:")
-    for category, count in stats.items():
-        print(f"   {category}: {count} séances")
+    for workout in all_workouts:
+        result = await db.workouts.update_one(
+            {"workout_id": workout["workout_id"]},
+            {"$set": workout},
+            upsert=True
+        )
+        if result.upserted_id:
+            inserted += 1
+            print(f"  + Inserted: {workout['title']} ({workout['language'].upper()})")
+        elif result.modified_count > 0:
+            updated += 1
+            print(f"  ~ Updated: {workout['title']} ({workout['language'].upper()})")
+        else:
+            print(f"  = Unchanged: {workout['title']} ({workout['language'].upper()})")
     
+    # Count after seeding
+    after_count = await db.workouts.count_documents({})
+    
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"  Total processed: {len(all_workouts)}")
+    print(f"  Inserted: {inserted}")
+    print(f"  Updated: {updated}")
+    print(f"  Workouts before: {before_count}")
+    print(f"  Workouts after: {after_count}")
+    
+    # Show breakdown by program type
+    print("\n  Breakdown by program type:")
+    for ptype in ['mass_gain', 'weight_loss', 'abs', 'legs_glutes', 'women_fitness']:
+        count = await db.workouts.count_documents({"program_type": ptype})
+        print(f"    - {ptype}: {count}")
+    
+    print("=" * 60)
     client.close()
 
 if __name__ == "__main__":
