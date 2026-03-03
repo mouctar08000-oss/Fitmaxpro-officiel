@@ -268,6 +268,10 @@ GET /api/workouts?program_type=yoga
   - Notification quand un live est programmé (avec date formatée)
   - Messages personnalisés pour les utilisateurs ayant fait des demandes
   - Respect des restrictions VIP (seuls les VIP notifiés pour les lives VIP)
+- ✅ **Gestion Individuelle des Réseaux Sociaux** :
+  - Chaque réseau social peut être enregistré séparément (bouton ✓ vert)
+  - Suppression individuelle (bouton poubelle rouge)
+  - APIs: PUT /api/admin/social-link, DELETE /api/admin/social-link/{platform}
 - ✅ **Tests complets** - Backend et Frontend 100% passés
 
 ## Test Reports

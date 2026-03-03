@@ -170,6 +170,7 @@ const AdminPage = () => {
     facebook: ''
   });
   const [savingSocial, setSavingSocial] = useState(false);
+  const [savingPlatform, setSavingPlatform] = useState(null); // Track which platform is being saved
   
   // Progress photos states
   const [usersProgressPhotos, setUsersProgressPhotos] = useState([]);
@@ -475,6 +476,40 @@ const AdminPage = () => {
       toast.error(isFr ? 'Erreur' : 'Error');
     }
     setSavingSocial(false);
+  };
+
+  // Save individual social link
+  const saveSingleSocialLink = async (platform) => {
+    setSavingPlatform(platform);
+    try {
+      await axios.put(`${API}/admin/social-link`, {
+        platform: platform,
+        url: socialLinks[platform] || ''
+      }, { headers: getAuthHeaders() });
+      toast.success(isFr ? `${platform} enregistré !` : `${platform} saved!`);
+    } catch (error) {
+      console.error(`Error saving ${platform}:`, error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setSavingPlatform(null);
+  };
+
+  // Delete individual social link
+  const deleteSingleSocialLink = async (platform) => {
+    setSavingPlatform(platform);
+    try {
+      await axios.delete(`${API}/admin/social-link/${platform}`, { headers: getAuthHeaders() });
+      setSocialLinks(prev => {
+        const updated = { ...prev };
+        delete updated[platform];
+        return updated;
+      });
+      toast.success(isFr ? `${platform} supprimé !` : `${platform} deleted!`);
+    } catch (error) {
+      console.error(`Error deleting ${platform}:`, error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setSavingPlatform(null);
   };
 
   // Inactive users management
@@ -2390,11 +2425,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('instagram')}
+                    disabled={savingPlatform === 'instagram'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'instagram' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.instagram && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, instagram: ''})}
+                      onClick={() => deleteSingleSocialLink('instagram')}
+                      disabled={savingPlatform === 'instagram'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2416,11 +2464,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('youtube')}
+                    disabled={savingPlatform === 'youtube'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'youtube' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.youtube && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, youtube: ''})}
+                      onClick={() => deleteSingleSocialLink('youtube')}
+                      disabled={savingPlatform === 'youtube'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2442,11 +2503,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('tiktok')}
+                    disabled={savingPlatform === 'tiktok'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'tiktok' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.tiktok && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, tiktok: ''})}
+                      onClick={() => deleteSingleSocialLink('tiktok')}
+                      disabled={savingPlatform === 'tiktok'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2468,11 +2542,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('facebook')}
+                    disabled={savingPlatform === 'facebook'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'facebook' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.facebook && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, facebook: ''})}
+                      onClick={() => deleteSingleSocialLink('facebook')}
+                      disabled={savingPlatform === 'facebook'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2494,11 +2581,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('snapchat')}
+                    disabled={savingPlatform === 'snapchat'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'snapchat' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.snapchat && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, snapchat: ''})}
+                      onClick={() => deleteSingleSocialLink('snapchat')}
+                      disabled={savingPlatform === 'snapchat'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2520,11 +2620,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('twitter')}
+                    disabled={savingPlatform === 'twitter'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'twitter' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.twitter && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, twitter: ''})}
+                      onClick={() => deleteSingleSocialLink('twitter')}
+                      disabled={savingPlatform === 'twitter'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2546,11 +2659,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('whatsapp')}
+                    disabled={savingPlatform === 'whatsapp'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'whatsapp' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.whatsapp && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, whatsapp: ''})}
+                      onClick={() => deleteSingleSocialLink('whatsapp')}
+                      disabled={savingPlatform === 'whatsapp'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2572,11 +2698,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('telegram')}
+                    disabled={savingPlatform === 'telegram'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'telegram' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.telegram && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, telegram: ''})}
+                      onClick={() => deleteSingleSocialLink('telegram')}
+                      disabled={savingPlatform === 'telegram'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -2598,11 +2737,24 @@ const AdminPage = () => {
                       className="bg-[#09090b] border-[#27272a]"
                     />
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => saveSingleSocialLink('website')}
+                    disabled={savingPlatform === 'website'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {savingPlatform === 'website' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                   {socialLinks.website && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setSocialLinks({...socialLinks, website: ''})}
+                      onClick={() => deleteSingleSocialLink('website')}
+                      disabled={savingPlatform === 'website'}
                       className="text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="w-4 h-4" />

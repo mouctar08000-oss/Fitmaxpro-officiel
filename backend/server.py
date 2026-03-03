@@ -3685,6 +3685,10 @@ async def get_email_history(admin: User = Depends(verify_admin)):
 
 # ==================== SOCIAL MEDIA LINKS ====================
 
+class SocialLinkUpdate(BaseModel):
+    platform: str
+    url: str
+
 @api_router.get("/social-links")
 async def get_social_links():
     """Get social media links"""
@@ -3693,13 +3697,49 @@ async def get_social_links():
 
 @api_router.put("/admin/social-links")
 async def admin_update_social_links(links: dict, admin: User = Depends(verify_admin)):
-    """Admin: Update social media links"""
+    """Admin: Update all social media links at once"""
     await db.settings.update_one(
         {"type": "social_links"},
         {"$set": {"type": "social_links", "links": links}},
         upsert=True
     )
     return {"message": "Social links updated"}
+
+@api_router.put("/admin/social-link")
+async def admin_update_single_social_link(data: SocialLinkUpdate, admin: User = Depends(verify_admin)):
+    """Admin: Update a single social media link individually"""
+    # Get current links
+    current = await db.settings.find_one({"type": "social_links"})
+    links = current.get("links", {}) if current else {}
+    
+    # Update or remove the specific platform
+    if data.url.strip():
+        links[data.platform] = data.url.strip()
+    else:
+        links.pop(data.platform, None)  # Remove if empty
+    
+    await db.settings.update_one(
+        {"type": "social_links"},
+        {"$set": {"type": "social_links", "links": links}},
+        upsert=True
+    )
+    return {"message": f"{data.platform} updated", "platform": data.platform, "url": data.url}
+
+@api_router.delete("/admin/social-link/{platform}")
+async def admin_delete_social_link(platform: str, admin: User = Depends(verify_admin)):
+    """Admin: Delete a single social media link"""
+    current = await db.settings.find_one({"type": "social_links"})
+    links = current.get("links", {}) if current else {}
+    
+    if platform in links:
+        del links[platform]
+        await db.settings.update_one(
+            {"type": "social_links"},
+            {"$set": {"links": links}}
+        )
+        return {"message": f"{platform} deleted", "platform": platform}
+    
+    return {"message": f"{platform} not found", "platform": platform}
 
 
 # ==================== PROGRESS PHOTOS (BEFORE/AFTER) ====================
