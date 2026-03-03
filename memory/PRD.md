@@ -231,6 +231,12 @@ GET /api/workouts?program_type=yoga
   - Bouton "Clear all" pour tout supprimer
   - Aperçu en temps réel des liens actifs
   - Affichage conditionnel sur Dashboard et Footer
+- ✅ **Intégration WebRTC Réelle (LiveKit)**
+  - Backend: Endpoints `/api/livekit/*` pour tokens, rooms, participants
+  - Frontend: Composant `LiveKitVideoRoom` avec `@livekit/components-react`
+  - Support Live Streaming (one-to-many) et Appels (one-to-one)
+  - Message clair quand WebRTC non configuré avec instructions
+  - Prêt pour activation avec clés API LiveKit
 
 ### March 3, 2026 - Session 2
 - ✅ **Course à Pied** - Fonctionnalité complète (5 onglets)

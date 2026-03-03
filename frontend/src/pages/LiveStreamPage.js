@@ -21,11 +21,15 @@ import {
   Calendar,
   Clock,
   Plus,
-  Hand
+  Hand,
+  Wifi,
+  WifiOff,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
+import { LiveKitVideoRoom, LiveKitCall, IncomingCallModal } from '../components/LiveKitRoom';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -60,6 +64,12 @@ const LiveStreamPage = () => {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestTitle, setRequestTitle] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
+  
+  // LiveKit WebRTC states
+  const [liveKitStatus, setLiveKitStatus] = useState({ configured: false });
+  const [liveKitToken, setLiveKitToken] = useState(null);
+  const [liveKitServerUrl, setLiveKitServerUrl] = useState(null);
+  const [isWebRTCConnected, setIsWebRTCConnected] = useState(false);
   
   const isAdmin = user?.role === 'admin';
   const isVIP = user?.subscription?.type === 'vip';
@@ -109,9 +119,49 @@ const LiveStreamPage = () => {
     fetchActiveLives();
     fetchSchedule();
     fetchRequests();
+    checkLiveKitStatus();
     const interval = setInterval(fetchActiveLives, 10000);
     return () => clearInterval(interval);
   }, [fetchActiveLives, fetchSchedule, fetchRequests]);
+
+  // Check LiveKit WebRTC status
+  const checkLiveKitStatus = async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.get(`${API}/api/livekit/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLiveKitStatus(response.data);
+    } catch (err) {
+      console.error('Error checking LiveKit status:', err);
+      setLiveKitStatus({ configured: false });
+    }
+  };
+
+  // Get LiveKit token for joining a room
+  const getLiveKitToken = async (roomName, canPublish = false) => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.post(`${API}/api/livekit/token`, {
+        room_name: roomName,
+        can_publish: canPublish,
+        can_subscribe: true,
+        room_type: 'live'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setLiveKitToken(response.data.token);
+      setLiveKitServerUrl(response.data.server_url);
+      setIsWebRTCConnected(true);
+      
+      return response.data;
+    } catch (err) {
+      console.error('Error getting LiveKit token:', err);
+      toast.error(err.response?.data?.detail || 'Error connecting to video service');
+      return null;
+    }
+  };
 
   // Request a live session (subscriber)
   const requestLive = async () => {
@@ -174,6 +224,15 @@ const LiveStreamPage = () => {
         setIsStreaming(true);
         setShowCreateForm(false);
         fetchActiveLives();
+        
+        // If LiveKit is configured, get token for broadcasting
+        if (liveKitStatus.configured && response.data.live_id) {
+          const roomName = `live_${response.data.live_id}`;
+          const lkToken = await getLiveKitToken(roomName, true); // canPublish = true for broadcaster
+          if (lkToken) {
+            toast.success(isFr ? 'WebRTC connecté ! Vous êtes en direct.' : 'WebRTC connected! You are live.');
+          }
+        }
       }
       
       setLiveTitle('');
@@ -195,7 +254,7 @@ const LiveStreamPage = () => {
     
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
       const response = await axios.post(`${API}/api/lives/${live.live_id}/join`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -203,6 +262,15 @@ const LiveStreamPage = () => {
       setCurrentLive({ ...live, token: response.data.token });
       setIsBroadcaster(false);
       setIsStreaming(true);
+      
+      // If LiveKit is configured, get token for viewing
+      if (liveKitStatus.configured && live.live_id) {
+        const roomName = `live_${live.live_id}`;
+        const lkToken = await getLiveKitToken(roomName, false); // canPublish = false for viewer
+        if (lkToken) {
+          toast.success(isFr ? 'WebRTC connecté !' : 'WebRTC connected!');
+        }
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to join live');
     } finally {
@@ -215,7 +283,7 @@ const LiveStreamPage = () => {
     if (!currentLive) return;
     
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
       await axios.post(`${API}/api/lives/${currentLive.live_id}/end`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -223,6 +291,8 @@ const LiveStreamPage = () => {
       setCurrentLive(null);
       setIsStreaming(false);
       setIsBroadcaster(false);
+      setLiveKitToken(null);
+      setIsWebRTCConnected(false);
       fetchActiveLives();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to end live');
@@ -234,6 +304,8 @@ const LiveStreamPage = () => {
     setCurrentLive(null);
     setIsStreaming(false);
     setIsBroadcaster(false);
+    setLiveKitToken(null);
+    setIsWebRTCConnected(false);
   };
 
   // Send chat message
@@ -661,59 +733,95 @@ const LiveStreamPage = () => {
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-120px)]">
       {/* Video Section */}
       <div className="flex-1 bg-black rounded-lg overflow-hidden relative">
-        {/* Video placeholder - In production, this would be the LiveKit video */}
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-900 to-black">
-          <div className="text-center">
-            <Video className="w-24 h-24 text-red-500 mx-auto mb-4 animate-pulse" />
-            <h2 className="text-2xl font-bold mb-2">{currentLive?.title}</h2>
-            <p className="text-gray-400">{currentLive?.description}</p>
-            
-            {isBroadcaster && (
-              <div className="mt-6">
-                <span className="inline-flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full">
-                  <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
-                  LIVE
-                </span>
-              </div>
-            )}
+        {/* LiveKit WebRTC Video - Real streaming */}
+        {liveKitToken && liveKitServerUrl && liveKitStatus.configured ? (
+          <LiveKitVideoRoom
+            token={liveKitToken}
+            serverUrl={liveKitServerUrl}
+            roomName={currentLive?.live_id ? `live_${currentLive.live_id}` : 'unknown'}
+            isBroadcaster={isBroadcaster}
+            participantName={user?.name || 'Viewer'}
+            onDisconnect={() => {
+              setIsWebRTCConnected(false);
+              if (!isBroadcaster) {
+                leaveLive();
+              }
+            }}
+          />
+        ) : (
+          // Fallback: Video placeholder when LiveKit not configured
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-900 to-black">
+            <div className="text-center">
+              {liveKitStatus.configured === false && (
+                <div className="mb-4 bg-orange-500/20 border border-orange-500/50 rounded-lg p-4 max-w-md mx-auto">
+                  <div className="flex items-center gap-2 justify-center text-orange-400 mb-2">
+                    <WifiOff className="w-5 h-5" />
+                    <span className="font-bold">{isFr ? 'WebRTC non configuré' : 'WebRTC not configured'}</span>
+                  </div>
+                  <p className="text-sm text-orange-300">
+                    {isFr 
+                      ? 'Pour activer la vidéo en direct, configurez LiveKit dans le fichier .env (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)'
+                      : 'To enable live video, configure LiveKit in .env file (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)'}
+                  </p>
+                </div>
+              )}
+              <Video className="w-24 h-24 text-red-500 mx-auto mb-4 animate-pulse" />
+              <h2 className="text-2xl font-bold mb-2">{currentLive?.title}</h2>
+              <p className="text-gray-400">{currentLive?.description}</p>
+              
+              {isBroadcaster && (
+                <div className="mt-6">
+                  <span className="inline-flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full">
+                    <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
+                    LIVE {liveKitStatus.configured ? '(WebRTC)' : '(Simulé)'}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
         
         {/* Viewer count */}
         <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-2">
           <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
           <span className="text-sm">LIVE</span>
+          {isWebRTCConnected && (
+            <>
+              <Wifi className="w-3 h-3 text-green-400" />
+            </>
+          )}
           <span className="text-gray-400">•</span>
           <Users className="w-4 h-4 text-gray-400" />
           <span className="text-sm">{viewerCount}</span>
         </div>
         
-        {/* Controls */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
-          {isBroadcaster && (
-            <>
-              <button
-                onClick={() => setVideoEnabled(!videoEnabled)}
-                className={`p-2 rounded-full ${videoEnabled ? 'bg-zinc-700' : 'bg-red-500'}`}
-              >
-                {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-              </button>
-              <button
-                onClick={() => setAudioEnabled(!audioEnabled)}
-                className={`p-2 rounded-full ${audioEnabled ? 'bg-zinc-700' : 'bg-red-500'}`}
-              >
-                {audioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-              </button>
-            </>
-          )}
-          
-          <button
-            onClick={isBroadcaster ? endLive : leaveLive}
-            className="p-2 rounded-full bg-red-500 hover:bg-red-600"
-          >
-            <Square className="w-5 h-5" />
-          </button>
-        </div>
+        {/* Controls - Only show if LiveKit not handling them */}
+        {!liveKitToken && (
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
+            {isBroadcaster && (
+              <>
+                <button
+                  onClick={() => setVideoEnabled(!videoEnabled)}
+                  className={`p-2 rounded-full ${videoEnabled ? 'bg-zinc-700' : 'bg-red-500'}`}
+                >
+                  {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                </button>
+                <button
+                  onClick={() => setAudioEnabled(!audioEnabled)}
+                  className={`p-2 rounded-full ${audioEnabled ? 'bg-zinc-700' : 'bg-red-500'}`}
+                >
+                  {audioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                </button>
+              </>
+            )}
+            <button
+              onClick={isBroadcaster ? endLive : leaveLive}
+              className="p-2 rounded-full bg-red-500 hover:bg-red-600"
+            >
+              <Square className="w-5 h-5" />
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Chat Section */}
