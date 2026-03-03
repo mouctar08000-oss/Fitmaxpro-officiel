@@ -3250,6 +3250,219 @@ async def get_running_stats(current_user: User = Depends(get_current_user)):
         "weekly_runs": weekly_runs
     }
 
+
+# ==================== LEADERBOARD & CHALLENGES ====================
+
+# Définition des défis hebdomadaires
+WEEKLY_CHALLENGES = [
+    {"id": "distance_5k", "name_fr": "5 km cette semaine", "name_en": "5 km this week", "type": "distance", "target": 5, "badge": "🏃", "points": 50},
+    {"id": "distance_10k", "name_fr": "10 km cette semaine", "name_en": "10 km this week", "type": "distance", "target": 10, "badge": "🏅", "points": 100},
+    {"id": "distance_20k", "name_fr": "20 km cette semaine", "name_en": "20 km this week", "type": "distance", "target": 20, "badge": "🏆", "points": 200},
+    {"id": "runs_3", "name_fr": "3 courses cette semaine", "name_en": "3 runs this week", "type": "runs", "target": 3, "badge": "⭐", "points": 75},
+    {"id": "runs_5", "name_fr": "5 courses cette semaine", "name_en": "5 runs this week", "type": "runs", "target": 5, "badge": "🌟", "points": 150},
+    {"id": "calories_500", "name_fr": "500 calories brûlées", "name_en": "500 calories burned", "type": "calories", "target": 500, "badge": "🔥", "points": 60},
+    {"id": "calories_1000", "name_fr": "1000 calories brûlées", "name_en": "1000 calories burned", "type": "calories", "target": 1000, "badge": "💪", "points": 120},
+]
+
+# Badges permanents
+ACHIEVEMENT_BADGES = [
+    {"id": "first_run", "name_fr": "Première course", "name_en": "First Run", "badge": "🎯", "description_fr": "Complétez votre première course", "description_en": "Complete your first run", "requirement": {"type": "total_runs", "value": 1}},
+    {"id": "marathon_total", "name_fr": "Marathon", "name_en": "Marathon", "badge": "🏃‍♂️", "description_fr": "42 km cumulés", "description_en": "42 km total", "requirement": {"type": "total_distance", "value": 42}},
+    {"id": "century", "name_fr": "Centenaire", "name_en": "Century", "badge": "💯", "description_fr": "100 km cumulés", "description_en": "100 km total", "requirement": {"type": "total_distance", "value": 100}},
+    {"id": "dedicated", "name_fr": "Assidu", "name_en": "Dedicated", "badge": "📅", "description_fr": "10 courses complétées", "description_en": "10 runs completed", "requirement": {"type": "total_runs", "value": 10}},
+    {"id": "speed_demon", "name_fr": "Éclair", "name_en": "Speed Demon", "badge": "⚡", "description_fr": "Allure sous 5 min/km", "description_en": "Pace under 5 min/km", "requirement": {"type": "best_pace", "value": 5}},
+    {"id": "long_runner", "name_fr": "Endurant", "name_en": "Long Runner", "badge": "🦵", "description_fr": "Course de 10+ km", "description_en": "10+ km run", "requirement": {"type": "single_run_distance", "value": 10}},
+    {"id": "calorie_burner", "name_fr": "Brûleur", "name_en": "Calorie Burner", "badge": "🔥", "description_fr": "5000 calories brûlées", "description_en": "5000 calories burned", "requirement": {"type": "total_calories", "value": 5000}},
+]
+
+@api_router.get("/running/leaderboard")
+async def get_leaderboard(current_user: User = Depends(get_current_user)):
+    """Classement public des coureurs"""
+    pipeline = [
+        {"$group": {
+            "_id": "$user_id",
+            "user_name": {"$first": "$user_name"},
+            "total_distance": {"$sum": "$distance"},
+            "total_runs": {"$sum": 1},
+            "total_calories": {"$sum": "$calories"},
+            "avg_pace": {"$avg": "$pace"},
+            "best_pace": {"$min": "$pace"}
+        }},
+        {"$sort": {"total_distance": -1}},
+        {"$limit": 50}
+    ]
+    
+    leaderboard = await db.running_sessions.aggregate(pipeline).to_list(50)
+    
+    result = []
+    for idx, runner in enumerate(leaderboard):
+        result.append({
+            "rank": idx + 1,
+            "user_id": runner["_id"],
+            "user_name": runner["user_name"],
+            "total_distance": round(runner.get("total_distance", 0), 2),
+            "total_runs": runner.get("total_runs", 0),
+            "total_calories": runner.get("total_calories", 0),
+            "avg_pace": round(runner.get("avg_pace", 0), 2) if runner.get("avg_pace") else None,
+            "best_pace": round(runner.get("best_pace", 0), 2) if runner.get("best_pace") else None,
+            "is_current_user": runner["_id"] == current_user.user_id
+        })
+    
+    current_user_rank = None
+    current_user_in_list = any(r["is_current_user"] for r in result)
+    
+    if not current_user_in_list:
+        user_stats = await db.running_sessions.aggregate([
+            {"$match": {"user_id": current_user.user_id}},
+            {"$group": {"_id": None, "total_distance": {"$sum": "$distance"}}}
+        ]).to_list(1)
+        
+        if user_stats:
+            user_distance = user_stats[0].get("total_distance", 0)
+            rank = await db.running_sessions.aggregate([
+                {"$group": {"_id": "$user_id", "total_distance": {"$sum": "$distance"}}},
+                {"$match": {"total_distance": {"$gt": user_distance}}},
+                {"$count": "count"}
+            ]).to_list(1)
+            current_user_rank = (rank[0]["count"] if rank else 0) + 1
+    
+    return {
+        "leaderboard": result,
+        "current_user_rank": current_user_rank,
+        "total_runners": await db.running_sessions.aggregate([{"$group": {"_id": "$user_id"}}, {"$count": "count"}]).to_list(1)
+    }
+
+@api_router.get("/running/challenges")
+async def get_challenges(current_user: User = Depends(get_current_user)):
+    """Récupérer les défis hebdomadaires et la progression"""
+    today = datetime.now(timezone.utc)
+    start_of_week = today - timedelta(days=today.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    week_runs = await db.running_sessions.find({
+        "user_id": current_user.user_id,
+        "created_at": {"$gte": start_of_week.isoformat()}
+    }).to_list(100)
+    
+    weekly_distance = sum(r.get("distance", 0) for r in week_runs)
+    weekly_runs = len(week_runs)
+    weekly_calories = sum(r.get("calories", 0) for r in week_runs)
+    
+    challenges_progress = []
+    for challenge in WEEKLY_CHALLENGES:
+        if challenge["type"] == "distance":
+            progress = weekly_distance
+        elif challenge["type"] == "runs":
+            progress = weekly_runs
+        elif challenge["type"] == "calories":
+            progress = weekly_calories
+        else:
+            progress = 0
+        
+        completed = progress >= challenge["target"]
+        percentage = min(100, int((progress / challenge["target"]) * 100))
+        
+        challenges_progress.append({
+            "id": challenge["id"],
+            "name_fr": challenge["name_fr"],
+            "name_en": challenge["name_en"],
+            "badge": challenge["badge"],
+            "points": challenge["points"],
+            "target": challenge["target"],
+            "progress": round(progress, 2),
+            "percentage": percentage,
+            "completed": completed,
+            "type": challenge["type"]
+        })
+    
+    challenges_progress.sort(key=lambda x: (x["completed"], -x["points"]))
+    
+    return {
+        "challenges": challenges_progress,
+        "weekly_stats": {
+            "distance": round(weekly_distance, 2),
+            "runs": weekly_runs,
+            "calories": weekly_calories
+        },
+        "week_start": start_of_week.isoformat(),
+        "week_end": (start_of_week + timedelta(days=6, hours=23, minutes=59, seconds=59)).isoformat()
+    }
+
+@api_router.get("/running/badges")
+async def get_user_badges(current_user: User = Depends(get_current_user)):
+    """Récupérer les badges de l'utilisateur"""
+    pipeline = [
+        {"$match": {"user_id": current_user.user_id}},
+        {"$group": {
+            "_id": None,
+            "total_distance": {"$sum": "$distance"},
+            "total_runs": {"$sum": 1},
+            "total_calories": {"$sum": "$calories"},
+            "best_pace": {"$min": "$pace"},
+            "max_single_distance": {"$max": "$distance"}
+        }}
+    ]
+    
+    user_stats = await db.running_sessions.aggregate(pipeline).to_list(1)
+    stats = user_stats[0] if user_stats else {
+        "total_distance": 0,
+        "total_runs": 0,
+        "total_calories": 0,
+        "best_pace": None,
+        "max_single_distance": 0
+    }
+    
+    badges = []
+    for badge in ACHIEVEMENT_BADGES:
+        req = badge["requirement"]
+        unlocked = False
+        progress = 0
+        
+        if req["type"] == "total_distance":
+            progress = stats.get("total_distance", 0)
+            unlocked = progress >= req["value"]
+        elif req["type"] == "total_runs":
+            progress = stats.get("total_runs", 0)
+            unlocked = progress >= req["value"]
+        elif req["type"] == "total_calories":
+            progress = stats.get("total_calories", 0)
+            unlocked = progress >= req["value"]
+        elif req["type"] == "best_pace":
+            progress = stats.get("best_pace") or 999
+            unlocked = progress <= req["value"] and stats.get("total_runs", 0) > 0
+        elif req["type"] == "single_run_distance":
+            progress = stats.get("max_single_distance", 0)
+            unlocked = progress >= req["value"]
+        
+        badges.append({
+            "id": badge["id"],
+            "name_fr": badge["name_fr"],
+            "name_en": badge["name_en"],
+            "badge": badge["badge"],
+            "description_fr": badge["description_fr"],
+            "description_en": badge["description_en"],
+            "unlocked": unlocked,
+            "progress": round(progress, 2) if isinstance(progress, float) else progress,
+            "target": req["value"]
+        })
+    
+    badges.sort(key=lambda x: (not x["unlocked"], x["id"]))
+    unlocked_count = sum(1 for b in badges if b["unlocked"])
+    
+    return {
+        "badges": badges,
+        "unlocked_count": unlocked_count,
+        "total_badges": len(badges),
+        "user_stats": {
+            "total_distance": round(stats.get("total_distance", 0), 2),
+            "total_runs": stats.get("total_runs", 0),
+            "total_calories": stats.get("total_calories", 0),
+            "best_pace": round(stats.get("best_pace", 0), 2) if stats.get("best_pace") else None
+        }
+    }
+
+
+# Routes with path parameters must come AFTER static routes
 @api_router.get("/running/{run_id}")
 async def get_running_session(run_id: str, current_user: User = Depends(get_current_user)):
     """Récupérer les détails d'une course spécifique"""

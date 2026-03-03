@@ -13,10 +13,15 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels Audio/V
 - **Onglet Courir** : Boutons Démarrer/Pause/Reprendre/Terminer, suivi GPS, Distance, Durée, Allure, Calories
 - **Onglet Historique** : Liste de toutes les courses passées avec **bouton partage** pour chaque course
 - **Onglet Stats** : Statistiques totales, graphique de progression (7 derniers jours), Records personnels
+- **Onglet Classement** : Leaderboard public avec podium Top 3, rang de l'utilisateur, badge "You"
+- **Onglet Défis** : 
+  - Défis hebdomadaires (5km, 10km, 20km, 3 courses, 5 courses, 500 cal, 1000 cal)
+  - Barres de progression en temps réel
+  - Badges permanents (7 badges : First Run, Marathon, Century, Dedicated, Speed Demon, Long Runner, Calorie Burner)
 - **Partage Social** : Modal de partage avec carte visuelle + boutons Instagram, TikTok, X (Twitter), WhatsApp, Copier stats
 - **Admin** : Onglet "Course à Pied" avec stats globales, Top Runners, courses récentes de tous les abonnés
 - **Admin Utilisateur** : L'admin peut lui-même faire des courses, sauvegarder et voir sa progression
-- **Endpoints API** : `/api/running/log`, `/api/running/history`, `/api/running/stats`, `/api/admin/running/*`
+- **Endpoints API** : `/api/running/log`, `/api/running/history`, `/api/running/stats`, `/api/running/leaderboard`, `/api/running/challenges`, `/api/running/badges`, `/api/admin/running/*`
 
 ### 🍽️ RECETTES COMPLÈTES ✅ NEW
 - **Toutes les recettes mises à jour** avec détails complets :
@@ -135,7 +140,7 @@ GET /api/workouts?program_type=yoga
 
 ### March 3, 2026 - Session 2
 - ✅ **Course à Pied** - Fonctionnalité complète
-  - Page /running avec 3 onglets (Courir, Historique, Stats)
+  - Page /running avec 5 onglets (Courir, Historique, Stats, Classement, Défis)
   - Suivi GPS, Distance, Durée, Allure, Calories
   - Graphique de progression (7 derniers jours)
   - Records personnels
@@ -144,6 +149,14 @@ GET /api/workouts?program_type=yoga
   - Modal de partage avec carte visuelle (stats de la course)
   - Partage vers Instagram, TikTok, X (Twitter), WhatsApp
   - Bouton "Copier les stats" pour le presse-papiers
+- ✅ **Classement / Leaderboard** - NEW
+  - Podium Top 3 avec médailles or/argent/bronze
+  - Liste complète des coureurs avec rang
+  - Badge "You" pour identifier l'utilisateur connecté
+- ✅ **Défis Hebdomadaires + Badges** - NEW
+  - 7 défis hebdomadaires avec barres de progression
+  - 7 badges permanents à débloquer (First Run, Marathon, Century, etc.)
+  - Système de points pour les défis complétés
 - ✅ **Admin Running** - L'admin peut également faire des courses et voir sa progression
 - ✅ **Recettes Complètes** - 26+ recettes mises à jour
   - Ingrédients précis, étapes détaillées

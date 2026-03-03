@@ -24,7 +24,12 @@ import {
   Download,
   X,
   Copy,
-  Check
+  Check,
+  Trophy,
+  Medal,
+  Crown,
+  Star,
+  Users
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -40,7 +45,7 @@ const RunningPage = () => {
   const isFr = t('language') === 'fr' || navigator.language?.startsWith('fr');
   
   // State
-  const [activeTab, setActiveTab] = useState('track'); // track, history, stats
+  const [activeTab, setActiveTab] = useState('track'); // track, history, stats, leaderboard, challenges
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -53,6 +58,13 @@ const RunningPage = () => {
   const [shareModalRun, setShareModalRun] = useState(null);
   const [copied, setCopied] = useState(false);
   const shareCardRef = useRef(null);
+  
+  // Leaderboard & Challenges state
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [challenges, setChallenges] = useState([]);
+  const [weeklyStats, setWeeklyStats] = useState(null);
+  const [badges, setBadges] = useState([]);
+  const [unlockedBadges, setUnlockedBadges] = useState(0);
   
   // Refs
   const timerRef = useRef(null);
@@ -85,10 +97,54 @@ const RunningPage = () => {
     }
   }, []);
 
+  // Fetch leaderboard
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.get(`${API}/api/running/leaderboard`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLeaderboard(response.data.leaderboard || []);
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+    }
+  }, []);
+
+  // Fetch challenges
+  const fetchChallenges = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.get(`${API}/api/running/challenges`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setChallenges(response.data.challenges || []);
+      setWeeklyStats(response.data.weekly_stats);
+    } catch (err) {
+      console.error('Error fetching challenges:', err);
+    }
+  }, []);
+
+  // Fetch badges
+  const fetchBadges = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.get(`${API}/api/running/badges`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBadges(response.data.badges || []);
+      setUnlockedBadges(response.data.unlocked_count || 0);
+    } catch (err) {
+      console.error('Error fetching badges:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchRunHistory();
     fetchStats();
-  }, [fetchRunHistory, fetchStats]);
+    fetchLeaderboard();
+    fetchChallenges();
+    fetchBadges();
+  }, [fetchRunHistory, fetchStats, fetchLeaderboard, fetchChallenges, fetchBadges]);
 
   // Calculate distance between two points
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -403,6 +459,231 @@ const RunningPage = () => {
     </div>
   );
 
+  // Render leaderboard view
+  const renderLeaderboardView = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <Trophy className="w-6 h-6 text-yellow-500" />
+          {isFr ? 'Classement des Coureurs' : 'Runner Leaderboard'}
+        </h2>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={fetchLeaderboard}
+          className="border-zinc-700"
+        >
+          {isFr ? 'Actualiser' : 'Refresh'}
+        </Button>
+      </div>
+      
+      {/* Top 3 Podium */}
+      {leaderboard.length >= 3 && (
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {/* 2nd Place */}
+          <div className="bg-gradient-to-b from-gray-500/20 to-gray-600/10 border border-gray-500/30 rounded-xl p-4 text-center mt-8">
+            <div className="w-12 h-12 bg-gray-400 rounded-full flex items-center justify-center mx-auto mb-2">
+              <span className="text-xl font-bold text-black">2</span>
+            </div>
+            <p className="font-bold truncate">{leaderboard[1]?.user_name}</p>
+            <p className="text-2xl font-bold text-gray-400">{leaderboard[1]?.total_distance} km</p>
+            <p className="text-xs text-gray-500">{leaderboard[1]?.total_runs} {isFr ? 'courses' : 'runs'}</p>
+          </div>
+          
+          {/* 1st Place */}
+          <div className="bg-gradient-to-b from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 rounded-xl p-4 text-center">
+            <Crown className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+            <div className="w-14 h-14 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-2">
+              <span className="text-2xl font-bold text-black">1</span>
+            </div>
+            <p className="font-bold truncate">{leaderboard[0]?.user_name}</p>
+            <p className="text-3xl font-bold text-yellow-500">{leaderboard[0]?.total_distance} km</p>
+            <p className="text-xs text-gray-500">{leaderboard[0]?.total_runs} {isFr ? 'courses' : 'runs'}</p>
+          </div>
+          
+          {/* 3rd Place */}
+          <div className="bg-gradient-to-b from-orange-600/20 to-orange-700/10 border border-orange-600/30 rounded-xl p-4 text-center mt-12">
+            <div className="w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center mx-auto mb-2">
+              <span className="text-lg font-bold text-white">3</span>
+            </div>
+            <p className="font-bold truncate">{leaderboard[2]?.user_name}</p>
+            <p className="text-xl font-bold text-orange-500">{leaderboard[2]?.total_distance} km</p>
+            <p className="text-xs text-gray-500">{leaderboard[2]?.total_runs} {isFr ? 'courses' : 'runs'}</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Full Leaderboard */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+        <div className="p-4 border-b border-zinc-800">
+          <h3 className="font-bold flex items-center gap-2">
+            <Users className="w-5 h-5 text-green-500" />
+            {isFr ? 'Tous les coureurs' : 'All Runners'}
+          </h3>
+        </div>
+        
+        {leaderboard.length === 0 ? (
+          <div className="p-8 text-center">
+            <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400">{isFr ? 'Aucun coureur encore' : 'No runners yet'}</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-800 max-h-[400px] overflow-y-auto">
+            {leaderboard.map((runner) => (
+              <div 
+                key={runner.user_id}
+                className={`flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors ${
+                  runner.is_current_user ? 'bg-green-500/10 border-l-4 border-green-500' : ''
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                    runner.rank === 1 ? 'bg-yellow-500 text-black' :
+                    runner.rank === 2 ? 'bg-gray-400 text-black' :
+                    runner.rank === 3 ? 'bg-orange-600 text-white' :
+                    'bg-zinc-700 text-white'
+                  }`}>
+                    {runner.rank}
+                  </span>
+                  <div>
+                    <p className="font-bold flex items-center gap-2">
+                      {runner.user_name}
+                      {runner.is_current_user && (
+                        <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">
+                          {isFr ? 'Vous' : 'You'}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-gray-500 text-sm">{runner.total_runs} {isFr ? 'courses' : 'runs'}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-green-400">{runner.total_distance} km</p>
+                  <p className="text-gray-500 text-sm">
+                    {isFr ? 'Allure moy:' : 'Avg:'} {runner.avg_pace ? `${runner.avg_pace} min/km` : '--'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Render challenges view
+  const renderChallengesView = () => (
+    <div className="space-y-6">
+      {/* Weekly Stats Header */}
+      <div className="bg-gradient-to-r from-green-600/20 to-blue-600/20 border border-green-500/30 rounded-xl p-6">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <Target className="w-6 h-6 text-green-500" />
+          {isFr ? 'Défis de la Semaine' : 'Weekly Challenges'}
+        </h2>
+        
+        {weeklyStats && (
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-3xl font-bold text-green-400">{weeklyStats.distance}</p>
+              <p className="text-gray-400 text-sm">{isFr ? 'km cette semaine' : 'km this week'}</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-blue-400">{weeklyStats.runs}</p>
+              <p className="text-gray-400 text-sm">{isFr ? 'courses' : 'runs'}</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-orange-400">{weeklyStats.calories}</p>
+              <p className="text-gray-400 text-sm">{isFr ? 'calories' : 'calories'}</p>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Challenges List */}
+      <div className="space-y-3">
+        <h3 className="font-bold text-lg flex items-center gap-2">
+          <Star className="w-5 h-5 text-yellow-500" />
+          {isFr ? 'Vos Défis' : 'Your Challenges'}
+        </h3>
+        
+        {challenges.map((challenge) => (
+          <div 
+            key={challenge.id}
+            className={`bg-zinc-900 border rounded-lg p-4 ${
+              challenge.completed 
+                ? 'border-green-500/50 bg-green-500/5' 
+                : 'border-zinc-800'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{challenge.badge}</span>
+                <div>
+                  <p className="font-bold">{isFr ? challenge.name_fr : challenge.name_en}</p>
+                  <p className="text-gray-500 text-sm">+{challenge.points} pts</p>
+                </div>
+              </div>
+              {challenge.completed ? (
+                <div className="flex items-center gap-2 text-green-500">
+                  <Check className="w-5 h-5" />
+                  <span className="font-bold">{isFr ? 'Complété !' : 'Completed!'}</span>
+                </div>
+              ) : (
+                <span className="text-gray-400">
+                  {challenge.progress}/{challenge.target} {challenge.type === 'distance' ? 'km' : challenge.type === 'calories' ? 'kcal' : ''}
+                </span>
+              )}
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="w-full bg-zinc-800 rounded-full h-2">
+              <div 
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  challenge.completed ? 'bg-green-500' : 'bg-blue-500'
+                }`}
+                style={{ width: `${challenge.percentage}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Badges Section */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+          <Medal className="w-5 h-5 text-purple-500" />
+          {isFr ? `Badges (${unlockedBadges}/${badges.length})` : `Badges (${unlockedBadges}/${badges.length})`}
+        </h3>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {badges.map((badge) => (
+            <div 
+              key={badge.id}
+              className={`text-center p-4 rounded-lg border transition-all ${
+                badge.unlocked 
+                  ? 'bg-purple-500/10 border-purple-500/50' 
+                  : 'bg-zinc-800/50 border-zinc-700 opacity-50'
+              }`}
+            >
+              <span className={`text-4xl ${badge.unlocked ? '' : 'grayscale'}`}>{badge.badge}</span>
+              <p className={`font-bold mt-2 text-sm ${badge.unlocked ? 'text-white' : 'text-gray-500'}`}>
+                {isFr ? badge.name_fr : badge.name_en}
+              </p>
+              <p className="text-gray-500 text-xs mt-1">
+                {isFr ? badge.description_fr : badge.description_en}
+              </p>
+              {!badge.unlocked && (
+                <p className="text-xs text-gray-600 mt-2">
+                  {badge.progress}/{badge.target}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   // Render stats view
   const renderStatsView = () => {
     const chartData = runHistory.slice(0, 7).reverse().map((run, idx) => ({
@@ -512,23 +793,26 @@ const RunningPage = () => {
         </div>
         
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 bg-zinc-900 p-1 rounded-lg">
+        <div className="flex gap-1 mb-6 bg-zinc-900 p-1 rounded-lg overflow-x-auto">
           {[
             { id: 'track', label: isFr ? 'Courir' : 'Run', icon: Play },
             { id: 'history', label: isFr ? 'Historique' : 'History', icon: Calendar },
-            { id: 'stats', label: isFr ? 'Stats' : 'Stats', icon: TrendingUp }
+            { id: 'stats', label: isFr ? 'Stats' : 'Stats', icon: TrendingUp },
+            { id: 'leaderboard', label: isFr ? 'Classement' : 'Leaderboard', icon: Trophy },
+            { id: 'challenges', label: isFr ? 'Défis' : 'Challenges', icon: Target }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-colors ${
+              data-testid={`tab-${tab.id}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-md transition-colors whitespace-nowrap ${
                 activeTab === tab.id 
                   ? 'bg-green-500 text-white' 
                   : 'text-gray-400 hover:text-white'
               }`}
             >
               <tab.icon className="w-4 h-4" />
-              {tab.label}
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
@@ -537,6 +821,8 @@ const RunningPage = () => {
         {activeTab === 'track' && renderTrackingView()}
         {activeTab === 'history' && renderHistoryView()}
         {activeTab === 'stats' && renderStatsView()}
+        {activeTab === 'leaderboard' && renderLeaderboardView()}
+        {activeTab === 'challenges' && renderChallengesView()}
         
         {/* Share Modal */}
         {shareModalRun && (
