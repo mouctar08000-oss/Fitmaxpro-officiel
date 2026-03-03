@@ -29,11 +29,14 @@ import {
   Medal,
   Crown,
   Star,
-  Users
+  Users,
+  Bell,
+  BellOff
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import useNotifications from '../hooks/useNotifications';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -41,6 +44,16 @@ const RunningPage = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // Notifications hook
+  const { 
+    permission, 
+    isSupported, 
+    isSubscribed, 
+    subscribe, 
+    unsubscribe, 
+    loading: notifLoading 
+  } = useNotifications();
   
   const isFr = t('language') === 'fr' || navigator.language?.startsWith('fr');
   
@@ -782,14 +795,51 @@ const RunningPage = () => {
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Footprints className="w-8 h-8 text-green-500" />
-            {isFr ? 'Course à Pied' : 'Running'}
-          </h1>
-          <p className="text-gray-400 mt-2">
-            {isFr ? 'Suivez vos courses et votre progression' : 'Track your runs and progress'}
-          </p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Footprints className="w-8 h-8 text-green-500" />
+              {isFr ? 'Course à Pied' : 'Running'}
+            </h1>
+            <p className="text-gray-400 mt-2">
+              {isFr ? 'Suivez vos courses et votre progression' : 'Track your runs and progress'}
+            </p>
+          </div>
+          
+          {/* Notification Toggle */}
+          {isSupported && (
+            <Button
+              onClick={async () => {
+                if (isSubscribed) {
+                  await unsubscribe();
+                  toast.success(isFr ? 'Notifications désactivées' : 'Notifications disabled');
+                } else {
+                  const result = await subscribe();
+                  if (result) {
+                    toast.success(isFr ? 'Notifications activées !' : 'Notifications enabled!');
+                  } else {
+                    toast.error(isFr ? 'Erreur lors de l\'activation' : 'Failed to enable');
+                  }
+                }
+              }}
+              disabled={notifLoading}
+              variant={isSubscribed ? "default" : "outline"}
+              className={`${isSubscribed ? 'bg-green-600 hover:bg-green-700' : 'border-zinc-700'}`}
+              data-testid="notification-toggle"
+            >
+              {isSubscribed ? (
+                <>
+                  <Bell className="w-4 h-4 mr-2" />
+                  {isFr ? 'Notifs ON' : 'Notifs ON'}
+                </>
+              ) : (
+                <>
+                  <BellOff className="w-4 h-4 mr-2" />
+                  {isFr ? 'Activer les notifs' : 'Enable notifs'}
+                </>
+              )}
+            </Button>
+          )}
         </div>
         
         {/* Tabs */}

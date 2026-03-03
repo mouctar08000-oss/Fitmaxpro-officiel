@@ -19,9 +19,14 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels Audio/V
   - Barres de progression en temps réel
   - Badges permanents (7 badges : First Run, Marathon, Century, Dedicated, Speed Demon, Long Runner, Calorie Burner)
 - **Partage Social** : Modal de partage avec carte visuelle + boutons Instagram, TikTok, X (Twitter), WhatsApp, Copier stats
-- **Admin** : Onglet "Course à Pied" avec stats globales, Top Runners, courses récentes de tous les abonnés
+- **Notifications Push** : 
+  - Bouton "Enable notifs" pour activer les notifications
+  - Notification quand un défi est presque complété
+  - Notification quand quelqu'un vous dépasse au classement
+  - Admin peut envoyer des notifications broadcast à tous les abonnés
+- **Admin** : Onglet "Course à Pied" avec stats globales, Top Runners, courses récentes, bouton "Notify all"
 - **Admin Utilisateur** : L'admin peut lui-même faire des courses, sauvegarder et voir sa progression
-- **Endpoints API** : `/api/running/log`, `/api/running/history`, `/api/running/stats`, `/api/running/leaderboard`, `/api/running/challenges`, `/api/running/badges`, `/api/admin/running/*`
+- **Endpoints API** : `/api/running/*`, `/api/notifications/*`, `/api/admin/notifications/broadcast`
 
 ### 🍽️ RECETTES COMPLÈTES ✅ NEW
 - **Toutes les recettes mises à jour** avec détails complets :
@@ -157,6 +162,12 @@ GET /api/workouts?program_type=yoga
   - 7 défis hebdomadaires avec barres de progression
   - 7 badges permanents à débloquer (First Run, Marathon, Century, etc.)
   - Système de points pour les défis complétés
+- ✅ **Notifications Push** - NEW
+  - Service Worker pour les notifications push
+  - Bouton "Enable notifs" dans la page Running
+  - Notifications automatiques quand défi presque complété
+  - Notifications quand quelqu'un vous dépasse au classement
+  - Admin: Bouton "Notify all" pour broadcast à tous les abonnés
 - ✅ **Admin Running** - L'admin peut également faire des courses et voir sa progression
 - ✅ **Recettes Complètes** - 26+ recettes mises à jour
   - Ingrédients précis, étapes détaillées

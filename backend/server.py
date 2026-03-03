@@ -17,6 +17,19 @@ from passlib.context import CryptContext
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 import resend
 
+# Web Push Notifications
+try:
+    from pywebpush import webpush, WebPushException
+    WEBPUSH_AVAILABLE = True
+except ImportError:
+    WEBPUSH_AVAILABLE = False
+    print("Warning: pywebpush not available")
+
+# VAPID Keys for Push Notifications (replace with your own in production)
+VAPID_PRIVATE_KEY = "Bmw7bEZI0X6QZkQQJ1Y9TWFU7h_sA_Tz5t8mKlkMfms"
+VAPID_PUBLIC_KEY = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
+VAPID_CLAIMS = {"sub": "mailto:admin@fitmaxpro.com"}
+
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -3178,6 +3191,33 @@ async def log_running_session(run: RunningSession, current_user: User = Depends(
     
     await db.running_sessions.insert_one(run_doc)
     
+    # Trigger notifications in background
+    try:
+        # Calculate weekly stats for challenge notifications
+        today = datetime.now(timezone.utc)
+        start_of_week = today - timedelta(days=today.weekday())
+        start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        week_runs = await db.running_sessions.find({
+            "user_id": current_user.user_id,
+            "created_at": {"$gte": start_of_week.isoformat()}
+        }).to_list(100)
+        
+        weekly_stats = {
+            "distance": sum(r.get("distance", 0) for r in week_runs),
+            "runs": len(week_runs),
+            "calories": sum(r.get("calories", 0) for r in week_runs)
+        }
+        
+        # Check challenge progress notifications
+        asyncio.create_task(check_and_notify_challenges(current_user.user_id, weekly_stats))
+        
+        # Check leaderboard changes
+        total_distance = sum(r.get("distance", 0) for r in await db.running_sessions.find({"user_id": current_user.user_id}).to_list(500))
+        asyncio.create_task(check_leaderboard_changes(current_user.user_id, current_user.name, total_distance))
+    except Exception as e:
+        print(f"Notification check error: {e}")
+    
     return {
         "success": True,
         "run_id": run_id,
@@ -3589,6 +3629,219 @@ async def admin_get_user_running(user_id: str, admin: User = Depends(verify_admi
             "total_time": total_time,
             "total_calories": total_calories
         }
+    }
+
+
+# ==================== PUSH NOTIFICATIONS ====================
+
+class PushSubscription(BaseModel):
+    subscription: Dict
+
+@api_router.post("/notifications/subscribe")
+async def subscribe_notifications(data: PushSubscription, current_user: User = Depends(get_current_user)):
+    """Subscribe user to push notifications"""
+    subscription = data.subscription
+    
+    # Store subscription in database
+    await db.push_subscriptions.update_one(
+        {"user_id": current_user.user_id},
+        {
+            "$set": {
+                "user_id": current_user.user_id,
+                "subscription": subscription,
+                "enabled": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        },
+        upsert=True
+    )
+    
+    return {"success": True, "message": "Subscribed to notifications"}
+
+@api_router.post("/notifications/unsubscribe")
+async def unsubscribe_notifications(current_user: User = Depends(get_current_user)):
+    """Unsubscribe user from push notifications"""
+    await db.push_subscriptions.update_one(
+        {"user_id": current_user.user_id},
+        {"$set": {"enabled": False}}
+    )
+    
+    return {"success": True, "message": "Unsubscribed from notifications"}
+
+@api_router.get("/notifications/status")
+async def get_notification_status(current_user: User = Depends(get_current_user)):
+    """Get user's notification subscription status"""
+    sub = await db.push_subscriptions.find_one(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    )
+    
+    return {
+        "subscribed": sub is not None and sub.get("enabled", False),
+        "subscription": sub.get("subscription") if sub else None
+    }
+
+async def send_push_notification(user_id: str, title: str, body: str, data: dict = None):
+    """Send push notification to a specific user"""
+    if not WEBPUSH_AVAILABLE:
+        print(f"[Notification] Would send to {user_id}: {title} - {body}")
+        return False
+    
+    sub = await db.push_subscriptions.find_one({"user_id": user_id, "enabled": True})
+    if not sub:
+        return False
+    
+    try:
+        subscription_info = sub.get("subscription")
+        payload = json.dumps({
+            "title": title,
+            "body": body,
+            "icon": "/logo192.png",
+            "badge": "/logo192.png",
+            "data": data or {},
+            "tag": f"fitmaxpro-{uuid.uuid4().hex[:8]}"
+        })
+        
+        webpush(
+            subscription_info=subscription_info,
+            data=payload,
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims=VAPID_CLAIMS
+        )
+        
+        # Log notification
+        await db.notification_logs.insert_one({
+            "user_id": user_id,
+            "title": title,
+            "body": body,
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "success": True
+        })
+        
+        return True
+    except WebPushException as e:
+        print(f"Push notification failed: {e}")
+        if e.response and e.response.status_code in [404, 410]:
+            # Subscription expired, remove it
+            await db.push_subscriptions.delete_one({"user_id": user_id})
+        return False
+    except Exception as e:
+        print(f"Push notification error: {e}")
+        return False
+
+async def check_and_notify_challenges(user_id: str, weekly_stats: dict):
+    """Check if user is close to completing challenges and send notifications"""
+    challenges = [
+        {"name": "5 km", "type": "distance", "target": 5, "threshold": 4},
+        {"name": "10 km", "type": "distance", "target": 10, "threshold": 8},
+        {"name": "20 km", "type": "distance", "target": 20, "threshold": 18},
+        {"name": "3 courses", "type": "runs", "target": 3, "threshold": 2},
+        {"name": "5 courses", "type": "runs", "target": 5, "threshold": 4},
+        {"name": "500 calories", "type": "calories", "target": 500, "threshold": 400},
+        {"name": "1000 calories", "type": "calories", "target": 1000, "threshold": 900},
+    ]
+    
+    for challenge in challenges:
+        progress = weekly_stats.get(challenge["type"], 0)
+        
+        # Check if close to completing (at threshold but not yet complete)
+        if challenge["threshold"] <= progress < challenge["target"]:
+            remaining = challenge["target"] - progress
+            
+            # Check if we already sent this notification
+            recent_notif = await db.notification_logs.find_one({
+                "user_id": user_id,
+                "title": {"$regex": challenge["name"]},
+                "sent_at": {"$gte": (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()}
+            })
+            
+            if not recent_notif:
+                if challenge["type"] == "distance":
+                    body = f"Plus que {remaining:.1f} km pour compléter le défi '{challenge['name']}' ! 🏃"
+                elif challenge["type"] == "runs":
+                    body = f"Plus qu'1 course pour compléter le défi '{challenge['name']}' ! 💪"
+                else:
+                    body = f"Plus que {int(remaining)} calories pour le défi '{challenge['name']}' ! 🔥"
+                
+                await send_push_notification(
+                    user_id,
+                    f"🎯 Défi presque complété !",
+                    body,
+                    {"url": "/running", "type": "challenge_progress"}
+                )
+
+async def check_leaderboard_changes(user_id: str, user_name: str, new_distance: float):
+    """Check if user passed someone in the leaderboard and notify them"""
+    # Get users who were just passed
+    passed_users = await db.running_sessions.aggregate([
+        {"$group": {
+            "_id": "$user_id",
+            "user_name": {"$first": "$user_name"},
+            "total_distance": {"$sum": "$distance"}
+        }},
+        {"$match": {
+            "_id": {"$ne": user_id},
+            "total_distance": {"$lt": new_distance, "$gt": new_distance - 10}  # Recently passed
+        }}
+    ]).to_list(10)
+    
+    for passed in passed_users:
+        passed_id = passed["_id"]
+        
+        # Check if already notified recently
+        recent = await db.notification_logs.find_one({
+            "user_id": passed_id,
+            "title": {"$regex": "classement"},
+            "sent_at": {"$gte": (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()}
+        })
+        
+        if not recent:
+            await send_push_notification(
+                passed_id,
+                "📊 Changement au classement !",
+                f"{user_name} vient de vous dépasser ! Courez pour reprendre votre place ! 🏃",
+                {"url": "/running", "type": "leaderboard_change"}
+            )
+
+# Test notification endpoint
+@api_router.post("/notifications/test")
+async def test_notification(current_user: User = Depends(get_current_user)):
+    """Send a test notification to the current user"""
+    success = await send_push_notification(
+        current_user.user_id,
+        "🎉 Test de notification FitMaxPro",
+        "Les notifications fonctionnent parfaitement ! Continuez à vous dépasser !",
+        {"url": "/running", "type": "test"}
+    )
+    
+    return {"success": success, "message": "Test notification sent" if success else "Failed to send"}
+
+# Admin: Send notification to all users
+class BroadcastNotification(BaseModel):
+    title: str
+    body: str
+    url: Optional[str] = "/running"
+
+@api_router.post("/admin/notifications/broadcast")
+async def broadcast_notification(notif: BroadcastNotification, admin: User = Depends(verify_admin)):
+    """Admin: Broadcast notification to all subscribed users"""
+    subs = await db.push_subscriptions.find({"enabled": True}).to_list(1000)
+    
+    sent_count = 0
+    for sub in subs:
+        success = await send_push_notification(
+            sub["user_id"],
+            notif.title,
+            notif.body,
+            {"url": notif.url, "type": "broadcast"}
+        )
+        if success:
+            sent_count += 1
+    
+    return {
+        "success": True,
+        "sent": sent_count,
+        "total_subscribed": len(subs)
     }
 
 

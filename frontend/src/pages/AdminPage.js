@@ -1914,19 +1914,44 @@ const AdminPage = () => {
           {/* Running Tab */}
           {activeTab === 'running' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-4">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Footprints className="w-5 h-5 text-green-500" />
                   {isFr ? 'Course à Pied - Suivi des Abonnés' : 'Running - Subscriber Tracking'}
                 </h2>
-                <Button
-                  onClick={() => { fetchRunningStats(); fetchAllRunningData(); }}
-                  variant="outline"
-                  className="border-[#27272a]"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  {isFr ? 'Actualiser' : 'Refresh'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={async () => {
+                      const title = prompt(isFr ? 'Titre de la notification:' : 'Notification title:', isFr ? '🏃 Défi Running !' : '🏃 Running Challenge!');
+                      if (!title) return;
+                      const body = prompt(isFr ? 'Message:' : 'Message:', isFr ? 'Nouveau défi disponible ! Venez courir !' : 'New challenge available! Come run!');
+                      if (!body) return;
+                      
+                      try {
+                        const response = await axios.post(`${API}/admin/notifications/broadcast`, {
+                          title,
+                          body,
+                          url: '/running'
+                        }, { headers: getAuthHeaders() });
+                        toast.success(`${isFr ? 'Notification envoyée à' : 'Notification sent to'} ${response.data.sent} ${isFr ? 'abonnés' : 'subscribers'}`);
+                      } catch (err) {
+                        toast.error(isFr ? 'Erreur d\'envoi' : 'Send error');
+                      }
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    <Bell className="w-4 h-4 mr-2" />
+                    {isFr ? 'Notifier tous' : 'Notify all'}
+                  </Button>
+                  <Button
+                    onClick={() => { fetchRunningStats(); fetchAllRunningData(); }}
+                    variant="outline"
+                    className="border-[#27272a]"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    {isFr ? 'Actualiser' : 'Refresh'}
+                  </Button>
+                </div>
               </div>
 
               {/* Global Running Stats */}
