@@ -20,6 +20,7 @@ import MessagesPage from './pages/MessagesPage';
 import RemindersPage from './pages/RemindersPage';
 import ReviewsPage from './pages/ReviewsPage';
 import ProgressPhotosPage from './pages/ProgressPhotosPage';
+import LiveStreamPage from './pages/LiveStreamPage';
 import './i18n';
 import './App.css';
 
@@ -91,6 +92,12 @@ function AppRouter() {
       <Route path="/progress-photos" element={
         <ProtectedRoute>
           <ProgressPhotosPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/live" element={
+        <ProtectedRoute>
+          <LiveStreamPage />
         </ProtectedRoute>
       } />
     </Routes>

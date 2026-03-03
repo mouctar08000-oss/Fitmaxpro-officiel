@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
@@ -104,6 +104,19 @@ const Navigation = () => {
                 >
                   <MessageCircle className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Coach' : 'Coach'}
+                </button>
+                <button
+                  data-testid="nav-live"
+                  onClick={() => navigate('/live')}
+                  className={`flex items-center gap-1 hover:text-red-400 transition-colors ${
+                    isActive('/live') ? 'text-red-400' : 'text-gray-400'
+                  }`}
+                >
+                  <Video className="w-4 h-4" />
+                  <span className="relative">
+                    Live
+                    <span className="absolute -top-1 -right-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                  </span>
                 </button>
                 <button
                   data-testid="nav-reminders"

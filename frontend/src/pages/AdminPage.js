@@ -2836,9 +2836,12 @@ const AdminPage = () => {
                       onChange={(e) => setNewWorkout(prev => ({ ...prev, program_type: e.target.value }))}
                       className="w-full bg-[#09090b] border border-[#27272a] rounded-md px-3 py-2 text-white"
                     >
-                      <option value="legs_glutes">{isFr ? 'Jambes & Fessiers' : 'Legs & Glutes'}</option>
                       <option value="mass_gain">{isFr ? 'Prise de masse' : 'Mass Gain'}</option>
                       <option value="weight_loss">{isFr ? 'Perte de poids' : 'Weight Loss'}</option>
+                      <option value="abs">{isFr ? 'Abdominaux' : 'Abs'}</option>
+                      <option value="legs_glutes">{isFr ? 'Jambes & Fessiers' : 'Legs & Glutes'}</option>
+                      <option value="women_fitness">{isFr ? 'Spécial Femme' : 'Women Special'}</option>
+                      <option value="yoga">{isFr ? 'Yoga & Détente' : 'Yoga & Relaxation'}</option>
                     </select>
                   </div>
                   <div>

@@ -46,6 +46,8 @@ class User(BaseModel):
     picture: Optional[str] = None
     subscription_tier: str = "none"
     subscription_status: str = "inactive"
+    role: Optional[str] = None
+    subscription: Optional[dict] = None
     created_at: datetime
 
 class UserSession(BaseModel):
@@ -2958,6 +2960,146 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# ==================== LIVE STREAMING ENDPOINTS ====================
+
+class LiveCreate(BaseModel):
+    title: str
+    description: str = ""
+    vip_only: bool = False
+
+class LiveChat(BaseModel):
+    message: str
+
+@api_router.get("/lives")
+async def get_active_lives(current_user: User = Depends(get_current_user)):
+    """Get all active live sessions"""
+    lives = await db.lives.find({"status": "active"}).to_list(100)
+    for live in lives:
+        live['live_id'] = str(live.get('live_id', live.get('_id')))
+        live.pop('_id', None)
+    return lives
+
+@api_router.post("/lives")
+async def create_live(live: LiveCreate, current_user: User = Depends(get_current_user)):
+    """Create a new live session (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can start lives")
+    
+    live_id = f"live_{uuid.uuid4().hex[:12]}"
+    live_doc = {
+        "live_id": live_id,
+        "title": live.title,
+        "description": live.description,
+        "vip_only": live.vip_only,
+        "host_id": current_user.user_id,
+        "host_name": current_user.name,
+        "status": "active",
+        "viewer_count": 0,
+        "viewers": [],
+        "chat_messages": [],
+        "created_at": datetime.utcnow().isoformat(),
+        "started_at": datetime.utcnow().isoformat()
+    }
+    
+    await db.lives.insert_one(live_doc)
+    live_doc.pop('_id', None)
+    return live_doc
+
+@api_router.post("/lives/{live_id}/join")
+async def join_live(live_id: str, current_user: User = Depends(get_current_user)):
+    """Join a live session as viewer"""
+    live = await db.lives.find_one({"live_id": live_id, "status": "active"})
+    if not live:
+        raise HTTPException(status_code=404, detail="Live session not found")
+    
+    # Check VIP access
+    if live.get('vip_only'):
+        user_sub = current_user.subscription or {}
+        if user_sub.get('type') != 'vip' and current_user.role != 'admin':
+            raise HTTPException(status_code=403, detail="This session is VIP only")
+    
+    # Add viewer
+    await db.lives.update_one(
+        {"live_id": live_id},
+        {
+            "$addToSet": {"viewers": current_user.user_id},
+            "$inc": {"viewer_count": 1}
+        }
+    )
+    
+    return {"success": True, "token": f"viewer_{uuid.uuid4().hex[:8]}"}
+
+@api_router.post("/lives/{live_id}/leave")
+async def leave_live(live_id: str, current_user: User = Depends(get_current_user)):
+    """Leave a live session"""
+    await db.lives.update_one(
+        {"live_id": live_id},
+        {
+            "$pull": {"viewers": current_user.user_id},
+            "$inc": {"viewer_count": -1}
+        }
+    )
+    return {"success": True}
+
+@api_router.post("/lives/{live_id}/end")
+async def end_live(live_id: str, current_user: User = Depends(get_current_user)):
+    """End a live session (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can end lives")
+    
+    result = await db.lives.update_one(
+        {"live_id": live_id},
+        {
+            "$set": {
+                "status": "ended",
+                "ended_at": datetime.utcnow().isoformat()
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Live not found")
+    
+    return {"success": True}
+
+@api_router.post("/lives/{live_id}/chat")
+async def send_chat_message(live_id: str, chat: LiveChat, current_user: User = Depends(get_current_user)):
+    """Send a chat message in a live session"""
+    message_doc = {
+        "user_id": current_user.user_id,
+        "user_name": current_user.name,
+        "message": chat.message,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    await db.lives.update_one(
+        {"live_id": live_id},
+        {"$push": {"chat_messages": message_doc}}
+    )
+    
+    return {"success": True}
+
+@api_router.get("/lives/{live_id}/chat")
+async def get_chat_messages(live_id: str, current_user: User = Depends(get_current_user)):
+    """Get chat messages for a live session"""
+    live = await db.lives.find_one({"live_id": live_id}, {"chat_messages": 1})
+    if not live:
+        raise HTTPException(status_code=404, detail="Live not found")
+    return live.get('chat_messages', [])
+
+@api_router.get("/admin/lives/history")
+async def get_live_history(current_user: User = Depends(get_current_user)):
+    """Get live session history (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    lives = await db.lives.find().sort("created_at", -1).to_list(50)
+    for live in lives:
+        live['live_id'] = str(live.get('live_id', live.get('_id')))
+        live.pop('_id', None)
+    return lives
+
 
 # Include router after all endpoints are defined
 app.include_router(api_router)
