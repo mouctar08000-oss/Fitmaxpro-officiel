@@ -219,6 +219,18 @@ GET /api/workouts?program_type=yoga
   - 4 produits IAP définis (standard/vip × monthly/annual)
   - Endpoint de vérification d'achat (RevenueCat prêt)
   - Stockage des reçus pour vérification manuelle
+- ✅ **Emails de Motivation Hebdomadaires**
+  - Onglet Admin "Motivation Emails" avec aperçu
+  - Configuration personnalisable (stats running, workouts, points, classement)
+  - Messages d'intro personnalisés FR/EN
+  - Historique des envois
+- ✅ **Gestion Complète des Réseaux Sociaux**
+  - Faux comptes supprimés
+  - 9 réseaux supportés: Instagram, YouTube, TikTok, Facebook, Snapchat, X, WhatsApp, Telegram, Website
+  - Bouton de suppression individuel pour chaque réseau
+  - Bouton "Clear all" pour tout supprimer
+  - Aperçu en temps réel des liens actifs
+  - Affichage conditionnel sur Dashboard et Footer
 
 ### March 3, 2026 - Session 2
 - ✅ **Course à Pied** - Fonctionnalité complète (5 onglets)
@@ -241,6 +253,7 @@ GET /api/workouts?program_type=yoga
 - ✅ Total: 138 séances d'entraînement
 
 ## Test Reports
+- `/app/test_reports/iteration_10.json` - Tests Emails Motivation (100% pass)
 - `/app/test_reports/iteration_9.json` - Tests P2 complets (100% pass)
 - `/app/test_reports/iteration_8.json` - Tests Avis complets avec likes et points (95-100% pass)
 - `/app/test_reports/iteration_7.json` - Tests Système d'Avis (100% pass)

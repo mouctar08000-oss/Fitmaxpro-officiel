@@ -2360,73 +2360,311 @@ const AdminPage = () => {
               </h2>
               <p className="text-gray-400 text-sm">
                 {isFr 
-                  ? 'Ajoutez vos liens de réseaux sociaux. Ils seront affichés dans le footer du site et permettront aux abonnés de vous suivre.'
-                  : 'Add your social media links. They will be displayed in the site footer and allow subscribers to follow you.'}
+                  ? 'Ajoutez vos liens de réseaux sociaux. Ils seront affichés dans le footer du site et sur le Dashboard. Laissez un champ vide pour ne pas afficher ce réseau.'
+                  : 'Add your social media links. They will be displayed in the site footer and Dashboard. Leave a field empty to hide that network.'}
               </p>
 
+              {/* Info Alert */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <p className="text-blue-400 text-sm">
+                  {isFr 
+                    ? '💡 Conseil : Ajoutez uniquement les réseaux sociaux où vous êtes actif. Les liens vides ne seront pas affichés aux abonnés.'
+                    : '💡 Tip: Only add social networks where you are active. Empty links will not be shown to subscribers.'}
+                </p>
+              </div>
+
               <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 space-y-4">
-                <div>
-                  <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                    <Instagram className="w-4 h-4 text-pink-400" /> Instagram
-                  </label>
-                  <Input
-                    value={socialLinks.instagram || ''}
-                    onChange={(e) => setSocialLinks({...socialLinks, instagram: e.target.value})}
-                    placeholder="https://instagram.com/votre-compte"
-                    className="bg-[#09090b] border-[#27272a]"
-                  />
+                <h3 className="font-bold text-lg mb-4">{isFr ? 'Vos Réseaux Sociaux' : 'Your Social Networks'}</h3>
+                
+                {/* Instagram */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Instagram className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">Instagram</label>
+                    <Input
+                      value={socialLinks.instagram || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, instagram: e.target.value})}
+                      placeholder="https://instagram.com/votre-compte"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.instagram && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, instagram: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
                 
-                <div>
-                  <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                    <Video className="w-4 h-4 text-red-500" /> YouTube
-                  </label>
-                  <Input
-                    value={socialLinks.youtube || ''}
-                    onChange={(e) => setSocialLinks({...socialLinks, youtube: e.target.value})}
-                    placeholder="https://youtube.com/@votre-chaine"
-                    className="bg-[#09090b] border-[#27272a]"
-                  />
+                {/* YouTube */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Video className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">YouTube</label>
+                    <Input
+                      value={socialLinks.youtube || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, youtube: e.target.value})}
+                      placeholder="https://youtube.com/@votre-chaine"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.youtube && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, youtube: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
                 
-                <div>
-                  <label className="text-sm text-gray-400 mb-2 block">TikTok</label>
-                  <Input
-                    value={socialLinks.tiktok || ''}
-                    onChange={(e) => setSocialLinks({...socialLinks, tiktok: e.target.value})}
-                    placeholder="https://tiktok.com/@votre-compte"
-                    className="bg-[#09090b] border-[#27272a]"
-                  />
+                {/* TikTok */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-black border border-[#27272a] rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-xs">TT</span>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">TikTok</label>
+                    <Input
+                      value={socialLinks.tiktok || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, tiktok: e.target.value})}
+                      placeholder="https://tiktok.com/@votre-compte"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.tiktok && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, tiktok: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
                 
-                <div>
-                  <label className="text-sm text-gray-400 mb-2 block">Snapchat</label>
-                  <Input
-                    value={socialLinks.snapchat || ''}
-                    onChange={(e) => setSocialLinks({...socialLinks, snapchat: e.target.value})}
-                    placeholder="https://snapchat.com/add/votre-compte"
-                    className="bg-[#09090b] border-[#27272a]"
-                  />
+                {/* Facebook */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold">f</span>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">Facebook</label>
+                    <Input
+                      value={socialLinks.facebook || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, facebook: e.target.value})}
+                      placeholder="https://facebook.com/votre-page"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.facebook && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, facebook: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
                 
-                <div>
-                  <label className="text-sm text-gray-400 mb-2 block">Facebook</label>
-                  <Input
-                    value={socialLinks.facebook || ''}
-                    onChange={(e) => setSocialLinks({...socialLinks, facebook: e.target.value})}
-                    placeholder="https://facebook.com/votre-page"
-                    className="bg-[#09090b] border-[#27272a]"
-                  />
+                {/* Snapchat */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-black font-bold text-lg">👻</span>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">Snapchat</label>
+                    <Input
+                      value={socialLinks.snapchat || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, snapchat: e.target.value})}
+                      placeholder="https://snapchat.com/add/votre-compte"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.snapchat && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, snapchat: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Twitter/X */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-black border border-[#27272a] rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold">X</span>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">X (Twitter)</label>
+                    <Input
+                      value={socialLinks.twitter || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, twitter: e.target.value})}
+                      placeholder="https://x.com/votre-compte"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.twitter && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, twitter: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                {/* WhatsApp */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Phone className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">WhatsApp</label>
+                    <Input
+                      value={socialLinks.whatsapp || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, whatsapp: e.target.value})}
+                      placeholder="https://wa.me/33612345678"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.whatsapp && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, whatsapp: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Telegram */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Send className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">Telegram</label>
+                    <Input
+                      value={socialLinks.telegram || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, telegram: e.target.value})}
+                      placeholder="https://t.me/votre-compte"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.telegram && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, telegram: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Website */}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-lg">🌐</span>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 mb-1 block">{isFr ? 'Site Web' : 'Website'}</label>
+                    <Input
+                      value={socialLinks.website || ''}
+                      onChange={(e) => setSocialLinks({...socialLinks, website: e.target.value})}
+                      placeholder="https://votre-site.com"
+                      className="bg-[#09090b] border-[#27272a]"
+                    />
+                  </div>
+                  {socialLinks.website && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks({...socialLinks, website: ''})}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
 
-                <Button onClick={saveSocialLinks} className="bg-[#EF4444] w-full mt-4" disabled={savingSocial}>
-                  {savingSocial ? (
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                {/* Actions */}
+                <div className="flex gap-4 mt-6 pt-4 border-t border-[#27272a]">
+                  <Button 
+                    onClick={() => setSocialLinks({})} 
+                    variant="outline" 
+                    className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    {isFr ? 'Tout supprimer' : 'Clear all'}
+                  </Button>
+                  <Button onClick={saveSocialLinks} className="bg-[#EF4444] flex-1" disabled={savingSocial}>
+                    {savingSocial ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    {isFr ? 'Enregistrer les liens' : 'Save links'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-blue-400" />
+                  {isFr ? 'Aperçu (liens actifs)' : 'Preview (active links)'}
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(socialLinks).filter(([_, url]) => url).length === 0 ? (
+                    <p className="text-gray-500 text-sm">
+                      {isFr ? 'Aucun réseau social configuré' : 'No social networks configured'}
+                    </p>
                   ) : (
-                    <Save className="w-4 h-4 mr-2" />
+                    Object.entries(socialLinks).filter(([_, url]) => url).map(([platform, url]) => (
+                      <a
+                        key={platform}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] rounded-lg hover:bg-[#27272a] transition-colors"
+                      >
+                        {platform === 'instagram' && <Instagram className="w-4 h-4 text-pink-400" />}
+                        {platform === 'youtube' && <Video className="w-4 h-4 text-red-500" />}
+                        {platform === 'tiktok' && <span className="text-xs font-bold">TT</span>}
+                        {platform === 'facebook' && <span className="text-blue-500 font-bold">f</span>}
+                        {platform === 'snapchat' && <span>👻</span>}
+                        {platform === 'twitter' && <span className="font-bold">X</span>}
+                        {platform === 'whatsapp' && <Phone className="w-4 h-4 text-green-500" />}
+                        {platform === 'telegram' && <Send className="w-4 h-4 text-blue-400" />}
+                        {platform === 'website' && <span>🌐</span>}
+                        <span className="capitalize">{platform}</span>
+                      </a>
+                    ))
                   )}
-                  {isFr ? 'Enregistrer les liens' : 'Save links'}
-                </Button>
+                </div>
               </div>
             </div>
           )}
