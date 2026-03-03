@@ -64,6 +64,31 @@ const LiveStreamPage = () => {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestTitle, setRequestTitle] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
+  const [requestCategory, setRequestCategory] = useState('');
+  const [requestExerciseType, setRequestExerciseType] = useState('');
+  
+  // Live request categories
+  const liveCategories = [
+    { id: 'masse', labelFr: 'Prise de Masse', labelEn: 'Mass Gain' },
+    { id: 'perte', labelFr: 'Perte de Poids', labelEn: 'Weight Loss' },
+    { id: 'jambes', labelFr: 'Jambes', labelEn: 'Legs' },
+    { id: 'femmes', labelFr: 'Programme Femmes', labelEn: 'Women Program' },
+    { id: 'abdos', labelFr: 'Abdominaux', labelEn: 'Abs' },
+    { id: 'yoga', labelFr: 'Yoga & Stretching', labelEn: 'Yoga & Stretching' },
+    { id: 'cardio', labelFr: 'Cardio & HIIT', labelEn: 'Cardio & HIIT' },
+    { id: 'nutrition', labelFr: 'Nutrition & Conseils', labelEn: 'Nutrition & Tips' },
+    { id: 'qa', labelFr: 'Q&A / Questions-Réponses', labelEn: 'Q&A Session' },
+    { id: 'autre', labelFr: 'Autre', labelEn: 'Other' }
+  ];
+  
+  const exerciseTypes = [
+    { id: 'debutant', labelFr: 'Niveau Débutant', labelEn: 'Beginner Level' },
+    { id: 'intermediaire', labelFr: 'Niveau Intermédiaire', labelEn: 'Intermediate Level' },
+    { id: 'avance', labelFr: 'Niveau Avancé', labelEn: 'Advanced Level' },
+    { id: 'echauffement', labelFr: 'Échauffement', labelEn: 'Warm-up' },
+    { id: 'etirements', labelFr: 'Étirements', labelEn: 'Stretching' },
+    { id: 'technique', labelFr: 'Technique & Form', labelEn: 'Technique & Form' }
+  ];
   
   // LiveKit WebRTC states
   const [liveKitStatus, setLiveKitStatus] = useState({ configured: false });
@@ -165,12 +190,26 @@ const LiveStreamPage = () => {
 
   // Request a live session (subscriber)
   const requestLive = async () => {
+    if (!requestCategory) {
+      toast.error(isFr ? 'Veuillez sélectionner un thème' : 'Please select a topic');
+      return;
+    }
+    
     setLoading(true);
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const categoryLabel = liveCategories.find(c => c.id === requestCategory)?.[isFr ? 'labelFr' : 'labelEn'] || requestCategory;
+      const exerciseLabel = exerciseTypes.find(e => e.id === requestExerciseType)?.[isFr ? 'labelFr' : 'labelEn'] || '';
+      
+      const fullTitle = requestTitle || `${categoryLabel}${exerciseLabel ? ` - ${exerciseLabel}` : ''}`;
+      
       await axios.post(`${API}/api/live/request`, {
-        title: requestTitle || (isFr ? 'Demande de Live' : 'Live Request'),
-        message: requestMessage || (isFr ? 'Je souhaite une session live' : 'I would like a live session')
+        title: fullTitle,
+        message: requestMessage || (isFr ? 'Je souhaite une session live' : 'I would like a live session'),
+        category: requestCategory,
+        exercise_type: requestExerciseType,
+        category_label: categoryLabel,
+        exercise_label: exerciseLabel
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -179,6 +218,8 @@ const LiveStreamPage = () => {
       setShowRequestForm(false);
       setRequestTitle('');
       setRequestMessage('');
+      setRequestCategory('');
+      setRequestExerciseType('');
       fetchRequests();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Error');
@@ -481,34 +522,92 @@ const LiveStreamPage = () => {
           </h2>
           
           <div className="space-y-4">
+            {/* Category Selection */}
             <div>
               <label className="text-sm text-gray-400 block mb-2">
-                {isFr ? 'Sujet souhaité' : 'Desired topic'}
+                {isFr ? 'Thème / Programme *' : 'Topic / Program *'}
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {liveCategories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setRequestCategory(cat.id)}
+                    className={`p-3 rounded-lg text-sm font-medium transition-all ${
+                      requestCategory === cat.id
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-zinc-800 text-gray-300 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {isFr ? cat.labelFr : cat.labelEn}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Exercise Type Selection */}
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                {isFr ? 'Type d\'exercice (optionnel)' : 'Exercise Type (optional)'}
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                {exerciseTypes.map(ex => (
+                  <button
+                    key={ex.id}
+                    onClick={() => setRequestExerciseType(requestExerciseType === ex.id ? '' : ex.id)}
+                    className={`p-2 rounded-lg text-xs font-medium transition-all ${
+                      requestExerciseType === ex.id
+                        ? 'bg-green-600 text-white'
+                        : 'bg-zinc-800 text-gray-300 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {isFr ? ex.labelFr : ex.labelEn}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Custom Title */}
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                {isFr ? 'Titre personnalisé (optionnel)' : 'Custom title (optional)'}
               </label>
               <Input
                 value={requestTitle}
                 onChange={(e) => setRequestTitle(e.target.value)}
-                placeholder={isFr ? "Ex: Questions sur la nutrition" : "Ex: Questions about nutrition"}
+                placeholder={isFr ? "Ex: Séance spéciale biceps et triceps" : "Ex: Special biceps and triceps session"}
                 className="bg-black border-zinc-700"
               />
             </div>
             
+            {/* Message */}
             <div>
               <label className="text-sm text-gray-400 block mb-2">
-                {isFr ? 'Message (optionnel)' : 'Message (optional)'}
+                {isFr ? 'Message au coach (optionnel)' : 'Message to coach (optional)'}
               </label>
               <textarea
                 value={requestMessage}
                 onChange={(e) => setRequestMessage(e.target.value)}
-                placeholder={isFr ? "Décrivez ce que vous aimeriez aborder..." : "Describe what you'd like to discuss..."}
+                placeholder={isFr ? "Décrivez ce que vous aimeriez aborder, vos questions, objectifs..." : "Describe what you'd like to cover, your questions, goals..."}
                 className="w-full bg-black border border-zinc-700 rounded-md p-3 text-white min-h-[100px]"
               />
             </div>
             
+            {/* Preview */}
+            {requestCategory && (
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <p className="text-purple-400 text-sm font-bold mb-1">
+                  {isFr ? 'Aperçu de votre demande:' : 'Preview of your request:'}
+                </p>
+                <p className="text-white">
+                  {requestTitle || `${liveCategories.find(c => c.id === requestCategory)?.[isFr ? 'labelFr' : 'labelEn']}${requestExerciseType ? ` - ${exerciseTypes.find(e => e.id === requestExerciseType)?.[isFr ? 'labelFr' : 'labelEn']}` : ''}`}
+                </p>
+              </div>
+            )}
+            
             <div className="flex gap-4">
               <Button 
                 onClick={requestLive}
-                disabled={loading}
+                disabled={loading || !requestCategory}
                 className="bg-purple-600 hover:bg-purple-700 flex-1"
               >
                 {loading ? (
@@ -520,7 +619,13 @@ const LiveStreamPage = () => {
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => setShowRequestForm(false)}
+                onClick={() => {
+                  setShowRequestForm(false);
+                  setRequestCategory('');
+                  setRequestExerciseType('');
+                  setRequestTitle('');
+                  setRequestMessage('');
+                }}
                 className="border-zinc-700"
               >
                 {isFr ? 'Annuler' : 'Cancel'}

@@ -5266,6 +5266,10 @@ async def admin_rewards_stats(admin: User = Depends(verify_admin)):
 class LiveRequest(BaseModel):
     title: Optional[str] = None
     message: Optional[str] = None
+    category: Optional[str] = None
+    exercise_type: Optional[str] = None
+    category_label: Optional[str] = None
+    exercise_label: Optional[str] = None
 
 @api_router.post("/live/request")
 async def request_live_session(data: LiveRequest, current_user: User = Depends(get_current_user)):
@@ -5276,13 +5280,22 @@ async def request_live_session(data: LiveRequest, current_user: User = Depends(g
         "request_id": request_id,
         "user_id": current_user.user_id,
         "user_name": current_user.name,
-        "title": data.title or "Demande de Live",
+        "title": data.title or data.category_label or "Demande de Live",
         "message": data.message or "Je souhaiterais une session live avec le coach",
+        "category": data.category,
+        "category_label": data.category_label,
+        "exercise_type": data.exercise_type,
+        "exercise_label": data.exercise_label,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.live_requests.insert_one(live_request)
+    
+    # Build notification message with category info
+    topic = data.category_label or data.title or "Coaching"
+    if data.exercise_label:
+        topic += f" ({data.exercise_label})"
     
     # Notify admin
     admins = await db.users.find({"role": "admin"}).to_list(10)
@@ -5290,7 +5303,7 @@ async def request_live_session(data: LiveRequest, current_user: User = Depends(g
         await send_push_notification(
             admin.get("user_id"),
             "📺 Demande de Live !",
-            f"{current_user.name} demande une session live : {data.title or 'Coaching'}",
+            f"{current_user.name} demande : {topic}",
             {"url": "/admin", "type": "live_request"}
         )
     
