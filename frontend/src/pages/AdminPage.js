@@ -141,6 +141,20 @@ const AdminPage = () => {
   const [cancellationRequests, setCancellationRequests] = useState([]);
   const [loadingCancellations, setLoadingCancellations] = useState(false);
   
+  // Weekly emails states
+  const [weeklyEmailSettings, setWeeklyEmailSettings] = useState({
+    enabled: true,
+    send_day: 'monday',
+    include_running_stats: true,
+    include_workout_stats: true,
+    include_points_earned: true,
+    include_leaderboard_position: true,
+    custom_intro_fr: '',
+    custom_intro_en: ''
+  });
+  const [emailHistory, setEmailHistory] = useState({ batches: [], pending_count: 0 });
+  const [sendingWeeklyEmails, setSendingWeeklyEmails] = useState(false);
+  
   // Reviews management states
   const [allReviews, setAllReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState(null);
@@ -522,6 +536,56 @@ const AdminPage = () => {
     }
   };
 
+  // Weekly emails management
+  const fetchWeeklyEmailSettings = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/weekly-email-settings`, { headers: getAuthHeaders() });
+      setWeeklyEmailSettings(response.data);
+    } catch (error) {
+      console.error('Error fetching weekly email settings:', error);
+    }
+  }, []);
+
+  const fetchEmailHistory = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/email-history`, { headers: getAuthHeaders() });
+      setEmailHistory(response.data);
+    } catch (error) {
+      console.error('Error fetching email history:', error);
+    }
+  }, []);
+
+  const saveWeeklyEmailSettings = async () => {
+    try {
+      await axios.put(`${API}/admin/weekly-email-settings`, weeklyEmailSettings, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Paramètres sauvegardés!' : 'Settings saved!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  const sendWeeklyEmailsNow = async () => {
+    if (!window.confirm(isFr 
+      ? 'Envoyer les emails de motivation à tous les abonnés actifs ?' 
+      : 'Send motivation emails to all active subscribers?'
+    )) return;
+    
+    setSendingWeeklyEmails(true);
+    try {
+      const response = await axios.post(`${API}/admin/send-weekly-emails`, {}, { headers: getAuthHeaders() });
+      toast.success(isFr 
+        ? `${response.data.sent} emails envoyés!` 
+        : `${response.data.sent} emails sent!`
+      );
+      fetchEmailHistory();
+    } catch (error) {
+      console.error('Error sending emails:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setSendingWeeklyEmails(false);
+  };
+
   // Progress photos management
   const fetchUsersProgressPhotos = useCallback(async () => {
     try {
@@ -820,12 +884,14 @@ const AdminPage = () => {
         fetchRunningStats(),
         fetchAllRunningData(),
         fetchInactiveUsers(),
-        fetchCancellationRequests()
+        fetchCancellationRequests(),
+        fetchWeeklyEmailSettings(),
+        fetchEmailHistory()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos, fetchRunningStats, fetchAllRunningData, fetchInactiveUsers, fetchCancellationRequests]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos, fetchRunningStats, fetchAllRunningData, fetchInactiveUsers, fetchCancellationRequests, fetchWeeklyEmailSettings, fetchEmailHistory]);
 
   // Check if user is admin
   useEffect(() => {
@@ -940,6 +1006,7 @@ const AdminPage = () => {
               { id: 'photos', icon: Image, label: isFr ? 'Photos Avant/Après' : 'Before/After Photos' },
               { id: 'messages', icon: MessageCircle, label: isFr ? 'Messages' : 'Messages', badge: unreadCount },
               { id: 'alerts', icon: AlertTriangle, label: isFr ? 'Alertes Inactifs' : 'Inactive Alerts' },
+              { id: 'motivation', icon: Mail, label: isFr ? 'Emails Motivation' : 'Motivation Emails' },
               { id: 'subscriptions', icon: Crown, label: isFr ? 'Abonnements' : 'Subscriptions' },
               { id: 'social', icon: Users, label: isFr ? 'Réseaux Sociaux' : 'Social Media' },
               { id: 'analytics', icon: Activity, label: isFr ? 'Analytiques' : 'Analytics' },
@@ -1981,6 +2048,191 @@ const AdminPage = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Motivation Emails Tab */}
+          {activeTab === 'motivation' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Mail className="w-5 h-5 text-green-400" />
+                {isFr ? 'Emails de Motivation Hebdomadaires' : 'Weekly Motivation Emails'}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {isFr 
+                  ? 'Envoyez des emails personnalisés résumant les accomplissements de vos abonnés pour les motiver.'
+                  : 'Send personalized emails summarizing your subscribers\' achievements to motivate them.'}
+              </p>
+
+              {/* Send Now Button */}
+              <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-lg p-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-green-400 text-lg">
+                      {isFr ? 'Envoyer maintenant' : 'Send Now'}
+                    </h3>
+                    <p className="text-gray-400 text-sm">
+                      {isFr 
+                        ? 'Envoie un email de motivation à tous les abonnés actifs avec leur résumé hebdomadaire.'
+                        : 'Send a motivation email to all active subscribers with their weekly summary.'}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={sendWeeklyEmailsNow}
+                    className="bg-green-500 hover:bg-green-600 px-8"
+                    disabled={sendingWeeklyEmails}
+                  >
+                    {sendingWeeklyEmails ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    {isFr ? 'Envoyer les emails' : 'Send emails'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Settings */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 space-y-4">
+                <h3 className="font-bold flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-gray-400" />
+                  {isFr ? 'Paramètres des emails' : 'Email Settings'}
+                </h3>
+
+                {/* Content options */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={weeklyEmailSettings.include_running_stats}
+                      onChange={(e) => setWeeklyEmailSettings({...weeklyEmailSettings, include_running_stats: e.target.checked})}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm">{isFr ? 'Stats Course' : 'Running Stats'}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={weeklyEmailSettings.include_workout_stats}
+                      onChange={(e) => setWeeklyEmailSettings({...weeklyEmailSettings, include_workout_stats: e.target.checked})}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm">{isFr ? 'Stats Séances' : 'Workout Stats'}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={weeklyEmailSettings.include_points_earned}
+                      onChange={(e) => setWeeklyEmailSettings({...weeklyEmailSettings, include_points_earned: e.target.checked})}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm">{isFr ? 'Points Gagnés' : 'Points Earned'}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={weeklyEmailSettings.include_leaderboard_position}
+                      onChange={(e) => setWeeklyEmailSettings({...weeklyEmailSettings, include_leaderboard_position: e.target.checked})}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm">{isFr ? 'Position Classement' : 'Leaderboard Position'}</span>
+                  </label>
+                </div>
+
+                {/* Custom intro */}
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block">
+                    {isFr ? 'Message d\'introduction personnalisé (Français):' : 'Custom intro message (French):'}
+                  </label>
+                  <Input
+                    value={weeklyEmailSettings.custom_intro_fr || ''}
+                    onChange={(e) => setWeeklyEmailSettings({...weeklyEmailSettings, custom_intro_fr: e.target.value})}
+                    placeholder={isFr ? "Voici votre résumé hebdomadaire..." : "Here's your weekly summary..."}
+                    className="bg-[#09090b] border-[#27272a]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block">
+                    {isFr ? 'Message d\'introduction personnalisé (Anglais):' : 'Custom intro message (English):'}
+                  </label>
+                  <Input
+                    value={weeklyEmailSettings.custom_intro_en || ''}
+                    onChange={(e) => setWeeklyEmailSettings({...weeklyEmailSettings, custom_intro_en: e.target.value})}
+                    placeholder="Here's your weekly FitMaxPro summary..."
+                    className="bg-[#09090b] border-[#27272a]"
+                  />
+                </div>
+
+                <Button onClick={saveWeeklyEmailSettings} className="bg-[#EF4444]">
+                  <Save className="w-4 h-4 mr-2" />
+                  {isFr ? 'Sauvegarder les paramètres' : 'Save settings'}
+                </Button>
+              </div>
+
+              {/* Email Preview */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-blue-400" />
+                  {isFr ? 'Aperçu de l\'email' : 'Email Preview'}
+                </h3>
+                <div className="bg-[#0a0a0a] rounded-lg p-6 border border-[#27272a]">
+                  <h4 className="text-center text-[#EF4444] text-2xl font-bold mb-2">FITMAXPRO</h4>
+                  <p className="text-center text-gray-500 mb-6">{isFr ? 'Résumé Hebdomadaire' : 'Weekly Summary'}</p>
+                  <h5 className="text-center text-xl mb-4">{isFr ? 'Salut [Nom] ! 👋' : 'Hey [Name]! 👋'}</h5>
+                  <p className="text-center text-gray-400 mb-6">
+                    {weeklyEmailSettings.custom_intro_fr || (isFr ? 'Voici votre résumé hebdomadaire FitMaxPro !' : 'Here\'s your weekly FitMaxPro summary!')}
+                  </p>
+                  <div className="bg-[#1a1a1a] rounded-lg p-4 mb-6">
+                    <h6 className="text-[#EF4444] font-bold mb-3">{isFr ? 'Vos accomplissements' : 'Your achievements'}</h6>
+                    {weeklyEmailSettings.include_running_stats && <p className="my-2">🏃 X km {isFr ? 'parcourus' : 'run'}</p>}
+                    {weeklyEmailSettings.include_workout_stats && <p className="my-2">💪 X {isFr ? 'séances complétées' : 'workouts completed'}</p>}
+                    {weeklyEmailSettings.include_points_earned && <p className="my-2">⭐ X {isFr ? 'points gagnés' : 'points earned'}</p>}
+                  </div>
+                  <p className="text-center text-[#EF4444] font-bold text-lg mb-6">
+                    🔥 {isFr ? 'INCROYABLE ! Vous êtes sur une lancée exceptionnelle !' : 'AMAZING! You\'re on an incredible streak!'}
+                  </p>
+                  <div className="text-center">
+                    <span className="bg-[#EF4444] text-white px-6 py-3 rounded-lg inline-block">
+                      {isFr ? 'Continuer l\'entraînement' : 'Continue Training'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* History */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    {isFr ? 'Historique des envois' : 'Send History'}
+                  </h3>
+                  {emailHistory.pending_count > 0 && (
+                    <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded text-xs">
+                      {emailHistory.pending_count} {isFr ? 'en attente' : 'pending'}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2 max-h-60 overflow-auto">
+                  {emailHistory.batches?.length > 0 ? (
+                    emailHistory.batches.map((batch, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-2 border-b border-[#27272a]">
+                        <div>
+                          <span className="text-gray-400">{formatDate(batch.sent_at)}</span>
+                          <span className="text-gray-500 text-sm ml-2">({batch.type})</span>
+                        </div>
+                        <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">
+                          {batch.results?.sent || 0} {isFr ? 'envoyés' : 'sent'}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">
+                      {isFr ? 'Aucun envoi pour le moment' : 'No sends yet'}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}

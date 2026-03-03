@@ -3399,6 +3399,282 @@ async def manual_verify_receipt(receipt_id: str, verified: bool, admin: User = D
     return {"message": "Receipt verified" if verified else "Receipt rejected"}
 
 
+# ==================== WEEKLY MOTIVATION EMAILS ====================
+
+class WeeklyEmailSettings(BaseModel):
+    enabled: bool = True
+    send_day: str = "monday"  # day of the week
+    include_running_stats: bool = True
+    include_workout_stats: bool = True
+    include_points_earned: bool = True
+    include_leaderboard_position: bool = True
+    custom_intro_fr: Optional[str] = None
+    custom_intro_en: Optional[str] = None
+
+@api_router.get("/admin/weekly-email-settings")
+async def get_weekly_email_settings(admin: User = Depends(verify_admin)):
+    """Get weekly email settings"""
+    settings = await db.settings.find_one({"type": "weekly_emails"}, {"_id": 0})
+    return settings or {
+        "type": "weekly_emails",
+        "enabled": True,
+        "send_day": "monday",
+        "include_running_stats": True,
+        "include_workout_stats": True,
+        "include_points_earned": True,
+        "include_leaderboard_position": True,
+        "custom_intro_fr": None,
+        "custom_intro_en": None
+    }
+
+@api_router.put("/admin/weekly-email-settings")
+async def update_weekly_email_settings(settings: WeeklyEmailSettings, admin: User = Depends(verify_admin)):
+    """Update weekly email settings"""
+    await db.settings.update_one(
+        {"type": "weekly_emails"},
+        {"$set": {"type": "weekly_emails", **settings.dict()}},
+        upsert=True
+    )
+    return {"message": "Settings updated"}
+
+@api_router.get("/user/weekly-stats")
+async def get_user_weekly_stats(current_user: User = Depends(get_current_user)):
+    """Get user's weekly statistics for motivation"""
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    week_ago_str = week_ago.isoformat()
+    
+    # Running stats for the week
+    running_sessions = await db.running_sessions.find({
+        "user_id": current_user.user_id,
+        "start_time": {"$gte": week_ago_str}
+    }, {"_id": 0}).to_list(100)
+    
+    total_distance = sum(s.get("distance", 0) for s in running_sessions)
+    total_running_time = sum(s.get("duration", 0) for s in running_sessions)
+    total_calories = sum(s.get("calories", 0) for s in running_sessions)
+    
+    # Workout stats for the week
+    workout_history = await db.workout_history.find({
+        "user_id": current_user.user_id,
+        "completed_at": {"$gte": week_ago_str}
+    }, {"_id": 0}).to_list(100)
+    
+    completed_workouts = len([w for w in workout_history if w.get("completed")])
+    total_workout_time = sum(w.get("duration_seconds", 0) for w in workout_history)
+    
+    # Points earned this week
+    point_transactions = await db.point_transactions.find({
+        "user_id": current_user.user_id,
+        "created_at": {"$gte": week_ago_str},
+        "type": "earned"
+    }, {"_id": 0}).to_list(100)
+    
+    points_earned = sum(t.get("points", 0) for t in point_transactions)
+    
+    # Leaderboard position
+    leaderboard = await db.running_sessions.aggregate([
+        {"$group": {
+            "_id": "$user_id",
+            "total_distance": {"$sum": "$distance"}
+        }},
+        {"$sort": {"total_distance": -1}}
+    ]).to_list(1000)
+    
+    position = 0
+    for i, entry in enumerate(leaderboard):
+        if entry["_id"] == current_user.user_id:
+            position = i + 1
+            break
+    
+    return {
+        "period": "weekly",
+        "running": {
+            "sessions": len(running_sessions),
+            "total_distance_km": round(total_distance, 2),
+            "total_time_minutes": round(total_running_time / 60, 1),
+            "calories_burned": total_calories
+        },
+        "workouts": {
+            "completed": completed_workouts,
+            "total_time_minutes": round(total_workout_time / 60, 1)
+        },
+        "points": {
+            "earned_this_week": points_earned
+        },
+        "leaderboard": {
+            "position": position,
+            "total_participants": len(leaderboard)
+        }
+    }
+
+@api_router.post("/admin/send-weekly-emails")
+async def admin_send_weekly_emails(admin: User = Depends(verify_admin)):
+    """Admin: Manually trigger weekly motivation emails to all active subscribers"""
+    # Get all active subscribers
+    active_users = await db.users.find(
+        {"subscription_status": "active"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(1000)
+    
+    settings = await db.settings.find_one({"type": "weekly_emails"}, {"_id": 0}) or {}
+    
+    results = {"sent": 0, "failed": 0, "emails": []}
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    week_ago_str = week_ago.isoformat()
+    
+    for user in active_users:
+        try:
+            user_id = user["user_id"]
+            email = user.get("email")
+            name = user.get("name", "Champion")
+            
+            if not email:
+                continue
+            
+            # Get user's weekly stats
+            running_sessions = await db.running_sessions.find({
+                "user_id": user_id,
+                "start_time": {"$gte": week_ago_str}
+            }, {"_id": 0}).to_list(100)
+            
+            total_distance = sum(s.get("distance", 0) for s in running_sessions)
+            total_running_time = sum(s.get("duration", 0) for s in running_sessions)
+            
+            workout_history = await db.workout_history.find({
+                "user_id": user_id,
+                "completed_at": {"$gte": week_ago_str}
+            }, {"_id": 0}).to_list(100)
+            completed_workouts = len([w for w in workout_history if w.get("completed")])
+            
+            point_transactions = await db.point_transactions.find({
+                "user_id": user_id,
+                "created_at": {"$gte": week_ago_str},
+                "type": "earned"
+            }, {"_id": 0}).to_list(100)
+            points_earned = sum(t.get("points", 0) for t in point_transactions)
+            
+            # Build motivational message
+            is_french = True  # Could be based on user preference
+            
+            achievements = []
+            if total_distance > 0:
+                achievements.append(f"🏃 {total_distance:.1f} km parcourus" if is_french else f"🏃 {total_distance:.1f} km run")
+            if completed_workouts > 0:
+                achievements.append(f"💪 {completed_workouts} séances complétées" if is_french else f"💪 {completed_workouts} workouts completed")
+            if points_earned > 0:
+                achievements.append(f"⭐ {points_earned} points gagnés" if is_french else f"⭐ {points_earned} points earned")
+            
+            # Custom intro or default
+            intro = settings.get("custom_intro_fr") if is_french else settings.get("custom_intro_en")
+            if not intro:
+                intro = f"Voici votre résumé hebdomadaire FitMaxPro !" if is_french else "Here's your weekly FitMaxPro summary!"
+            
+            # Determine motivation message based on activity
+            if total_distance >= 10 or completed_workouts >= 5:
+                motivation = "🔥 INCROYABLE ! Vous êtes sur une lancée exceptionnelle !" if is_french else "🔥 AMAZING! You're on an incredible streak!"
+            elif total_distance > 0 or completed_workouts > 0:
+                motivation = "👏 Bien joué ! Continuez sur cette voie !" if is_french else "👏 Well done! Keep it up!"
+            else:
+                motivation = "💪 Cette semaine est une nouvelle opportunité de briller !" if is_french else "💪 This week is a new opportunity to shine!"
+            
+            subject = f"🎯 {name}, votre semaine FitMaxPro !" if is_french else f"🎯 {name}, your FitMaxPro week!"
+            
+            html_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: white; padding: 40px;">
+                <h1 style="color: #EF4444; text-align: center; margin-bottom: 10px;">FITMAXPRO</h1>
+                <p style="text-align: center; color: #888; margin-bottom: 30px;">{"Résumé Hebdomadaire" if is_french else "Weekly Summary"}</p>
+                
+                <h2 style="text-align: center; margin-bottom: 20px;">{"Salut" if is_french else "Hey"} {name} ! 👋</h2>
+                
+                <p style="font-size: 16px; text-align: center; margin-bottom: 30px;">{intro}</p>
+                
+                <div style="background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <h3 style="color: #EF4444; margin-bottom: 15px;">{"Vos accomplissements" if is_french else "Your achievements"}</h3>
+                    {"".join(f'<p style="margin: 10px 0; font-size: 18px;">{a}</p>' for a in achievements) if achievements else f'<p style="color: #888;">{"Pas encore d activité cette semaine - commencez dès maintenant !" if is_french else "No activity yet this week - start now!"}</p>'}
+                </div>
+                
+                <p style="font-size: 20px; text-align: center; margin: 30px 0; color: #EF4444; font-weight: bold;">
+                    {motivation}
+                </p>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="{APP_URL}/dashboard" style="background: #EF4444; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                        {"Continuer l'entraînement" if is_french else "Continue Training"}
+                    </a>
+                </div>
+                
+                <p style="text-align: center; margin-top: 40px; color: #888; font-size: 12px;">
+                    {"À la semaine prochaine, Champion !" if is_french else "See you next week, Champion!"}
+                    <br>{"L'équipe FitMaxPro" if is_french else "The FitMaxPro Team"}
+                </p>
+            </div>
+            """
+            
+            # Try to send via Resend
+            resend_api_key = os.environ.get('RESEND_API_KEY')
+            if resend_api_key:
+                try:
+                    resend.api_key = resend_api_key
+                    resend.Emails.send({
+                        "from": "FitMaxPro <noreply@fitmax-gains.com>",
+                        "to": email,
+                        "subject": subject,
+                        "html": html_content
+                    })
+                    results["sent"] += 1
+                    results["emails"].append(email)
+                except Exception as e:
+                    print(f"Email send error: {e}")
+                    results["failed"] += 1
+            else:
+                # Store for manual sending
+                await db.pending_emails.insert_one({
+                    "email_id": str(uuid.uuid4()),
+                    "to": email,
+                    "user_name": name,
+                    "type": "weekly_motivation",
+                    "subject": subject,
+                    "html_content": html_content,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "status": "pending"
+                })
+                results["sent"] += 1
+                results["emails"].append(email)
+                
+        except Exception as e:
+            print(f"Error processing user {user.get('email')}: {e}")
+            results["failed"] += 1
+    
+    # Log the batch send
+    await db.email_batches.insert_one({
+        "batch_id": str(uuid.uuid4()),
+        "type": "weekly_motivation",
+        "sent_at": datetime.now(timezone.utc).isoformat(),
+        "sent_by": admin.user_id,
+        "results": results
+    })
+    
+    return results
+
+@api_router.get("/admin/email-history")
+async def get_email_history(admin: User = Depends(verify_admin)):
+    """Get history of sent email batches"""
+    batches = await db.email_batches.find(
+        {},
+        {"_id": 0}
+    ).sort("sent_at", -1).to_list(50)
+    
+    pending = await db.pending_emails.find(
+        {"status": "pending"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return {
+        "batches": batches,
+        "pending_count": len(pending)
+    }
+
+
 # ==================== SOCIAL MEDIA LINKS ====================
 
 @api_router.get("/social-links")
