@@ -3835,7 +3835,51 @@ async def create_live(live: LiveCreate, current_user: User = Depends(get_current
     
     await db.lives.insert_one(live_doc)
     live_doc.pop('_id', None)
+    
+    # Send push notifications to all subscribers when live starts NOW
+    asyncio.create_task(notify_live_started(live.title, live.vip_only, live_id))
+    
     return live_doc
+
+
+async def notify_live_started(title: str, vip_only: bool, live_id: str):
+    """Send push notifications when a live starts"""
+    try:
+        # Get all enabled push subscriptions
+        subs = await db.push_subscriptions.find({"enabled": True}).to_list(1000)
+        
+        for sub in subs:
+            user_id = sub.get("user_id")
+            
+            # Check VIP restriction
+            if vip_only:
+                user = await db.users.find_one({"user_id": user_id})
+                if user:
+                    user_sub = user.get("subscription", {})
+                    if user_sub.get("type") != "vip" and user.get("role") != "admin":
+                        continue  # Skip non-VIP users for VIP-only lives
+            
+            # Check if this user requested a similar topic
+            # Find pending requests from this user
+            user_requests = await db.live_requests.find({
+                "user_id": user_id,
+                "status": "pending"
+            }).to_list(10)
+            
+            # Personalize message if user requested this type
+            if user_requests:
+                body = f"🎉 Le coach est EN DIRECT maintenant ! '{title}' - Votre demande a peut-être été entendue !"
+            else:
+                body = f"🔴 EN DIRECT maintenant ! '{title}' - Rejoignez la session !"
+            
+            await send_push_notification(
+                user_id,
+                "📺 Live en cours !",
+                body,
+                {"url": "/live", "type": "live_started", "live_id": live_id}
+            )
+    except Exception as e:
+        print(f"Error sending live notifications: {e}")
 
 @api_router.post("/lives/{live_id}/join")
 async def join_live(live_id: str, current_user: User = Depends(get_current_user)):
@@ -5415,16 +5459,58 @@ async def schedule_live(data: CreateScheduledLive, admin: User = Depends(verify_
     
     # Notify all subscribers if scheduled
     if data.scheduled_time:
-        subs = await db.push_subscriptions.find({"enabled": True}).to_list(1000)
-        for sub in subs:
-            await send_push_notification(
-                sub["user_id"],
-                "📺 Live programmé !",
-                f"'{data.title}' prévu le {data.scheduled_time}. Ne le manquez pas !",
-                {"url": "/live", "type": "live_scheduled"}
-            )
+        asyncio.create_task(notify_live_scheduled(data.title, data.scheduled_time, data.is_vip, live_id))
     
     return {"success": True, "live_id": live_id, "status": live["status"]}
+
+
+async def notify_live_scheduled(title: str, scheduled_time: str, is_vip: bool, live_id: str):
+    """Send push notifications when a live is scheduled"""
+    try:
+        # Format the scheduled time nicely
+        try:
+            dt = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
+            formatted_time = dt.strftime("%d/%m à %H:%M")
+        except:
+            formatted_time = scheduled_time
+        
+        subs = await db.push_subscriptions.find({"enabled": True}).to_list(1000)
+        
+        notified_count = 0
+        for sub in subs:
+            user_id = sub.get("user_id")
+            
+            # Check VIP restriction
+            if is_vip:
+                user = await db.users.find_one({"user_id": user_id})
+                if user:
+                    user_sub = user.get("subscription", {})
+                    if user_sub.get("type") != "vip" and user.get("role") != "admin":
+                        continue
+            
+            # Check if user has pending requests (personalize message)
+            user_requests = await db.live_requests.find({
+                "user_id": user_id,
+                "status": "pending"
+            }).to_list(10)
+            
+            if user_requests:
+                body = f"🎉 '{title}' prévu le {formatted_time} ! Votre demande a été prise en compte !"
+            else:
+                body = f"📅 '{title}' prévu le {formatted_time}. Ne le manquez pas !"
+            
+            success = await send_push_notification(
+                user_id,
+                "📺 Live programmé !",
+                body,
+                {"url": "/live", "type": "live_scheduled", "live_id": live_id}
+            )
+            if success:
+                notified_count += 1
+        
+        print(f"Live scheduled notifications sent to {notified_count} users")
+    except Exception as e:
+        print(f"Error sending scheduled live notifications: {e}")
 
 
 # Include router after all endpoints are defined

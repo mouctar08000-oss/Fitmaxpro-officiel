@@ -263,6 +263,11 @@ GET /api/workouts?program_type=yoga
 
 ### December 2025 - Session 4
 - ✅ **Formulaire Demande de Live Amélioré** - 10 thèmes, 6 types d'exercice, aperçu
+- ✅ **Notifications Push Automatiques pour Lives** :
+  - Notification immédiate quand un live démarre (tous les abonnés notifiés)
+  - Notification quand un live est programmé (avec date formatée)
+  - Messages personnalisés pour les utilisateurs ayant fait des demandes
+  - Respect des restrictions VIP (seuls les VIP notifiés pour les lives VIP)
 - ✅ **Tests complets** - Backend et Frontend 100% passés
 
 ## Test Reports
