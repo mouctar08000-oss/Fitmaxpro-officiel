@@ -42,13 +42,16 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels Audio/V
 - **Admin** : Endpoint pour donner des points bonus
 - **Endpoints API** : `/api/rewards/*`, `/api/admin/rewards/*`
 
-### 📺 LIVE STREAMING AMÉLIORÉ ✅ NEW
-- **Demande de Live** : Les abonnés peuvent demander une session live au coach
+### 📺 LIVE STREAMING AMÉLIORÉ ✅ UPDATED
+- **WebRTC LiveKit** : Intégration complète prête à l'emploi (backend + frontend)
+- **Demande de Live Avancée** : Les abonnés peuvent demander une session live avec :
+  - 10 thèmes/programmes : Prise de Masse, Perte de Poids, Jambes, Programme Femmes, Abdominaux, Yoga & Stretching, Cardio & HIIT, Nutrition & Conseils, Q&A, Autre
+  - 6 types d'exercice : Débutant, Intermédiaire, Avancé, Échauffement, Étirements, Technique
+  - Titre personnalisé et message au coach
+  - Aperçu de la demande avant envoi
 - **Programmation** : L'admin peut programmer des lives à l'avance
-- **Notifications** : Les abonnés sont notifiés des lives programmés
-- **Acceptation** : L'admin peut accepter les demandes et démarrer un live
+- **Vue Admin** : Section "Demandes de Live" avec compteur, bouton "Accepter"
 - **Section "Lives Programmés"** avec date et heure
-- **Section "Demandes de Live"** pour l'admin (avec badge de comptage)
 
 ### ⭐ SYSTÈME D'AVIS AMÉLIORÉ ✅ NEW (Session 3)
 - **Dashboard** : Section "VOTRE AVIS COMPTE !" avec note moyenne et statistiques
@@ -258,7 +261,12 @@ GET /api/workouts?program_type=yoga
 - ✅ Guides TikTok Pro et App Stores
 - ✅ Total: 138 séances d'entraînement
 
+### December 2025 - Session 4
+- ✅ **Formulaire Demande de Live Amélioré** - 10 thèmes, 6 types d'exercice, aperçu
+- ✅ **Tests complets** - Backend et Frontend 100% passés
+
 ## Test Reports
+- `/app/test_reports/iteration_11.json` - Tests Demande de Live (100% pass - Backend 6/6, Frontend UI complet)
 - `/app/test_reports/iteration_10.json` - Tests Emails Motivation (100% pass)
 - `/app/test_reports/iteration_9.json` - Tests P2 complets (100% pass)
 - `/app/test_reports/iteration_8.json` - Tests Avis complets avec likes et points (95-100% pass)
