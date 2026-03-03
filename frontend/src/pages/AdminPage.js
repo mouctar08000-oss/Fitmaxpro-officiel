@@ -43,7 +43,10 @@ import {
   Instagram,
   Footprints,
   Target,
-  Zap
+  Zap,
+  Heart,
+  CheckCircle,
+  Award
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -410,6 +413,19 @@ const AdminPage = () => {
       fetchAllReviews();
     } catch (error) {
       console.error('Error deleting review:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  const adminLikeReview = async (reviewId) => {
+    try {
+      const response = await axios.post(`${API}/admin/reviews/${reviewId}/like`, {}, { headers: getAuthHeaders() });
+      toast.success(response.data.admin_liked 
+        ? (isFr ? 'Avis aimé!' : 'Review liked!') 
+        : (isFr ? 'Like retiré' : 'Like removed'));
+      fetchAllReviews();
+    } catch (error) {
+      console.error('Error liking review:', error);
       toast.error(isFr ? 'Erreur' : 'Error');
     }
   };
@@ -1488,8 +1504,8 @@ const AdminPage = () => {
                   allReviews.map(review => (
                     <div key={review.review_id} className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
                       <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className="font-bold">{review.user_name}</span>
                             <div className="flex gap-0.5">
                               {[1,2,3,4,5].map(s => (
@@ -1499,14 +1515,45 @@ const AdminPage = () => {
                             <span className="text-gray-500 text-xs">
                               {new Date(review.created_at).toLocaleDateString(isFr ? 'fr-FR' : 'en-US')}
                             </span>
+                            {/* Badge abonné vérifié */}
+                            {review.verified_subscriber && (
+                              <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">
+                                <CheckCircle className="w-3 h-3" />
+                                {isFr ? 'Vérifié' : 'Verified'}
+                              </span>
+                            )}
+                            {/* Badge tier */}
+                            {review.subscription_tier === 'vip' && (
+                              <span className="flex items-center gap-1 text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                                <Award className="w-3 h-3" />
+                                VIP
+                              </span>
+                            )}
                             {!review.is_public && (
-                              <span className="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-xs">
+                              <span className="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded text-xs">
                                 {isFr ? 'Privé' : 'Private'}
+                              </span>
+                            )}
+                            {/* Likes count */}
+                            {(review.likes_count > 0 || review.admin_liked) && (
+                              <span className="flex items-center gap-1 text-xs text-gray-400">
+                                <Heart className={`w-3 h-3 ${review.admin_liked ? 'fill-red-400 text-red-400' : ''}`} />
+                                {review.likes_count || 0}
                               </span>
                             )}
                           </div>
                           <h3 className="font-bold mb-1">{review.title}</h3>
                           <p className="text-gray-400 text-sm">{review.content}</p>
+                          
+                          {/* Admin liked indicator */}
+                          {review.admin_liked && (
+                            <div className="mt-2">
+                              <span className="inline-flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                                <Heart className="w-3 h-3 fill-current" />
+                                {isFr ? 'Vous avez aimé' : 'You liked this'}
+                              </span>
+                            </div>
+                          )}
                           
                           {/* Admin Response */}
                           {review.admin_response && (
@@ -1535,7 +1582,18 @@ const AdminPage = () => {
                           )}
                         </div>
                         
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 ml-4">
+                          {/* Like button */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => adminLikeReview(review.review_id)}
+                            className={`${review.admin_liked ? 'border-red-500 text-red-400 bg-red-500/10' : 'border-gray-500/30 text-gray-400'}`}
+                            data-testid={`admin-like-${review.review_id}`}
+                          >
+                            <Heart className={`w-4 h-4 ${review.admin_liked ? 'fill-current' : ''}`} />
+                          </Button>
+                          {/* Reply button */}
                           {!review.admin_response && (
                             <Button
                               size="sm"
@@ -1546,6 +1604,7 @@ const AdminPage = () => {
                               <Send className="w-4 h-4" />
                             </Button>
                           )}
+                          {/* Delete button */}
                           <Button
                             size="sm"
                             variant="outline"

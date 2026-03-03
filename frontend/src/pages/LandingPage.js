@@ -439,6 +439,19 @@ const LandingPage = () => {
               </div>
             ))}
           </div>
+          
+          {/* Bouton voir tous les avis */}
+          <div className="text-center mt-12">
+            <Button
+              onClick={() => navigate('/reviews')}
+              variant="outline"
+              className="border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white px-8 py-6 text-lg"
+              data-testid="see-all-reviews-btn"
+            >
+              <Star className="w-5 h-5 mr-2" />
+              {isFr ? 'Voir tous les avis de nos abonnés' : 'See all subscriber reviews'}
+            </Button>
+          </div>
         </div>
       </section>
 

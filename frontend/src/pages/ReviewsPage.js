@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 import { 
   ArrowLeft, Star, MessageSquare, Send, User, 
-  ThumbsUp, Calendar, Reply, Trash2
+  ThumbsUp, Calendar, Reply, Trash2, Heart, CheckCircle, Award
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -32,6 +32,7 @@ const ReviewsPage = () => {
     is_public: true
   });
   const [submitting, setSubmitting] = useState(false);
+  const [likingReview, setLikingReview] = useState(null);
 
   const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem('session_token');
@@ -57,6 +58,26 @@ const ReviewsPage = () => {
     fetchReviews();
   }, [fetchReviews]);
 
+  const handleLike = async (reviewId) => {
+    if (!user) {
+      toast.error(isFr ? 'Connectez-vous pour aimer un avis' : 'Login to like a review');
+      return;
+    }
+    
+    setLikingReview(reviewId);
+    try {
+      const response = await axios.post(`${API}/reviews/${reviewId}/like`, {}, { headers: getAuthHeaders() });
+      toast.success(response.data.action === 'liked' 
+        ? (isFr ? 'Avis aimé!' : 'Review liked!') 
+        : (isFr ? 'Like retiré' : 'Like removed'));
+      fetchReviews();
+    } catch (error) {
+      console.error('Error liking review:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setLikingReview(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -72,14 +93,18 @@ const ReviewsPage = () => {
     
     setSubmitting(true);
     try {
-      await axios.post(`${API}/reviews`, newReview, { headers: getAuthHeaders() });
-      toast.success(isFr ? 'Merci pour votre avis!' : 'Thank you for your review!');
+      const response = await axios.post(`${API}/reviews`, newReview, { headers: getAuthHeaders() });
+      const pointsMsg = response.data.points_earned 
+        ? (isFr ? ` (+${response.data.points_earned} points!)` : ` (+${response.data.points_earned} points!)`)
+        : '';
+      toast.success((isFr ? 'Merci pour votre avis!' : 'Thank you for your review!') + pointsMsg);
       setNewReview({ rating: 5, title: '', content: '', is_public: true });
       setShowForm(false);
       fetchReviews();
     } catch (error) {
       console.error('Error submitting review:', error);
-      toast.error(isFr ? 'Erreur lors de l\'envoi' : 'Error submitting review');
+      const errorMsg = error.response?.data?.detail || (isFr ? 'Erreur lors de l\'envoi' : 'Error submitting review');
+      toast.error(errorMsg);
     }
     setSubmitting(false);
   };
@@ -270,14 +295,30 @@ const ReviewsPage = () => {
               </div>
             ) : (
               reviews.map((review) => (
-                <div key={review.review_id} className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <div key={review.review_id} className="bg-[#121212] border border-[#27272a] rounded-lg p-6 hover:border-[#27272a]/50 transition-colors">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-[#EF4444]/20 rounded-full flex items-center justify-center">
                         <User className="w-5 h-5 text-[#EF4444]" />
                       </div>
                       <div>
-                        <p className="font-bold">{review.user_name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold">{review.user_name}</p>
+                          {/* Badge abonné vérifié */}
+                          {review.verified_subscriber && (
+                            <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">
+                              <CheckCircle className="w-3 h-3" />
+                              {isFr ? 'Vérifié' : 'Verified'}
+                            </span>
+                          )}
+                          {/* Badge tier */}
+                          {review.subscription_tier === 'vip' && (
+                            <span className="flex items-center gap-1 text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                              <Award className="w-3 h-3" />
+                              VIP
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           {renderStars(review.rating)}
                           <span className="text-gray-500 text-sm flex items-center gap-1">
@@ -287,10 +328,37 @@ const ReviewsPage = () => {
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Like button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleLike(review.review_id)}
+                      disabled={likingReview === review.review_id}
+                      className={`flex items-center gap-1 ${
+                        review.likes?.includes(user?.user_id) 
+                          ? 'text-red-400 hover:text-red-300' 
+                          : 'text-gray-400 hover:text-red-400'
+                      }`}
+                      data-testid={`like-review-${review.review_id}`}
+                    >
+                      <Heart className={`w-4 h-4 ${review.likes?.includes(user?.user_id) ? 'fill-current' : ''}`} />
+                      <span>{review.likes_count || 0}</span>
+                    </Button>
                   </div>
                   
                   <h3 className="font-bold text-lg mb-2">{review.title}</h3>
                   <p className="text-gray-400">{review.content}</p>
+                  
+                  {/* Admin liked badge */}
+                  {review.admin_liked && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-xs bg-[#EF4444]/20 text-[#EF4444] px-2 py-1 rounded-full">
+                        <Heart className="w-3 h-3 fill-current" />
+                        {isFr ? 'Aimé par le Coach' : 'Liked by Coach'}
+                      </span>
+                    </div>
+                  )}
                   
                   {/* Admin Response */}
                   {review.admin_response && (

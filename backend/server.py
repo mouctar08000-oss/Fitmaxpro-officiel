@@ -2784,7 +2784,11 @@ class ReviewCreate(BaseModel):
 
 @api_router.post("/reviews")
 async def create_review(review: ReviewCreate, current_user: User = Depends(get_current_user)):
-    """Create a new review"""
+    """Create a new review - Only active subscribers can create reviews"""
+    # Vérifier que l'utilisateur a un abonnement actif
+    if current_user.subscription_status != "active":
+        raise HTTPException(status_code=403, detail="Only active subscribers can leave reviews")
+    
     review_data = {
         "review_id": str(uuid.uuid4()),
         "user_id": current_user.user_id,
@@ -2795,10 +2799,19 @@ async def create_review(review: ReviewCreate, current_user: User = Depends(get_c
         "is_public": review.is_public,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "admin_response": None,
-        "admin_response_at": None
+        "admin_response_at": None,
+        "verified_subscriber": True,  # Marqué comme abonné vérifié
+        "subscription_tier": current_user.subscription_tier,
+        "likes": [],  # Liste des user_ids qui ont aimé
+        "likes_count": 0,
+        "admin_liked": False  # Si l'admin a aimé
     }
     await db.reviews.insert_one(review_data)
-    return {"message": "Review created", "review_id": review_data["review_id"]}
+    
+    # Donner des points pour avoir laissé un avis (automatisation des points)
+    await add_points(current_user.user_id, 25, "review_created", review_data["review_id"])
+    
+    return {"message": "Review created", "review_id": review_data["review_id"], "points_earned": 25}
 
 @api_router.get("/reviews")
 async def get_public_reviews():
@@ -2818,6 +2831,47 @@ async def get_public_reviews():
         "average_rating": round(avg_rating, 1)
     }
 
+@api_router.post("/reviews/{review_id}/like")
+async def like_review(review_id: str, current_user: User = Depends(get_current_user)):
+    """Like/Unlike a review"""
+    review = await db.reviews.find_one({"review_id": review_id})
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    likes = review.get("likes", [])
+    
+    if current_user.user_id in likes:
+        # Unlike
+        likes.remove(current_user.user_id)
+        action = "unliked"
+    else:
+        # Like
+        likes.append(current_user.user_id)
+        action = "liked"
+    
+    await db.reviews.update_one(
+        {"review_id": review_id},
+        {"$set": {"likes": likes, "likes_count": len(likes)}}
+    )
+    
+    return {"message": f"Review {action}", "likes_count": len(likes), "action": action}
+
+@api_router.post("/admin/reviews/{review_id}/like")
+async def admin_like_review(review_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Like/Unlike a review (special admin like)"""
+    review = await db.reviews.find_one({"review_id": review_id})
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    admin_liked = not review.get("admin_liked", False)
+    
+    await db.reviews.update_one(
+        {"review_id": review_id},
+        {"$set": {"admin_liked": admin_liked}}
+    )
+    
+    return {"message": f"Review {'liked by admin' if admin_liked else 'unliked by admin'}", "admin_liked": admin_liked}
+
 @api_router.get("/user/reviews")
 async def get_user_reviews(current_user: User = Depends(get_current_user)):
     """Get current user's reviews"""
@@ -2836,13 +2890,15 @@ async def admin_get_all_reviews(admin: User = Depends(verify_admin)):
     total = len(reviews)
     avg_rating = sum(r.get("rating", 0) for r in reviews) / total if total else 0
     rating_distribution = {i: len([r for r in reviews if r.get("rating") == i]) for i in range(1, 6)}
+    total_likes = sum(r.get("likes_count", 0) for r in reviews)
     
     return {
         "reviews": reviews,
         "stats": {
             "total": total,
             "average_rating": round(avg_rating, 1),
-            "distribution": rating_distribution
+            "distribution": rating_distribution,
+            "total_likes": total_likes
         }
     }
 
@@ -3191,6 +3247,33 @@ async def log_running_session(run: RunningSession, current_user: User = Depends(
     
     await db.running_sessions.insert_one(run_doc)
     
+    # Automatisation des points pour les courses
+    points_earned = 0
+    points_reasons = []
+    
+    # Points de base: 10 points par course
+    points_earned += 10
+    points_reasons.append("course_completed")
+    
+    # Bonus distance: 5 points par km
+    distance_bonus = int(run.distance * 5)
+    points_earned += distance_bonus
+    if distance_bonus > 0:
+        points_reasons.append(f"+{distance_bonus} pts (distance)")
+    
+    # Bonus grande distance (5+ km)
+    if run.distance >= 5:
+        points_earned += 25
+        points_reasons.append("+25 pts (5km+)")
+    
+    # Bonus marathon (10+ km)
+    if run.distance >= 10:
+        points_earned += 50
+        points_reasons.append("+50 pts (10km+)")
+    
+    # Attribuer les points
+    await add_points(current_user.user_id, points_earned, "running_session", run_id)
+    
     # Trigger notifications in background
     try:
         # Calculate weekly stats for challenge notifications
@@ -3224,7 +3307,9 @@ async def log_running_session(run: RunningSession, current_user: User = Depends(
         "distance": run.distance,
         "duration": run.duration,
         "pace": pace,
-        "calories": calories
+        "calories": calories,
+        "points_earned": points_earned,
+        "points_breakdown": points_reasons
     }
 
 @api_router.get("/running/history")
