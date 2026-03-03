@@ -50,6 +50,22 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels Audio/V
 - **Section "Lives Programmés"** avec date et heure
 - **Section "Demandes de Live"** pour l'admin (avec badge de comptage)
 
+### ⭐ SYSTÈME D'AVIS AMÉLIORÉ ✅ NEW (Session 3)
+- **Dashboard** : Section "VOTRE AVIS COMPTE !" avec note moyenne et statistiques
+  - Boutons "Voir les avis" et "Donner mon avis"
+  - Affichage des étoiles et du nombre d'avis en temps réel
+- **Actions rapides** : Bouton jaune "Donner un Avis" parmi Running, Live, Rewards, Progress
+- **Navigation** : Lien "Avis/Reviews" avec icône étoile dans le menu principal et mobile
+- **Page /reviews** :
+  - Formulaire de création d'avis (note, titre, contenu, public/privé)
+  - Liste de tous les avis publics avec nom, date, note, contenu
+  - Réponses du coach visibles
+- **Admin Panel** : Onglet "Reviews" avec :
+  - Statistiques (note moyenne, total, distribution par étoiles)
+  - Liste de TOUS les avis (publics et privés)
+  - Boutons Répondre et Supprimer
+- **Endpoints API** : `/api/reviews`, `/api/user/reviews`, `/api/admin/reviews/*`
+
 ### 📱 RÉSEAUX SOCIAUX VISIBLES ✅ NEW
 - **Dashboard** : Section "SUIVEZ-NOUS" avec boutons colorés
   - Instagram (gradient violet/rose)
@@ -173,6 +189,14 @@ GET /api/workouts?program_type=yoga
 
 ## Changelog
 
+### March 3, 2026 - Session 3
+- ✅ **Système d'Avis Amélioré** - Visibilité maximale pour les abonnés
+  - Bouton "Donner un Avis" dans les actions rapides du Dashboard (jaune)
+  - Section "YOUR OPINION MATTERS!" avec stats (note moyenne, nombre d'avis)
+  - Lien "Avis/Reviews" dans la Navigation principale (desktop + mobile)
+  - Page /reviews avec formulaire interactif
+  - Admin: Onglet Reviews avec statistiques, répondre/supprimer
+
 ### March 3, 2026 - Session 2
 - ✅ **Course à Pied** - Fonctionnalité complète (5 onglets)
 - ✅ **Partage Social** - Instagram, TikTok, X, WhatsApp
@@ -194,5 +218,6 @@ GET /api/workouts?program_type=yoga
 - ✅ Total: 138 séances d'entraînement
 
 ## Test Reports
+- `/app/test_reports/iteration_7.json` - Tests Système d'Avis (100% pass)
 - `/app/test_reports/iteration_6.json` - Tests Course à Pied (100% pass)
 - `/app/test_reports/iteration_5.json` - Tests précédents
