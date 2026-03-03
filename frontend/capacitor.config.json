@@ -3,13 +3,33 @@
   "appName": "FitMaxPro",
   "webDir": "build",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "iosScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 2000,
       "backgroundColor": "#09090b",
-      "showSpinner": false
+      "showSpinner": true,
+      "spinnerColor": "#EF4444"
+    },
+    "StatusBar": {
+      "style": "Dark",
+      "backgroundColor": "#09090b"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "dark"
     }
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "allowsLinkPreview": true,
+    "scrollEnabled": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
   }
 }
