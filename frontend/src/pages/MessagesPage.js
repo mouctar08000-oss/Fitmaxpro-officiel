@@ -151,24 +151,28 @@ const MessagesPage = () => {
 
           {/* Contact Options */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center hover:border-green-500/50 transition-colors cursor-pointer"
-              onClick={() => toast.info(isFr ? 'Fonctionnalité bientôt disponible!' : 'Feature coming soon!')}
+            <div 
+              className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center hover:border-green-500/50 transition-colors cursor-pointer hover:bg-green-500/10"
+              onClick={() => navigate('/call?type=audio&callee=coach')}
+              data-testid="audio-call-btn"
             >
               <div className="p-3 bg-green-500/20 rounded-full w-fit mx-auto mb-2">
                 <Phone className="w-6 h-6 text-green-500" />
               </div>
               <p className="font-bold">{isFr ? 'Appel Audio' : 'Audio Call'}</p>
-              <p className="text-gray-500 text-xs mt-1">{isFr ? 'Bientôt disponible' : 'Coming soon'}</p>
+              <p className="text-green-400 text-xs mt-1">{isFr ? 'Disponible' : 'Available'}</p>
             </div>
             
-            <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center hover:border-blue-500/50 transition-colors cursor-pointer"
-              onClick={() => toast.info(isFr ? 'Fonctionnalité bientôt disponible!' : 'Feature coming soon!')}
+            <div 
+              className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center hover:border-blue-500/50 transition-colors cursor-pointer hover:bg-blue-500/10"
+              onClick={() => navigate('/call?type=video&callee=coach')}
+              data-testid="video-call-btn"
             >
               <div className="p-3 bg-blue-500/20 rounded-full w-fit mx-auto mb-2">
                 <VideoIcon className="w-6 h-6 text-blue-500" />
               </div>
               <p className="font-bold">{isFr ? 'Appel Vidéo' : 'Video Call'}</p>
-              <p className="text-gray-500 text-xs mt-1">{isFr ? 'Bientôt disponible' : 'Coming soon'}</p>
+              <p className="text-blue-400 text-xs mt-1">{isFr ? 'Disponible' : 'Available'}</p>
             </div>
             
             <div className="bg-[#121212] border border-[#EF4444]/50 rounded-lg p-4 text-center">

@@ -3100,6 +3100,45 @@ async def get_live_history(current_user: User = Depends(get_current_user)):
         live.pop('_id', None)
     return lives
 
+# ==================== CALL LOGGING ENDPOINTS ====================
+
+class CallLog(BaseModel):
+    call_type: str  # 'audio' or 'video'
+    duration: int
+    callee_id: str
+
+@api_router.post("/calls/log")
+async def log_call(call: CallLog, current_user: User = Depends(get_current_user)):
+    """Log a call for analytics"""
+    call_doc = {
+        "call_id": f"call_{uuid.uuid4().hex[:12]}",
+        "caller_id": current_user.user_id,
+        "caller_name": current_user.name,
+        "callee_id": call.callee_id,
+        "call_type": call.call_type,
+        "duration": call.duration,
+        "status": "completed",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    await db.calls.insert_one(call_doc)
+    call_doc.pop('_id', None)
+    return {"success": True, "call_id": call_doc["call_id"]}
+
+@api_router.get("/admin/calls/history")
+async def get_call_history(current_user: User = Depends(get_current_user)):
+    """Get call history (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    calls = await db.calls.find().sort("created_at", -1).to_list(100)
+    for call in calls:
+        call['call_id'] = str(call.get('call_id', call.get('_id')))
+        call.pop('_id', None)
+    return calls
+
+
+
 
 # Include router after all endpoints are defined
 app.include_router(api_router)

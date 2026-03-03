@@ -21,6 +21,7 @@ import RemindersPage from './pages/RemindersPage';
 import ReviewsPage from './pages/ReviewsPage';
 import ProgressPhotosPage from './pages/ProgressPhotosPage';
 import LiveStreamPage from './pages/LiveStreamPage';
+import CallPage from './pages/CallPage';
 import './i18n';
 import './App.css';
 
@@ -98,6 +99,12 @@ function AppRouter() {
       <Route path="/live" element={
         <ProtectedRoute>
           <LiveStreamPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/call" element={
+        <ProtectedRoute>
+          <CallPage />
         </ProtectedRoute>
       } />
     </Routes>
