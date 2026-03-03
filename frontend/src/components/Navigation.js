@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video, Footprints, Gift, Radio } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video, Footprints, Gift, Radio, Star } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
@@ -148,6 +148,16 @@ const Navigation = () => {
                   <Gift className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Récompenses' : 'Rewards'}
                 </button>
+                <button
+                  data-testid="nav-reviews"
+                  onClick={() => navigate('/reviews')}
+                  className={`flex items-center gap-1 hover:text-yellow-400 transition-colors ${
+                    isActive('/reviews') ? 'text-yellow-400' : 'text-gray-400'
+                  }`}
+                >
+                  <Star className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Avis' : 'Reviews'}
+                </button>
               </>
             )}
             
@@ -290,6 +300,13 @@ const Navigation = () => {
                 >
                   <Gift className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Récompenses' : 'Rewards'}
+                </button>
+                <button
+                  onClick={() => { navigate('/reviews'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-yellow-400 hover:text-white transition-colors"
+                >
+                  <Star className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Donner un Avis' : 'Leave Review'}
                 </button>
                 <button
                   onClick={() => { navigate('/live'); setMobileMenuOpen(false); }}

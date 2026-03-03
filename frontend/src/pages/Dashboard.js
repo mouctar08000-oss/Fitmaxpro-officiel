@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import Footer from '../components/Footer';
 import { Button } from '../components/ui/button.jsx';
-import { Dumbbell, Pill, TrendingUp, CreditCard, Instagram, Youtube, Gift, Footprints, Radio } from 'lucide-react';
+import { Dumbbell, Pill, TrendingUp, CreditCard, Instagram, Youtube, Gift, Footprints, Radio, Star, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -24,11 +24,25 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState(null);
   const [socialLinks, setSocialLinks] = useState({});
+  const [reviewStats, setReviewStats] = useState({ total_reviews: 0, average_rating: 0 });
 
   useEffect(() => {
     fetchSubscription();
     fetchSocialLinks();
+    fetchReviewStats();
   }, []);
+
+  const fetchReviewStats = async () => {
+    try {
+      const response = await axios.get(`${API}/reviews`);
+      setReviewStats({
+        total_reviews: response.data.total_reviews || 0,
+        average_rating: response.data.average_rating || 0
+      });
+    } catch (error) {
+      console.error('Error fetching review stats:', error);
+    }
+  };
 
   const fetchSubscription = async () => {
     try {
@@ -206,10 +220,11 @@ const Dashboard = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
             <Button
               onClick={() => navigate('/running')}
               className="bg-green-600 hover:bg-green-700 h-auto py-4 flex flex-col items-center gap-2"
+              data-testid="quick-running-btn"
             >
               <Footprints className="w-6 h-6" />
               <span>{isFr ? 'Course à Pied' : 'Running'}</span>
@@ -217,6 +232,7 @@ const Dashboard = () => {
             <Button
               onClick={() => navigate('/live')}
               className="bg-red-600 hover:bg-red-700 h-auto py-4 flex flex-col items-center gap-2 relative"
+              data-testid="quick-live-btn"
             >
               <Radio className="w-6 h-6" />
               <span>Live</span>
@@ -225,17 +241,73 @@ const Dashboard = () => {
             <Button
               onClick={() => navigate('/rewards')}
               className="bg-purple-600 hover:bg-purple-700 h-auto py-4 flex flex-col items-center gap-2"
+              data-testid="quick-rewards-btn"
             >
               <Gift className="w-6 h-6" />
               <span>{isFr ? 'Récompenses' : 'Rewards'}</span>
             </Button>
             <Button
-              onClick={() => navigate('/progress')}
+              onClick={() => navigate('/reviews')}
+              className="bg-yellow-500 hover:bg-yellow-600 h-auto py-4 flex flex-col items-center gap-2"
+              data-testid="quick-reviews-btn"
+            >
+              <Star className="w-6 h-6" />
+              <span>{isFr ? 'Donner un Avis' : 'Leave Review'}</span>
+            </Button>
+            <Button
+              onClick={() => navigate('/my-progress')}
               className="bg-blue-600 hover:bg-blue-700 h-auto py-4 flex flex-col items-center gap-2"
+              data-testid="quick-progress-btn"
             >
               <TrendingUp className="w-6 h-6" />
               <span>{isFr ? 'Progression' : 'Progress'}</span>
             </Button>
+          </div>
+
+          {/* Reviews Section - Prominent Call to Action */}
+          <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-lg p-6 mb-12">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-yellow-500 p-3 rounded-full">
+                  <MessageSquare className="w-8 h-8 text-black" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                    {isFr ? 'VOTRE AVIS COMPTE !' : 'YOUR OPINION MATTERS!'}
+                  </h3>
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star 
+                          key={star}
+                          className={`w-4 h-4 ${star <= Math.round(reviewStats.average_rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'}`}
+                        />
+                      ))}
+                    </div>
+                    <span>{reviewStats.average_rating.toFixed(1)}</span>
+                    <span className="text-gray-500">({reviewStats.total_reviews} {isFr ? 'avis' : 'reviews'})</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => navigate('/reviews')}
+                  variant="outline"
+                  className="border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black"
+                  data-testid="view-reviews-btn"
+                >
+                  {isFr ? 'Voir les avis' : 'View reviews'}
+                </Button>
+                <Button
+                  onClick={() => navigate('/reviews')}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
+                  data-testid="leave-review-btn"
+                >
+                  <Star className="w-4 h-4 mr-2" />
+                  {isFr ? 'Donner mon avis' : 'Leave a review'}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Social Links Section */}
