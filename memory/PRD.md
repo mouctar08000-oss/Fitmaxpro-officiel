@@ -4,119 +4,101 @@
 Application de fitness nommée "FitMaxPro" avec:
 - Plans de paiement: VIP (9,99€/mois), Standard (6,99€/mois), Supplément (4,99€)
 - Séances de musculation pour débutants, amateurs et professionnels
-- Programmes prise de masse, perte de poids, jambes/fessiers, spécial femme, **ABDOMINAUX (NEW)**
-- Suppléments nutritionnels avec recettes détaillées (20+ repas par plan)
+- Programmes: prise de masse, perte de poids, jambes/fessiers, spécial femme, **ABDOMINAUX**, **YOGA/DÉTENTE**
+- Suppléments nutritionnels avec recettes détaillées
 - Internationalisation: Français et Anglais
-- Système de tracking des séances avec début/fin et pauses
+- Système de tracking des séances avec chronomètre et pauses
 - Messagerie directe entre abonnés et coach
 - Rappels d'entraînement programmables
 - Échauffement avant chaque séance et étirements après
 - Panneau d'administration complet avec suivi des progrès utilisateurs
-- **Live Streaming pour coaching en direct (DEMANDÉ)**
+- **Live Streaming pour coaching en direct (EN ATTENTE)**
+- **Système d'avis clients**
+- **Photos Avant/Après**
+- **Gestion des réseaux sociaux**
 
 ## Website URL
 **https://fitmax-gains.preview.emergentagent.com**
 
-## All Implemented Features (March 2026)
+## All Implemented Features (March 3, 2026)
 
-### 1. Session Tracking System ✅
-- **Bouton "START WORKOUT"** sur chaque séance
-- **Barre de tracking rouge** en haut avec chronomètre
-- **Bouton PAUSE/RESUME** pour gérer les temps de repos
-- **Bouton FINISH** pour terminer la séance
-- **Chronomètre de pause** en jaune pendant les pauses
-- **Messages de feedback** avec temps total
+### 1. Workout Programs ✅ UPDATED
+| Type | Nombre | Description |
+|------|--------|-------------|
+| mass_gain | 44 | Prise de masse (débutant à pro) |
+| weight_loss | 24 | Perte de poids (débutant à pro) |
+| **abs** | **18** | **Abdominaux (9 FR + 9 EN)** ✅ NEW |
+| legs_glutes | 16 | Jambes & Fessiers |
+| women_fitness | 18 | Spécial Femmes |
+| **yoga** | **18** | **Yoga & Détente (9 FR + 9 EN)** ✅ NEW |
+| **TOTAL** | **138** | Séances d'entraînement |
 
-### 2. User Progress Tracking ✅
-- Page **/my-progress** pour voir son évolution
-- Statistiques: Séances totales, Séances terminées, Temps total, Taux de complétion
-- Historique détaillé de chaque séance avec durée et pauses
-- **Graphiques d'évolution** (NEW)
+### 2. Session Tracking System ✅
+- Bouton "START WORKOUT" sur chaque séance
+- Barre de tracking rouge avec chronomètre
+- Boutons PAUSE/RESUME et FINISH
+- Chronomètre de pause en jaune
 
-### 3. Coach Messaging System ✅
-- Page **/messages** pour contacter le coach
-- Options affichées: Audio Call, Video Call (Coming soon), Text Chat (Available)
-- Chat en temps réel avec Coach FitMaxPro
+### 3. Warm-Up & Stretching System ✅
+- 8 exercices d'échauffement (FR + EN) avec vidéos YouTube
+- 10 exercices d'étirement (FR + EN) avec vidéos YouTube
+- Tracking début/fin automatique
+- **Vidéos modifiables par l'admin**
 
-### 4. Workout Reminders ✅
-- Page **/reminders** pour programmer ses rappels
-- Sélection de séance, jour, heure
-- Option "Répéter chaque semaine"
-- Notes optionnelles
-- Section "Upcoming Reminders"
-- Liste complète avec activation/désactivation
+### 4. User Progress Tracking ✅
+- Page /my-progress avec statistiques
+- Graphiques d'évolution (7 derniers jours)
+- Onglets: Overview, Charts, History
+- Discipline score et streak
 
-### 5. Warm-Up & Stretching System ✅
-- **Section Échauffement** avant chaque séance (8 exercices, 5-7 min)
-- **Section Étirements** après chaque séance (10 exercices, 5-10 min)
-- **Tracking de début/fin** pour échauffement et étirements
-- **Bouton START WARM-UP** sur l'image de la séance
-- **Vidéos YouTube explicatives** pour chaque exercice
-- **Support bilingue** (FR/EN)
+### 5. Admin Panel ✅ COMPLETE
+| Onglet | Fonctionnalité |
+|--------|----------------|
+| Dashboard | Stats générales (138 workouts, users, VIP) |
+| Subscribers | Liste des abonnés |
+| **Coaching** | Vue détaillée par abonné + alertes inactivité |
+| Progress | Historique des séances |
+| Discipline | Suivi échauffements/étirements |
+| **Reviews** | Gestion des avis clients |
+| **Before/After Photos** | Photos de progression |
+| Messages | Messagerie avec abonnés |
+| **Social Media** | Gestion Instagram/TikTok/YouTube/Facebook/Snapchat |
+| Analytics | Stats par séance |
+| Workouts | Création/modification séances |
+| **Warm-Up/Stretching** | Modification des vidéos d'exercices |
+| Nutrition | Gestion des repas |
 
-### 6. Email Reminders Integration ✅
-- **Intégration Resend** pour envoi d'emails
-- **Template HTML** professionnel avec branding FitMaxPro
-- **Bouton CTA** dans l'email pour commencer la séance
-- **Configuration dans .env**: RESEND_API_KEY, SENDER_EMAIL
+### 6. Reviews System ✅
+- Page /reviews pour laisser un avis (note + commentaire)
+- Admin peut voir tous les avis
+- Statistiques par étoiles
 
-### 7. Admin Discipline Tracking ✅
-- **Onglet "Discipline"** dans le panneau admin
-- **Statistiques globales** échauffements et étirements
-- **Top 5 abonnés les plus disciplinés** avec score et détails
-- **Historique complet** de toutes les sessions
-- **Graphiques d'évolution**
+### 7. Social Media Management ✅
+- Admin peut ajouter/modifier les liens sociaux
+- Instagram, YouTube, TikTok, Snapchat, Facebook
+- Liens affichés dans le footer
 
-### 8. Workout Programs ✅ UPDATED March 2026
-- **Prise de Masse** (mass_gain): 44 séances
-- **Perte de Poids** (weight_loss): 24 séances
-- **Abdominaux** (abs): 6 séances ✅ NEW
-- **Jambes/Fessiers** (legs_glutes): 16 séances
-- **Spécial Femmes** (women_fitness): 18 séances
-- **TOTAL: 108 séances d'entraînement**
+### 8. Progress Photos ✅
+- Utilisateurs peuvent uploader photos avant/après
+- Admin peut voir les photos de tous les abonnés
 
-### 9. Complete Website (Landing Page) ✅
-- Hero section avec statistiques
-- Sections: How It Works, Programs, Why FitMaxPro, Testimonials, FAQ
-- CTA final avec garantie 30 jours
-- Footer complet
+### 9. Inactivity Alerts ✅
+- Endpoint /api/admin/send-inactivity-alerts
+- Envoie des emails aux abonnés inactifs via Resend
 
-### 10. Nutrition Content (84 repas) ✅
-- 21 repas par plan (FR + EN)
-- Recettes complètes avec ingrédients et étapes
-- Gestion admin des repas
+### 10. Email Integration ✅
+- Resend configuré et fonctionnel
+- Templates HTML professionnels
 
-## Bug Fixed Today (March 3, 2026) ✅
+## Bug Fixed Today (March 3, 2026)
 
-### Scripts de Seeding - Stratégie UPSERT
-**Problème**: Les scripts de seeding s'écrasaient mutuellement, causant une perte de données.
+### Scripts de Seeding - Stratégie UPSERT ✅
+**Problème résolu**: Les scripts de seeding ne s'écrasent plus mutuellement.
+- Tous les scripts utilisent maintenant `update_one(..., upsert=True)`
+- IDs stables au lieu de `uuid.uuid4()`
 
-**Solution implémentée**:
-- Remplacement de `delete_many()` par `update_one(..., upsert=True)`
-- Utilisation d'IDs stables au lieu de `uuid.uuid4()` généré à chaque exécution
-- Scripts modifiés:
-  - `seed_detailed_workouts.py`
-  - `add_abs_workouts.py`
-  - `add_leg_workouts.py`
-  - `add_women_workouts.py`
-
-**Résultat**: Les scripts peuvent être ré-exécutés sans perte de données.
-
-## API Endpoints
-
-| Endpoint | Méthode | Description |
-|----------|---------|-------------|
-| `/api/routines/warmup` | GET | Récupérer les exercices d'échauffement |
-| `/api/routines/stretching` | GET | Récupérer les exercices d'étirement |
-| `/api/routine/start` | POST | Démarrer une session (warmup/stretching) |
-| `/api/routine/end` | POST | Terminer une session avec durée |
-| `/api/admin/routines` | GET | Liste de toutes les routines (admin) |
-| `/api/reminders/{id}/send-email` | POST | Envoyer un email de rappel |
-| `/api/admin/analytics/evolution` | GET | Données d'évolution (7 jours) |
-| `/api/workouts` | GET | Récupérer les séances avec filtres |
-| `/api/reviews` | GET/POST | Gestion des avis |
-| `/api/social-links` | GET/PUT | Gestion des réseaux sociaux |
-| `/api/progress-photos` | GET/POST | Gestion des photos avant/après |
+### Badge de type programme ✅
+**Problème résolu**: Les badges affichent maintenant le bon type (Abs, Yoga, etc.)
 
 ## Test Credentials
 - Admin Email: mouctar08000@hotmail.com
@@ -125,55 +107,81 @@ Application de fitness nommée "FitMaxPro" avec:
 
 ## Prioritized Backlog
 
-### P0 - Critical (En cours)
+### P0 - Critical (Prochaine étape)
 - ⏳ **Live Streaming** - Coaching en direct style TikTok/Instagram
   - Technologie recommandée: **LiveKit**
   - Fonctionnalités: Broadcaster, viewers, chat temps réel, accès VIP
-  - Complexité: Élevée (nécessite intégration tierce)
+  - **Playbook obtenu, prêt pour implémentation**
 
 ### P1 - Important
-- 🔲 Achats in-app natifs pour les stores (RevenueCat)
-- 🔲 Notifications push réelles (PWA ou mobile)
-- 🔲 Appels Audio/Vidéo Coach-Abonné
-- 🔲 Finaliser système d'avis/reviews
-- 🔲 Finaliser liens réseaux sociaux
-- 🔲 Finaliser photos avant/après
+- ⏳ Appels Audio/Vidéo Coach-Abonné (boutons dans Messages)
+- 🔲 Achats in-app natifs (RevenueCat)
+- 🔲 Notifications push réelles
 
 ### P2 - Nice to Have
-- 🔲 Guide de soumission aux App Stores
-- 🔲 Configuration domaine personnalisé (fitmax-gains.com)
-- 🔲 Refactorisation backend (server.py > 3000 lignes)
-- 🔲 Refactorisation frontend (AdminPage.js > 3700 lignes)
-
-## Known Issues
-- ⚠️ Export GitHub - Bug plateforme Emergent (en attente du support)
+- 🔲 Refactorisation backend (server.py ~3000 lignes)
+- 🔲 Refactorisation frontend (AdminPage.js ~3700 lignes)
+- 🔲 Guide soumission App Stores
+- 🔲 Domaine personnalisé (fitmax-gains.com)
 
 ## 3rd Party Integrations
 | Service | Usage | Status |
 |---------|-------|--------|
-| Stripe | Paiements | ✅ Configuré avec clé test |
-| Resend | Emails de rappel | ✅ Configuré et fonctionnel |
+| Stripe | Paiements | ✅ Configuré |
+| Resend | Emails | ✅ Fonctionnel |
 | YouTube | Vidéos exercices | ✅ Embeds fonctionnels |
 | Pexels | Images stock | ✅ URLs utilisées |
-| LiveKit | Live Streaming | ⏳ Playbook obtenu, prêt à implémenter |
+| LiveKit | Live Streaming | ⏳ Playbook prêt |
+
+## Key API Endpoints
+```
+GET  /api/workouts?program_type=abs&language=fr
+GET  /api/routines/warmup?language=fr
+GET  /api/reviews
+POST /api/reviews
+GET  /api/social-links
+PUT  /api/admin/social-links
+GET  /api/admin/reviews
+GET  /api/admin/progress-photos
+POST /api/admin/send-inactivity-alerts
+GET  /api/user/evolution
+GET  /api/admin/all-subscribers-evolution
+```
 
 ## File Structure (Key Files)
-- `/app/backend/server.py` - API FastAPI (~3000 lignes)
-- `/app/backend/seed_detailed_workouts.py` - Script de seeding (CORRIGÉ)
-- `/app/backend/add_abs_workouts.py` - Séances abdos (CORRIGÉ)
-- `/app/backend/add_leg_workouts.py` - Séances jambes (CORRIGÉ)
-- `/app/backend/add_women_workouts.py` - Séances femmes (CORRIGÉ)
-- `/app/frontend/src/pages/WorkoutsPage.js` - Catalogue séances
-- `/app/frontend/src/pages/AdminPage.js` - Panneau admin (~3700 lignes)
+```
+/app/
+├── backend/
+│   ├── server.py                 # API FastAPI (~3000 lignes)
+│   ├── seed_detailed_workouts.py # Mass/Weight Loss (CORRIGÉ)
+│   ├── seed_abs_complete.py      # Abdominaux (NEW - 18 séances)
+│   ├── seed_yoga_workouts.py     # Yoga/Détente (NEW - 18 séances)
+│   ├── add_leg_workouts.py       # Jambes (CORRIGÉ)
+│   └── add_women_workouts.py     # Femmes (CORRIGÉ)
+├── frontend/src/pages/
+│   ├── WorkoutsPage.js           # Catalogue (UPDATED - filtres yoga/abs)
+│   ├── AdminPage.js              # Panneau admin (~3700 lignes)
+│   ├── MyProgressPage.js         # Progression utilisateur
+│   ├── ReviewsPage.js            # Avis clients
+│   └── ProgressPhotosPage.js     # Photos avant/après
+└── memory/
+    └── PRD.md
+```
 
 ## Test Reports
-- `/app/test_reports/iteration_4.json` - Dernier rapport
+- /app/test_reports/iteration_5.json - 100% tests passés (20/20)
 
 ## Changelog
 
-### March 3, 2026
-- ✅ Corrigé bug critique des scripts de seeding (perte de données)
-- ✅ Ajouté 6 nouvelles séances d'abdominaux (FR + EN)
-- ✅ Total workouts passé de 51 à 108
-- ✅ Vérifié filtre "Abs" fonctionnel sur la page Workouts
-- ⏳ Obtenu playbook LiveKit pour Live Streaming
+### March 3, 2026 (Session 2)
+- ✅ Ajouté 12 nouvelles séances d'abdominaux (6 FR + 6 EN) - Total: 18
+- ✅ Ajouté 18 nouvelles séances de Yoga/Détente (9 FR + 9 EN)
+- ✅ Corrigé l'affichage des badges de type (Abs, Yoga, etc.)
+- ✅ Ajouté le filtre "Yoga & Relaxation" dans WorkoutsPage
+- ✅ Total workouts: 138 (était 108)
+- ✅ Tests passés: 100% (20/20)
+
+### March 3, 2026 (Session 1)
+- ✅ Corrigé bug critique des scripts de seeding
+- ✅ Vérifié fonctionnement Reviews, Social Media, Progress
+- ✅ Vérifié graphiques d'évolution utilisateur et admin

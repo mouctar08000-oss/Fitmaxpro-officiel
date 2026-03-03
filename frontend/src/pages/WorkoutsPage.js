@@ -56,10 +56,23 @@ const WorkoutsPage = () => {
       case 'mass_gain': return '#EF4444';
       case 'weight_loss': return '#3B82F6';
       case 'legs_glutes': return '#EC4899';
-      case 'women': return '#A855F7';
+      case 'women_fitness': return '#A855F7';
       case 'abs': return '#F97316';
+      case 'yoga': return '#10B981';
       default: return '#6B7280';
     }
+  };
+
+  const getTypeName = (type) => {
+    const names = {
+      'mass_gain': i18n.language?.startsWith('fr') ? 'Prise de Masse' : 'Mass Gain',
+      'weight_loss': i18n.language?.startsWith('fr') ? 'Perte de Poids' : 'Weight Loss',
+      'legs_glutes': i18n.language?.startsWith('fr') ? 'Jambes & Fessiers' : 'Legs & Glutes',
+      'women_fitness': i18n.language?.startsWith('fr') ? 'Spécial Femme' : 'Women Special',
+      'abs': i18n.language?.startsWith('fr') ? 'Abdominaux' : 'Abs',
+      'yoga': i18n.language?.startsWith('fr') ? 'Yoga & Détente' : 'Yoga & Relaxation'
+    };
+    return names[type] || type;
   };
 
   return (
@@ -105,8 +118,9 @@ const WorkoutsPage = () => {
                 <option value="mass_gain">{t('workouts.massGain')}</option>
                 <option value="weight_loss">{t('workouts.weightLoss')}</option>
                 <option value="legs_glutes">{i18n.language?.startsWith('fr') ? 'Jambes & Fessiers' : 'Legs & Glutes'}</option>
-                <option value="women">{i18n.language?.startsWith('fr') ? 'Spécial Femme' : 'Women Special'}</option>
+                <option value="women_fitness">{i18n.language?.startsWith('fr') ? 'Spécial Femme' : 'Women Special'}</option>
                 <option value="abs">{i18n.language?.startsWith('fr') ? 'Abdominaux' : 'Abs'}</option>
+                <option value="yoga">{i18n.language?.startsWith('fr') ? 'Yoga & Détente' : 'Yoga & Relaxation'}</option>
               </select>
             </div>
           </div>
@@ -146,7 +160,7 @@ const WorkoutsPage = () => {
                           color: '#fff'
                         }}
                       >
-                        {workout.program_type === 'mass_gain' ? t('workouts.massGain') : t('workouts.weightLoss')}
+                        {getTypeName(workout.program_type)}
                       </span>
                     </div>
                     
