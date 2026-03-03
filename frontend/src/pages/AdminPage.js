@@ -40,7 +40,10 @@ import {
   Bell,
   AlertTriangle,
   Star,
-  Instagram
+  Instagram,
+  Footprints,
+  Target,
+  Zap
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -143,6 +146,11 @@ const AdminPage = () => {
   // Progress photos states
   const [usersProgressPhotos, setUsersProgressPhotos] = useState([]);
   const [selectedUserPhotos, setSelectedUserPhotos] = useState(null);
+  
+  // Running stats states
+  const [runningStats, setRunningStats] = useState(null);
+  const [allRunningData, setAllRunningData] = useState([]);
+  const [selectedUserRunning, setSelectedUserRunning] = useState(null);
   
   // New workout creation states
   const [showCreateWorkout, setShowCreateWorkout] = useState(false);
@@ -336,6 +344,35 @@ const AdminPage = () => {
       setSelectedUserProgress(response.data);
     } catch (error) {
       console.error('Error fetching user sessions:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  // Running data fetching
+  const fetchRunningStats = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/running/stats`, { headers: getAuthHeaders() });
+      setRunningStats(response.data);
+    } catch (error) {
+      console.error('Error fetching running stats:', error);
+    }
+  }, []);
+
+  const fetchAllRunningData = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/running/all`, { headers: getAuthHeaders() });
+      setAllRunningData(response.data.runs || []);
+    } catch (error) {
+      console.error('Error fetching running data:', error);
+    }
+  }, []);
+
+  const fetchUserRunning = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/running/user/${userId}`, { headers: getAuthHeaders() });
+      setSelectedUserRunning(response.data);
+    } catch (error) {
+      console.error('Error fetching user running data:', error);
       toast.error(isFr ? 'Erreur' : 'Error');
     }
   };
@@ -693,12 +730,14 @@ const AdminPage = () => {
         fetchAlertsHistory(),
         fetchAllReviews(),
         fetchSocialLinks(),
-        fetchUsersProgressPhotos()
+        fetchUsersProgressPhotos(),
+        fetchRunningStats(),
+        fetchAllRunningData()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos, fetchRunningStats, fetchAllRunningData]);
 
   // Check if user is admin
   useEffect(() => {
@@ -807,6 +846,7 @@ const AdminPage = () => {
               { id: 'subscribers', icon: Users, label: isFr ? 'Abonnés' : 'Subscribers' },
               { id: 'coaching', icon: UserCog, label: isFr ? 'Coaching' : 'Coaching' },
               { id: 'progress', icon: TrendingUp, label: isFr ? 'Progrès' : 'Progress' },
+              { id: 'running', icon: Footprints, label: isFr ? 'Course à Pied' : 'Running' },
               { id: 'discipline', icon: Timer, label: isFr ? 'Discipline' : 'Discipline' },
               { id: 'reviews', icon: MessageCircle, label: isFr ? 'Avis' : 'Reviews', badge: allReviews.length },
               { id: 'photos', icon: Image, label: isFr ? 'Photos Avant/Après' : 'Before/After Photos' },
@@ -1865,6 +1905,236 @@ const AdminPage = () => {
                         </Button>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Running Tab */}
+          {activeTab === 'running' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Footprints className="w-5 h-5 text-green-500" />
+                  {isFr ? 'Course à Pied - Suivi des Abonnés' : 'Running - Subscriber Tracking'}
+                </h2>
+                <Button
+                  onClick={() => { fetchRunningStats(); fetchAllRunningData(); }}
+                  variant="outline"
+                  className="border-[#27272a]"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {isFr ? 'Actualiser' : 'Refresh'}
+                </Button>
+              </div>
+
+              {/* Global Running Stats */}
+              {runningStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 text-center">
+                    <Target className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                    <p className="text-3xl font-bold">{runningStats.global_stats?.total_distance?.toFixed(1) || 0}</p>
+                    <p className="text-gray-500 text-sm">{isFr ? 'km total' : 'Total km'}</p>
+                  </div>
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 text-center">
+                    <Footprints className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                    <p className="text-3xl font-bold">{runningStats.global_stats?.total_runs || 0}</p>
+                    <p className="text-gray-500 text-sm">{isFr ? 'Courses totales' : 'Total Runs'}</p>
+                  </div>
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 text-center">
+                    <Clock className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+                    <p className="text-3xl font-bold">
+                      {Math.floor((runningStats.global_stats?.total_time || 0) / 3600)}h{Math.floor(((runningStats.global_stats?.total_time || 0) % 3600) / 60)}m
+                    </p>
+                    <p className="text-gray-500 text-sm">{isFr ? 'Temps total' : 'Total Time'}</p>
+                  </div>
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 text-center">
+                    <Flame className="w-8 h-8 text-orange-500 mx-auto mb-2" />
+                    <p className="text-3xl font-bold">{runningStats.global_stats?.total_calories || 0}</p>
+                    <p className="text-gray-500 text-sm">{isFr ? 'Calories brûlées' : 'Calories Burned'}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Top Runners Leaderboard */}
+              {runningStats?.top_runners && runningStats.top_runners.length > 0 && (
+                <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <Star className="w-5 h-5 text-yellow-500" />
+                    {isFr ? 'Top Coureurs' : 'Top Runners'}
+                  </h3>
+                  <div className="space-y-3">
+                    {runningStats.top_runners.map((runner, idx) => (
+                      <div 
+                        key={runner.user_id}
+                        className="flex items-center justify-between p-4 bg-black/30 rounded-lg hover:bg-black/50 cursor-pointer transition-colors"
+                        onClick={() => fetchUserRunning(runner.user_id)}
+                      >
+                        <div className="flex items-center gap-4">
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                            idx === 0 ? 'bg-yellow-500 text-black' :
+                            idx === 1 ? 'bg-gray-400 text-black' :
+                            idx === 2 ? 'bg-orange-600 text-white' :
+                            'bg-zinc-700 text-white'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <p className="font-bold">{runner.user_name}</p>
+                            <p className="text-gray-500 text-sm">{runner.total_runs} {isFr ? 'courses' : 'runs'}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-green-400 font-bold">{runner.total_distance} km</p>
+                          <p className="text-gray-500 text-sm">
+                            {isFr ? 'Allure moy:' : 'Avg pace:'} {runner.avg_pace?.toFixed(2) || '--'} min/km
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Runs */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-blue-400" />
+                  {isFr ? 'Courses Récentes' : 'Recent Runs'}
+                </h3>
+                {allRunningData.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    {isFr ? 'Aucune course enregistrée' : 'No runs recorded yet'}
+                  </p>
+                ) : (
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {allRunningData.slice(0, 20).map((run) => (
+                      <div 
+                        key={run.run_id}
+                        className="flex items-center justify-between p-4 bg-black/30 rounded-lg hover:bg-black/50 cursor-pointer transition-colors"
+                        onClick={() => fetchUserRunning(run.user_id)}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
+                            <Footprints className="w-6 h-6 text-green-500" />
+                          </div>
+                          <div>
+                            <p className="font-bold">{run.user_name}</p>
+                            <p className="text-gray-500 text-sm">
+                              {new Date(run.created_at).toLocaleDateString()} - {new Date(run.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6 text-sm">
+                          <div className="text-center">
+                            <p className="text-white font-bold">{run.distance?.toFixed(2)} km</p>
+                            <p className="text-gray-600">{isFr ? 'Distance' : 'Distance'}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-white">{Math.floor(run.duration / 60)}:{(run.duration % 60).toString().padStart(2, '0')}</p>
+                            <p className="text-gray-600">{isFr ? 'Durée' : 'Duration'}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-blue-400">{run.pace?.toFixed(2)}</p>
+                            <p className="text-gray-600">min/km</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-orange-400">{run.calories}</p>
+                            <p className="text-gray-600">kcal</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected User Running Details Modal */}
+              {selectedUserRunning && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <div className="p-6 border-b border-[#27272a] flex justify-between items-center sticky top-0 bg-[#121212]">
+                      <h3 className="text-xl font-bold flex items-center gap-2">
+                        <Footprints className="w-6 h-6 text-green-500" />
+                        {selectedUserRunning.user?.name} - {isFr ? 'Historique Course' : 'Running History'}
+                      </h3>
+                      <Button variant="ghost" onClick={() => setSelectedUserRunning(null)}>
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+                    
+                    <div className="p-6 space-y-6">
+                      {/* User Stats */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-black/30 rounded-lg p-4 text-center">
+                          <p className="text-2xl font-bold text-green-400">{selectedUserRunning.stats?.total_distance}</p>
+                          <p className="text-gray-500 text-sm">{isFr ? 'km total' : 'Total km'}</p>
+                        </div>
+                        <div className="bg-black/30 rounded-lg p-4 text-center">
+                          <p className="text-2xl font-bold">{selectedUserRunning.stats?.total_runs}</p>
+                          <p className="text-gray-500 text-sm">{isFr ? 'Courses' : 'Runs'}</p>
+                        </div>
+                        <div className="bg-black/30 rounded-lg p-4 text-center">
+                          <p className="text-2xl font-bold text-purple-400">
+                            {Math.floor((selectedUserRunning.stats?.total_time || 0) / 3600)}h{Math.floor(((selectedUserRunning.stats?.total_time || 0) % 3600) / 60)}m
+                          </p>
+                          <p className="text-gray-500 text-sm">{isFr ? 'Temps total' : 'Total Time'}</p>
+                        </div>
+                        <div className="bg-black/30 rounded-lg p-4 text-center">
+                          <p className="text-2xl font-bold text-orange-400">{selectedUserRunning.stats?.total_calories}</p>
+                          <p className="text-gray-500 text-sm">{isFr ? 'Calories' : 'Calories'}</p>
+                        </div>
+                      </div>
+
+                      {/* Progress Chart */}
+                      {selectedUserRunning.runs && selectedUserRunning.runs.length > 1 && (
+                        <div className="bg-black/30 rounded-lg p-4">
+                          <h4 className="font-bold mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-green-400" />
+                            {isFr ? 'Progression' : 'Progress'}
+                          </h4>
+                          <ResponsiveContainer width="100%" height={200}>
+                            <AreaChart data={[...selectedUserRunning.runs].reverse().slice(-10).map((r, i) => ({
+                              name: new Date(r.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+                              distance: r.distance,
+                              pace: r.pace
+                            }))}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                              <XAxis dataKey="name" stroke="#666" fontSize={12} />
+                              <YAxis stroke="#666" fontSize={12} />
+                              <Tooltip 
+                                contentStyle={{ backgroundColor: '#121212', border: '1px solid #333' }}
+                                labelStyle={{ color: '#fff' }}
+                              />
+                              <Area type="monotone" dataKey="distance" stroke="#22c55e" fill="#22c55e20" name="Distance (km)" />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+
+                      {/* Run History */}
+                      <div>
+                        <h4 className="font-bold mb-4">{isFr ? 'Historique détaillé' : 'Detailed History'}</h4>
+                        <div className="space-y-2">
+                          {selectedUserRunning.runs?.map((run, idx) => (
+                            <div key={run.run_id} className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <span className="text-gray-500 text-sm w-20">
+                                  {new Date(run.created_at).toLocaleDateString()}
+                                </span>
+                                <span className="font-bold text-green-400">{run.distance?.toFixed(2)} km</span>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm">
+                                <span>{Math.floor(run.duration / 60)}:{(run.duration % 60).toString().padStart(2, '0')}</span>
+                                <span className="text-blue-400">{run.pace?.toFixed(2)} min/km</span>
+                                <span className="text-orange-400">{run.calories} kcal</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

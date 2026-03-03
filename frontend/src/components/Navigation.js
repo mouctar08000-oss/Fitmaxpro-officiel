@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video, Footprints } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
@@ -127,6 +127,16 @@ const Navigation = () => {
                 >
                   <Bell className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Rappels' : 'Reminders'}
+                </button>
+                <button
+                  data-testid="nav-running"
+                  onClick={() => navigate('/running')}
+                  className={`flex items-center gap-1 hover:text-green-500 transition-colors ${
+                    isActive('/running') ? 'text-green-500' : 'text-gray-400'
+                  }`}
+                >
+                  <Footprints className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Course' : 'Running'}
                 </button>
               </>
             )}
@@ -256,6 +266,13 @@ const Navigation = () => {
                 >
                   <Bell className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Mes Rappels' : 'My Reminders'}
+                </button>
+                <button
+                  onClick={() => { navigate('/running'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-green-500 hover:text-white transition-colors"
+                >
+                  <Footprints className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Course à Pied' : 'Running'}
                 </button>
               </>
             )}

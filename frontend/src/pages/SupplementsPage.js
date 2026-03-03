@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import { Button } from '../components/ui/button.jsx';
-import { Pill, Play, X, Utensils, Flame, ChefHat, Clock, Users, ChevronRight, BookOpen } from 'lucide-react';
+import { Pill, Play, X, Utensils, Flame, ChefHat, Clock, Users, ChevronRight, BookOpen, Lightbulb, ArrowRightLeft, Award } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -437,6 +437,58 @@ const SupplementsPage = () => {
                       ))}
                     </ol>
                   </div>
+
+                  {/* Conseils */}
+                  {activeRecipe.tips && activeRecipe.tips.length > 0 && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                      <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-yellow-500">
+                        <Lightbulb className="w-5 h-5" />
+                        {isFr ? 'Conseils du Chef' : "Chef's Tips"}
+                      </h3>
+                      <ul className="space-y-2">
+                        {activeRecipe.tips.map((tip, idx) => (
+                          <li key={idx} className="flex items-start gap-3">
+                            <span className="text-yellow-500 mt-0.5">💡</span>
+                            <span className="text-gray-300 text-sm">{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Substitutions */}
+                  {activeRecipe.substitutions && Object.keys(activeRecipe.substitutions).length > 0 && (
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                      <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-blue-400">
+                        <ArrowRightLeft className="w-5 h-5" />
+                        {isFr ? 'Substitutions possibles' : 'Possible Substitutions'}
+                      </h3>
+                      <ul className="space-y-2">
+                        {Object.entries(activeRecipe.substitutions).map(([original, replacement], idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-sm">
+                            <span className="text-gray-400">{original}</span>
+                            <span className="text-blue-400">→</span>
+                            <span className="text-gray-300">{replacement}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Difficulté */}
+                  {activeRecipe.difficulty && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Award className="w-4 h-4 text-purple-400" />
+                      <span className="text-gray-500">{isFr ? 'Difficulté:' : 'Difficulty:'}</span>
+                      <span className={`font-medium ${
+                        activeRecipe.difficulty === 'Facile' ? 'text-green-400' :
+                        activeRecipe.difficulty === 'Moyen' ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {activeRecipe.difficulty}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer */}

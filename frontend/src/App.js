@@ -22,6 +22,7 @@ import ReviewsPage from './pages/ReviewsPage';
 import ProgressPhotosPage from './pages/ProgressPhotosPage';
 import LiveStreamPage from './pages/LiveStreamPage';
 import CallPage from './pages/CallPage';
+import RunningPage from './pages/RunningPage';
 import './i18n';
 import './App.css';
 
@@ -105,6 +106,12 @@ function AppRouter() {
       <Route path="/call" element={
         <ProtectedRoute>
           <CallPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/running" element={
+        <ProtectedRoute>
+          <RunningPage />
         </ProtectedRoute>
       } />
     </Routes>

@@ -3138,6 +3138,245 @@ async def get_call_history(current_user: User = Depends(get_current_user)):
     return calls
 
 
+# ==================== RUNNING / COURSE À PIED ====================
+
+class RunningSession(BaseModel):
+    distance: float  # en km
+    duration: int  # en secondes
+    pace: Optional[float] = None  # min/km
+    calories: Optional[int] = None
+    route_points: Optional[List[Dict]] = None  # [{lat, lng}]
+    notes: Optional[str] = None
+
+@api_router.post("/running/log")
+async def log_running_session(run: RunningSession, current_user: User = Depends(get_current_user)):
+    """Enregistrer une session de course"""
+    run_id = f"run_{uuid.uuid4().hex[:12]}"
+    
+    # Calculer l'allure si non fournie
+    pace = run.pace
+    if not pace and run.distance > 0:
+        pace = (run.duration / 60) / run.distance  # min/km
+    
+    # Calculer les calories si non fournies (estimation: ~60 cal/km)
+    calories = run.calories
+    if not calories:
+        calories = int(run.distance * 60)
+    
+    run_doc = {
+        "run_id": run_id,
+        "user_id": current_user.user_id,
+        "user_name": current_user.name,
+        "distance": run.distance,
+        "duration": run.duration,
+        "pace": pace,
+        "calories": calories,
+        "route_points": run.route_points or [],
+        "notes": run.notes,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.running_sessions.insert_one(run_doc)
+    
+    return {
+        "success": True,
+        "run_id": run_id,
+        "distance": run.distance,
+        "duration": run.duration,
+        "pace": pace,
+        "calories": calories
+    }
+
+@api_router.get("/running/history")
+async def get_running_history(current_user: User = Depends(get_current_user)):
+    """Récupérer l'historique des courses de l'utilisateur"""
+    runs = await db.running_sessions.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return runs
+
+@api_router.get("/running/stats")
+async def get_running_stats(current_user: User = Depends(get_current_user)):
+    """Récupérer les statistiques de course de l'utilisateur"""
+    runs = await db.running_sessions.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).to_list(500)
+    
+    if not runs:
+        return {
+            "total_runs": 0,
+            "total_distance": 0,
+            "total_time": 0,
+            "total_calories": 0,
+            "avg_pace": None,
+            "best_pace": None,
+            "best_distance": 0,
+            "avg_distance": 0
+        }
+    
+    total_runs = len(runs)
+    total_distance = sum(r.get("distance", 0) for r in runs)
+    total_time = sum(r.get("duration", 0) for r in runs)
+    total_calories = sum(r.get("calories", 0) for r in runs)
+    
+    # Meilleures performances
+    paces = [r.get("pace") for r in runs if r.get("pace") and r.get("pace") > 0]
+    best_pace = min(paces) if paces else None
+    avg_pace = sum(paces) / len(paces) if paces else None
+    
+    distances = [r.get("distance", 0) for r in runs]
+    best_distance = max(distances) if distances else 0
+    avg_distance = sum(distances) / len(distances) if distances else 0
+    
+    # Stats par semaine (7 derniers jours)
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    week_runs = [r for r in runs if datetime.fromisoformat(r.get("created_at", "2000-01-01").replace('Z', '+00:00')) > week_ago]
+    weekly_distance = sum(r.get("distance", 0) for r in week_runs)
+    weekly_runs = len(week_runs)
+    
+    return {
+        "total_runs": total_runs,
+        "total_distance": round(total_distance, 2),
+        "total_time": total_time,
+        "total_calories": total_calories,
+        "avg_pace": round(avg_pace, 2) if avg_pace else None,
+        "best_pace": round(best_pace, 2) if best_pace else None,
+        "best_distance": round(best_distance, 2),
+        "avg_distance": round(avg_distance, 2),
+        "weekly_distance": round(weekly_distance, 2),
+        "weekly_runs": weekly_runs
+    }
+
+@api_router.get("/running/{run_id}")
+async def get_running_session(run_id: str, current_user: User = Depends(get_current_user)):
+    """Récupérer les détails d'une course spécifique"""
+    run = await db.running_sessions.find_one(
+        {"run_id": run_id, "user_id": current_user.user_id},
+        {"_id": 0}
+    )
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    return run
+
+@api_router.delete("/running/{run_id}")
+async def delete_running_session(run_id: str, current_user: User = Depends(get_current_user)):
+    """Supprimer une course"""
+    result = await db.running_sessions.delete_one(
+        {"run_id": run_id, "user_id": current_user.user_id}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    return {"success": True, "message": "Run deleted"}
+
+# ==================== ADMIN - RUNNING ANALYTICS ====================
+
+@api_router.get("/admin/running/all")
+async def admin_get_all_running(admin: User = Depends(verify_admin)):
+    """Admin: Récupérer toutes les courses de tous les utilisateurs"""
+    runs = await db.running_sessions.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    
+    return {"runs": runs, "total": len(runs)}
+
+@api_router.get("/admin/running/stats")
+async def admin_get_running_stats(admin: User = Depends(verify_admin)):
+    """Admin: Statistiques globales de course"""
+    # Stats globales
+    total_runs = await db.running_sessions.count_documents({})
+    
+    pipeline = [
+        {"$group": {
+            "_id": None,
+            "total_distance": {"$sum": "$distance"},
+            "total_time": {"$sum": "$duration"},
+            "total_calories": {"$sum": "$calories"},
+            "avg_distance": {"$avg": "$distance"},
+            "avg_duration": {"$avg": "$duration"}
+        }}
+    ]
+    
+    global_stats = await db.running_sessions.aggregate(pipeline).to_list(1)
+    
+    if global_stats:
+        stats = global_stats[0]
+        stats.pop("_id", None)
+        stats["total_runs"] = total_runs
+        stats["total_distance"] = round(stats.get("total_distance", 0), 2)
+        stats["avg_distance"] = round(stats.get("avg_distance", 0), 2)
+    else:
+        stats = {
+            "total_runs": 0,
+            "total_distance": 0,
+            "total_time": 0,
+            "total_calories": 0,
+            "avg_distance": 0,
+            "avg_duration": 0
+        }
+    
+    # Top runners
+    top_runners_pipeline = [
+        {"$group": {
+            "_id": "$user_id",
+            "user_name": {"$first": "$user_name"},
+            "total_distance": {"$sum": "$distance"},
+            "total_runs": {"$sum": 1},
+            "avg_pace": {"$avg": "$pace"}
+        }},
+        {"$sort": {"total_distance": -1}},
+        {"$limit": 10}
+    ]
+    
+    top_runners = await db.running_sessions.aggregate(top_runners_pipeline).to_list(10)
+    
+    for runner in top_runners:
+        runner["user_id"] = runner.pop("_id")
+        runner["total_distance"] = round(runner.get("total_distance", 0), 2)
+        if runner.get("avg_pace"):
+            runner["avg_pace"] = round(runner["avg_pace"], 2)
+    
+    return {
+        "global_stats": stats,
+        "top_runners": top_runners
+    }
+
+@api_router.get("/admin/running/user/{user_id}")
+async def admin_get_user_running(user_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Historique de course d'un utilisateur spécifique"""
+    runs = await db.running_sessions.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password": 0})
+    
+    # Stats de l'utilisateur
+    total_distance = sum(r.get("distance", 0) for r in runs)
+    total_time = sum(r.get("duration", 0) for r in runs)
+    total_calories = sum(r.get("calories", 0) for r in runs)
+    
+    return {
+        "user": {
+            "user_id": user_id,
+            "name": user.get("name") if user else "Unknown",
+            "email": user.get("email") if user else ""
+        },
+        "runs": runs,
+        "stats": {
+            "total_runs": len(runs),
+            "total_distance": round(total_distance, 2),
+            "total_time": total_time,
+            "total_calories": total_calories
+        }
+    }
 
 
 # Include router after all endpoints are defined
