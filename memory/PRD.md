@@ -11,9 +11,11 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels Audio/V
 ### 🏃 COURSE À PIED ✅ NEW
 - **Page /running** : Interface complète de suivi de course
 - **Onglet Courir** : Boutons Démarrer/Pause/Reprendre/Terminer, suivi GPS, Distance, Durée, Allure, Calories
-- **Onglet Historique** : Liste de toutes les courses passées
+- **Onglet Historique** : Liste de toutes les courses passées avec **bouton partage** pour chaque course
 - **Onglet Stats** : Statistiques totales, graphique de progression (7 derniers jours), Records personnels
+- **Partage Social** : Modal de partage avec carte visuelle + boutons Instagram, TikTok, X (Twitter), WhatsApp, Copier stats
 - **Admin** : Onglet "Course à Pied" avec stats globales, Top Runners, courses récentes de tous les abonnés
+- **Admin Utilisateur** : L'admin peut lui-même faire des courses, sauvegarder et voir sa progression
 - **Endpoints API** : `/api/running/log`, `/api/running/history`, `/api/running/stats`, `/api/admin/running/*`
 
 ### 🍽️ RECETTES COMPLÈTES ✅ NEW
@@ -138,6 +140,11 @@ GET /api/workouts?program_type=yoga
   - Graphique de progression (7 derniers jours)
   - Records personnels
   - Admin: Stats globales, Top Runners, détails par utilisateur
+- ✅ **Partage Social des Courses** - NEW
+  - Modal de partage avec carte visuelle (stats de la course)
+  - Partage vers Instagram, TikTok, X (Twitter), WhatsApp
+  - Bouton "Copier les stats" pour le presse-papiers
+- ✅ **Admin Running** - L'admin peut également faire des courses et voir sa progression
 - ✅ **Recettes Complètes** - 26+ recettes mises à jour
   - Ingrédients précis, étapes détaillées
   - Conseils du chef, substitutions possibles

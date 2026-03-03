@@ -18,7 +18,13 @@ import {
   Footprints,
   Flame,
   Target,
-  Plus
+  Plus,
+  Share2,
+  Instagram,
+  Download,
+  X,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -44,6 +50,9 @@ const RunningPage = () => {
   const [runHistory, setRunHistory] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [shareModalRun, setShareModalRun] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const shareCardRef = useRef(null);
   
   // Refs
   const timerRef = useRef(null);
@@ -359,19 +368,32 @@ const RunningPage = () => {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="text-center">
-                    <p className="text-gray-400">{formatTime(run.duration)}</p>
-                    <p className="text-gray-600">{isFr ? 'Durée' : 'Time'}</p>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-6 text-sm">
+                    <div className="text-center">
+                      <p className="text-gray-400">{formatTime(run.duration)}</p>
+                      <p className="text-gray-600">{isFr ? 'Durée' : 'Time'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-gray-400">{formatPace(run.pace)}</p>
+                      <p className="text-gray-600">{isFr ? 'Allure' : 'Pace'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-orange-400">{run.calories}</p>
+                      <p className="text-gray-600">kcal</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-gray-400">{formatPace(run.pace)}</p>
-                    <p className="text-gray-600">{isFr ? 'Allure' : 'Pace'}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-orange-400">{run.calories}</p>
-                    <p className="text-gray-600">kcal</p>
-                  </div>
+                  
+                  {/* Share Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShareModalRun(run)}
+                    className="text-gray-400 hover:text-green-400"
+                    data-testid={`share-run-${run.run_id}`}
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -515,6 +537,153 @@ const RunningPage = () => {
         {activeTab === 'track' && renderTrackingView()}
         {activeTab === 'history' && renderHistoryView()}
         {activeTab === 'stats' && renderStatsView()}
+        
+        {/* Share Modal */}
+        {shareModalRun && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-green-500" />
+                  {isFr ? 'Partager ma course' : 'Share my run'}
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => { setShareModalRun(null); setCopied(false); }}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              {/* Share Card Preview */}
+              <div className="p-4">
+                <div 
+                  ref={shareCardRef}
+                  className="bg-gradient-to-br from-green-600 to-green-800 rounded-xl p-6 text-white"
+                  data-testid="share-card"
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <Footprints className="w-6 h-6" />
+                    <span className="font-bold">FitMaxPro</span>
+                  </div>
+                  
+                  <div className="text-center mb-4">
+                    <p className="text-5xl font-bold">{shareModalRun.distance?.toFixed(2)}</p>
+                    <p className="text-xl opacity-80">km</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                    <div className="bg-white/10 rounded-lg p-2">
+                      <p className="font-bold">{formatTime(shareModalRun.duration)}</p>
+                      <p className="opacity-70">{isFr ? 'Durée' : 'Time'}</p>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-2">
+                      <p className="font-bold">{formatPace(shareModalRun.pace)}</p>
+                      <p className="opacity-70">{isFr ? 'Allure' : 'Pace'}</p>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-2">
+                      <p className="font-bold">{shareModalRun.calories}</p>
+                      <p className="opacity-70">kcal</p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 text-center text-xs opacity-60">
+                    {new Date(shareModalRun.created_at).toLocaleDateString()} • fitmax-gains.preview.emergentagent.com
+                  </div>
+                </div>
+              </div>
+              
+              {/* Share Options */}
+              <div className="p-4 space-y-3">
+                <p className="text-gray-400 text-sm mb-2">{isFr ? 'Partager sur :' : 'Share on:'}</p>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Instagram Story */}
+                  <Button
+                    onClick={() => {
+                      const text = `🏃 J'ai couru ${shareModalRun.distance?.toFixed(2)} km en ${formatTime(shareModalRun.duration)} ! Allure: ${formatPace(shareModalRun.pace)}/km 🔥 #FitMaxPro #Running`;
+                      window.open(`https://www.instagram.com/?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white"
+                    data-testid="share-instagram"
+                  >
+                    <Instagram className="w-4 h-4 mr-2" />
+                    Instagram
+                  </Button>
+                  
+                  {/* TikTok */}
+                  <Button
+                    onClick={() => {
+                      const text = `J'ai couru ${shareModalRun.distance?.toFixed(2)} km ! 🏃💪 #FitMaxPro #Running #Fitness`;
+                      window.open(`https://www.tiktok.com/upload?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="bg-black border border-white/20 hover:bg-zinc-800 text-white"
+                    data-testid="share-tiktok"
+                  >
+                    <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                    </svg>
+                    TikTok
+                  </Button>
+                  
+                  {/* Twitter/X */}
+                  <Button
+                    onClick={() => {
+                      const text = `🏃 J'ai couru ${shareModalRun.distance?.toFixed(2)} km en ${formatTime(shareModalRun.duration)} avec @FitMaxPro ! Allure: ${formatPace(shareModalRun.pace)}/km 🔥 #Running #Fitness`;
+                      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="bg-black border border-white/20 hover:bg-zinc-800 text-white"
+                    data-testid="share-twitter"
+                  >
+                    <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                    X (Twitter)
+                  </Button>
+                  
+                  {/* WhatsApp */}
+                  <Button
+                    onClick={() => {
+                      const text = `🏃 J'ai couru ${shareModalRun.distance?.toFixed(2)} km en ${formatTime(shareModalRun.duration)} avec FitMaxPro ! Allure: ${formatPace(shareModalRun.pace)}/km 🔥`;
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="share-whatsapp"
+                  >
+                    <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                    WhatsApp
+                  </Button>
+                </div>
+                
+                {/* Copy Text */}
+                <Button
+                  onClick={() => {
+                    const text = `🏃 Course FitMaxPro\n📏 Distance: ${shareModalRun.distance?.toFixed(2)} km\n⏱️ Durée: ${formatTime(shareModalRun.duration)}\n🔥 Allure: ${formatPace(shareModalRun.pace)}/km\n💪 Calories: ${shareModalRun.calories} kcal`;
+                    navigator.clipboard.writeText(text);
+                    setCopied(true);
+                    toast.success(isFr ? 'Copié !' : 'Copied!');
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  variant="outline"
+                  className="w-full border-zinc-700"
+                  data-testid="copy-run-stats"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2 text-green-500" />
+                      {isFr ? 'Copié !' : 'Copied!'}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      {isFr ? 'Copier les stats' : 'Copy stats'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
