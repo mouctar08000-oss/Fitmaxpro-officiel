@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video, Footprints } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video, Footprints, Gift, Radio } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
@@ -137,6 +137,16 @@ const Navigation = () => {
                 >
                   <Footprints className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Course' : 'Running'}
+                </button>
+                <button
+                  data-testid="nav-rewards"
+                  onClick={() => navigate('/rewards')}
+                  className={`flex items-center gap-1 hover:text-purple-400 transition-colors ${
+                    isActive('/rewards') ? 'text-purple-400' : 'text-gray-400'
+                  }`}
+                >
+                  <Gift className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Récompenses' : 'Rewards'}
                 </button>
               </>
             )}
@@ -273,6 +283,23 @@ const Navigation = () => {
                 >
                   <Footprints className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Course à Pied' : 'Running'}
+                </button>
+                <button
+                  onClick={() => { navigate('/rewards'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-purple-400 hover:text-white transition-colors"
+                >
+                  <Gift className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Récompenses' : 'Rewards'}
+                </button>
+                <button
+                  onClick={() => { navigate('/live'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-red-400 hover:text-white transition-colors"
+                >
+                  <Radio className="w-4 h-4" />
+                  <span className="relative">
+                    Live
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                  </span>
                 </button>
               </>
             )}

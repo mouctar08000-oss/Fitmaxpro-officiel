@@ -3845,6 +3845,406 @@ async def broadcast_notification(notif: BroadcastNotification, admin: User = Dep
     }
 
 
+# ==================== REWARDS SYSTEM ====================
+
+# Available rewards
+REWARDS_CATALOG = [
+    {
+        "id": "vip_1_day",
+        "name_fr": "Accès VIP 1 jour",
+        "name_en": "VIP Access 1 day",
+        "description_fr": "Accédez à tous les contenus VIP pendant 24h",
+        "description_en": "Access all VIP content for 24h",
+        "points_cost": 200,
+        "icon": "👑",
+        "type": "vip_access",
+        "duration_hours": 24
+    },
+    {
+        "id": "vip_7_days",
+        "name_fr": "Accès VIP 7 jours",
+        "name_en": "VIP Access 7 days",
+        "description_fr": "Accédez à tous les contenus VIP pendant 1 semaine",
+        "description_en": "Access all VIP content for 1 week",
+        "points_cost": 1000,
+        "icon": "🏆",
+        "type": "vip_access",
+        "duration_hours": 168
+    },
+    {
+        "id": "coaching_session",
+        "name_fr": "Session coaching gratuite",
+        "name_en": "Free coaching session",
+        "description_fr": "15 minutes de coaching personnalisé avec le coach",
+        "description_en": "15 minutes of personalized coaching",
+        "points_cost": 500,
+        "icon": "💪",
+        "type": "coaching",
+        "duration_minutes": 15
+    },
+    {
+        "id": "nutrition_plan",
+        "name_fr": "Plan nutrition personnalisé",
+        "name_en": "Personalized nutrition plan",
+        "description_fr": "Un plan alimentaire adapté à vos objectifs",
+        "description_en": "A meal plan tailored to your goals",
+        "points_cost": 750,
+        "icon": "🥗",
+        "type": "nutrition"
+    },
+    {
+        "id": "badge_gold",
+        "name_fr": "Badge Or Exclusif",
+        "name_en": "Exclusive Gold Badge",
+        "description_fr": "Affichez un badge Or à côté de votre nom",
+        "description_en": "Display a Gold badge next to your name",
+        "points_cost": 300,
+        "icon": "🥇",
+        "type": "badge"
+    },
+    {
+        "id": "priority_live",
+        "name_fr": "Priorité Live",
+        "name_en": "Live Priority",
+        "description_fr": "Vos questions seront traitées en priorité pendant les lives",
+        "description_en": "Your questions will be prioritized during lives",
+        "points_cost": 150,
+        "icon": "⭐",
+        "type": "live_priority",
+        "duration_hours": 168
+    }
+]
+
+@api_router.get("/rewards/catalog")
+async def get_rewards_catalog(current_user: User = Depends(get_current_user)):
+    """Get available rewards catalog"""
+    return {"rewards": REWARDS_CATALOG}
+
+@api_router.get("/rewards/points")
+async def get_user_points(current_user: User = Depends(get_current_user)):
+    """Get user's current points balance and history"""
+    user_data = await db.user_points.find_one({"user_id": current_user.user_id})
+    
+    if not user_data:
+        # Initialize user points
+        user_data = {
+            "user_id": current_user.user_id,
+            "total_points": 0,
+            "lifetime_points": 0,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.user_points.insert_one(user_data)
+    
+    # Get recent transactions
+    transactions = await db.points_transactions.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    
+    # Get active rewards
+    active_rewards = await db.user_rewards.find({
+        "user_id": current_user.user_id,
+        "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()}
+    }, {"_id": 0}).to_list(10)
+    
+    return {
+        "total_points": user_data.get("total_points", 0),
+        "lifetime_points": user_data.get("lifetime_points", 0),
+        "transactions": transactions,
+        "active_rewards": active_rewards
+    }
+
+async def add_points(user_id: str, points: int, reason: str, reason_id: str = None):
+    """Add points to user's balance"""
+    # Update or create user points
+    result = await db.user_points.update_one(
+        {"user_id": user_id},
+        {
+            "$inc": {"total_points": points, "lifetime_points": max(0, points)},
+            "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
+        },
+        upsert=True
+    )
+    
+    # Log transaction
+    await db.points_transactions.insert_one({
+        "user_id": user_id,
+        "points": points,
+        "reason": reason,
+        "reason_id": reason_id,
+        "type": "earned" if points > 0 else "spent",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return True
+
+@api_router.post("/rewards/redeem/{reward_id}")
+async def redeem_reward(reward_id: str, current_user: User = Depends(get_current_user)):
+    """Redeem a reward using points"""
+    # Find reward in catalog
+    reward = next((r for r in REWARDS_CATALOG if r["id"] == reward_id), None)
+    if not reward:
+        raise HTTPException(status_code=404, detail="Reward not found")
+    
+    # Check user points
+    user_data = await db.user_points.find_one({"user_id": current_user.user_id})
+    current_points = user_data.get("total_points", 0) if user_data else 0
+    
+    if current_points < reward["points_cost"]:
+        raise HTTPException(status_code=400, detail="Not enough points")
+    
+    # Deduct points
+    await add_points(current_user.user_id, -reward["points_cost"], f"Redeemed: {reward['name_en']}", reward_id)
+    
+    # Calculate expiration if applicable
+    expires_at = None
+    if reward.get("duration_hours"):
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=reward["duration_hours"])).isoformat()
+    
+    # Create user reward
+    user_reward = {
+        "reward_id": f"ur_{uuid.uuid4().hex[:12]}",
+        "user_id": current_user.user_id,
+        "catalog_id": reward_id,
+        "name": reward["name_en"],
+        "type": reward["type"],
+        "status": "active",
+        "expires_at": expires_at,
+        "redeemed_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.user_rewards.insert_one(user_reward)
+    
+    # Send notification
+    await send_push_notification(
+        current_user.user_id,
+        f"🎁 Récompense débloquée !",
+        f"Vous avez échangé {reward['points_cost']} points contre : {reward['name_fr']}",
+        {"url": "/rewards", "type": "reward_redeemed"}
+    )
+    
+    return {
+        "success": True,
+        "reward": reward,
+        "remaining_points": current_points - reward["points_cost"]
+    }
+
+@api_router.get("/rewards/my-rewards")
+async def get_my_rewards(current_user: User = Depends(get_current_user)):
+    """Get user's redeemed rewards"""
+    rewards = await db.user_rewards.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("redeemed_at", -1).to_list(50)
+    
+    return {"rewards": rewards}
+
+# Admin: Give points to user
+class GivePointsRequest(BaseModel):
+    user_id: str
+    points: int
+    reason: str
+
+@api_router.post("/admin/rewards/give-points")
+async def admin_give_points(data: GivePointsRequest, admin: User = Depends(verify_admin)):
+    """Admin: Give points to a user"""
+    await add_points(data.user_id, data.points, f"Admin gift: {data.reason}")
+    
+    # Notify user
+    await send_push_notification(
+        data.user_id,
+        "🎉 Bonus de points !",
+        f"Vous avez reçu {data.points} points ! Raison: {data.reason}",
+        {"url": "/rewards", "type": "points_gift"}
+    )
+    
+    return {"success": True, "message": f"Gave {data.points} points to user"}
+
+@api_router.get("/admin/rewards/stats")
+async def admin_rewards_stats(admin: User = Depends(verify_admin)):
+    """Admin: Get rewards statistics"""
+    total_points_issued = await db.points_transactions.aggregate([
+        {"$match": {"points": {"$gt": 0}}},
+        {"$group": {"_id": None, "total": {"$sum": "$points"}}}
+    ]).to_list(1)
+    
+    total_points_spent = await db.points_transactions.aggregate([
+        {"$match": {"points": {"$lt": 0}}},
+        {"$group": {"_id": None, "total": {"$sum": "$points"}}}
+    ]).to_list(1)
+    
+    rewards_redeemed = await db.user_rewards.count_documents({})
+    
+    top_earners = await db.user_points.find(
+        {},
+        {"_id": 0, "user_id": 1, "total_points": 1, "lifetime_points": 1}
+    ).sort("lifetime_points", -1).limit(10).to_list(10)
+    
+    # Get user names
+    for earner in top_earners:
+        user = await db.users.find_one({"user_id": earner["user_id"]}, {"name": 1})
+        earner["name"] = user.get("name", "Unknown") if user else "Unknown"
+    
+    return {
+        "total_points_issued": total_points_issued[0]["total"] if total_points_issued else 0,
+        "total_points_spent": abs(total_points_spent[0]["total"]) if total_points_spent else 0,
+        "rewards_redeemed": rewards_redeemed,
+        "top_earners": top_earners
+    }
+
+
+# ==================== LIVE STREAMING IMPROVEMENTS ====================
+
+class LiveRequest(BaseModel):
+    title: Optional[str] = None
+    message: Optional[str] = None
+
+@api_router.post("/live/request")
+async def request_live_session(data: LiveRequest, current_user: User = Depends(get_current_user)):
+    """Subscriber requests a live session from admin"""
+    request_id = f"lr_{uuid.uuid4().hex[:12]}"
+    
+    live_request = {
+        "request_id": request_id,
+        "user_id": current_user.user_id,
+        "user_name": current_user.name,
+        "title": data.title or "Demande de Live",
+        "message": data.message or "Je souhaiterais une session live avec le coach",
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.live_requests.insert_one(live_request)
+    
+    # Notify admin
+    admins = await db.users.find({"role": "admin"}).to_list(10)
+    for admin in admins:
+        await send_push_notification(
+            admin.get("user_id"),
+            "📺 Demande de Live !",
+            f"{current_user.name} demande une session live : {data.title or 'Coaching'}",
+            {"url": "/admin", "type": "live_request"}
+        )
+    
+    return {"success": True, "request_id": request_id}
+
+@api_router.get("/live/requests")
+async def get_live_requests(current_user: User = Depends(get_current_user)):
+    """Get live session requests (admin sees all, user sees own)"""
+    if current_user.role == "admin":
+        requests = await db.live_requests.find(
+            {},
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(50)
+    else:
+        requests = await db.live_requests.find(
+            {"user_id": current_user.user_id},
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(20)
+    
+    return {"requests": requests}
+
+@api_router.post("/live/requests/{request_id}/respond")
+async def respond_to_live_request(
+    request_id: str, 
+    response: str,  # accepted, declined, scheduled
+    scheduled_time: Optional[str] = None,
+    admin: User = Depends(verify_admin)
+):
+    """Admin responds to a live request"""
+    request = await db.live_requests.find_one({"request_id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    await db.live_requests.update_one(
+        {"request_id": request_id},
+        {"$set": {
+            "status": response,
+            "scheduled_time": scheduled_time,
+            "responded_at": datetime.now(timezone.utc).isoformat(),
+            "responded_by": admin.user_id
+        }}
+    )
+    
+    # Notify requester
+    if response == "accepted":
+        message = "Votre demande de live a été acceptée ! Le coach sera bientôt en ligne."
+    elif response == "scheduled":
+        message = f"Votre live est programmé pour : {scheduled_time}"
+    else:
+        message = "Votre demande de live n'a pas pu être acceptée pour le moment."
+    
+    await send_push_notification(
+        request["user_id"],
+        "📺 Réponse à votre demande de Live",
+        message,
+        {"url": "/live", "type": "live_response"}
+    )
+    
+    return {"success": True}
+
+@api_router.get("/live/schedule")
+async def get_live_schedule(current_user: User = Depends(get_current_user)):
+    """Get upcoming scheduled lives"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Get scheduled lives
+    scheduled = await db.lives.find({
+        "status": "scheduled",
+        "scheduled_time": {"$gte": now}
+    }, {"_id": 0}).sort("scheduled_time", 1).to_list(10)
+    
+    # Get active lives
+    active = await db.lives.find({
+        "status": "active"
+    }, {"_id": 0}).to_list(5)
+    
+    return {
+        "active_lives": active,
+        "scheduled_lives": scheduled
+    }
+
+# Modify create live to support scheduling
+class CreateScheduledLive(BaseModel):
+    title: str
+    description: Optional[str] = None
+    is_vip: bool = False
+    scheduled_time: Optional[str] = None  # ISO format
+
+@api_router.post("/live/schedule")
+async def schedule_live(data: CreateScheduledLive, admin: User = Depends(verify_admin)):
+    """Admin: Schedule a live session"""
+    live_id = f"live_{uuid.uuid4().hex[:12]}"
+    
+    live = {
+        "live_id": live_id,
+        "title": data.title,
+        "description": data.description,
+        "created_by": admin.user_id,
+        "creator_name": admin.name,
+        "is_vip": data.is_vip,
+        "status": "scheduled" if data.scheduled_time else "active",
+        "scheduled_time": data.scheduled_time,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "viewer_count": 0,
+        "chat_messages": []
+    }
+    
+    await db.lives.insert_one(live)
+    
+    # Notify all subscribers if scheduled
+    if data.scheduled_time:
+        subs = await db.push_subscriptions.find({"enabled": True}).to_list(1000)
+        for sub in subs:
+            await send_push_notification(
+                sub["user_id"],
+                "📺 Live programmé !",
+                f"'{data.title}' prévu le {data.scheduled_time}. Ne le manquez pas !",
+                {"url": "/live", "type": "live_scheduled"}
+            )
+    
+    return {"success": True, "live_id": live_id, "status": live["status"]}
+
+
 # Include router after all endpoints are defined
 app.include_router(api_router)
 

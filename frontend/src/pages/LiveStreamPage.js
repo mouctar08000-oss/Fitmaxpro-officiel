@@ -17,10 +17,15 @@ import {
   Crown,
   Lock,
   Unlock,
-  RefreshCw
+  RefreshCw,
+  Calendar,
+  Clock,
+  Plus,
+  Hand
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { toast } from 'sonner';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -31,6 +36,8 @@ const LiveStreamPage = () => {
   
   // State
   const [activeLives, setActiveLives] = useState([]);
+  const [scheduledLives, setScheduledLives] = useState([]);
+  const [liveRequests, setLiveRequests] = useState([]);
   const [currentLive, setCurrentLive] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isBroadcaster, setIsBroadcaster] = useState(false);
@@ -47,14 +54,22 @@ const LiveStreamPage = () => {
   const [liveTitle, setLiveTitle] = useState('');
   const [liveDescription, setLiveDescription] = useState('');
   const [isVipOnly, setIsVipOnly] = useState(false);
+  const [scheduledTime, setScheduledTime] = useState('');
+  
+  // For subscribers: requesting a live
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [requestTitle, setRequestTitle] = useState('');
+  const [requestMessage, setRequestMessage] = useState('');
   
   const isAdmin = user?.role === 'admin';
   const isVIP = user?.subscription?.type === 'vip';
+  
+  const isFr = t('language') === 'fr' || navigator.language?.startsWith('fr');
 
   // Fetch active lives
   const fetchActiveLives = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
       const response = await axios.get(`${API}/api/lives`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -64,11 +79,63 @@ const LiveStreamPage = () => {
     }
   }, []);
 
+  // Fetch scheduled lives and requests
+  const fetchSchedule = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.get(`${API}/api/live/schedule`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setScheduledLives(response.data.scheduled_lives || []);
+    } catch (err) {
+      console.error('Error fetching schedule:', err);
+    }
+  }, []);
+
+  // Fetch live requests
+  const fetchRequests = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.get(`${API}/api/live/requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLiveRequests(response.data.requests || []);
+    } catch (err) {
+      console.error('Error fetching requests:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchActiveLives();
+    fetchSchedule();
+    fetchRequests();
     const interval = setInterval(fetchActiveLives, 10000);
     return () => clearInterval(interval);
-  }, [fetchActiveLives]);
+  }, [fetchActiveLives, fetchSchedule, fetchRequests]);
+
+  // Request a live session (subscriber)
+  const requestLive = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      await axios.post(`${API}/api/live/request`, {
+        title: requestTitle || (isFr ? 'Demande de Live' : 'Live Request'),
+        message: requestMessage || (isFr ? 'Je souhaite une session live' : 'I would like a live session')
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      toast.success(isFr ? 'Demande envoyée au coach !' : 'Request sent to coach!');
+      setShowRequestForm(false);
+      setRequestTitle('');
+      setRequestMessage('');
+      fetchRequests();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Create a new live stream (admin only)
   const createLive = async () => {
@@ -76,22 +143,42 @@ const LiveStreamPage = () => {
     
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`${API}/api/lives`, {
-        title: liveTitle,
-        description: liveDescription,
-        vip_only: isVipOnly
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
       
-      setCurrentLive(response.data);
-      setIsBroadcaster(true);
-      setIsStreaming(true);
-      setShowCreateForm(false);
+      if (scheduledTime) {
+        // Schedule for later
+        await axios.post(`${API}/api/live/schedule`, {
+          title: liveTitle,
+          description: liveDescription,
+          is_vip: isVipOnly,
+          scheduled_time: scheduledTime
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        toast.success(isFr ? 'Live programmé !' : 'Live scheduled!');
+        setShowCreateForm(false);
+        fetchSchedule();
+      } else {
+        // Start now
+        const response = await axios.post(`${API}/api/lives`, {
+          title: liveTitle,
+          description: liveDescription,
+          vip_only: isVipOnly
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        setCurrentLive(response.data);
+        setIsBroadcaster(true);
+        setIsStreaming(true);
+        setShowCreateForm(false);
+        fetchActiveLives();
+      }
+      
       setLiveTitle('');
       setLiveDescription('');
-      fetchActiveLives();
+      setScheduledTime('');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create live');
     } finally {
@@ -187,13 +274,21 @@ const LiveStreamPage = () => {
           </p>
         </div>
         
-        {isAdmin && (
+        {isAdmin ? (
           <Button 
             onClick={() => setShowCreateForm(true)}
             className="bg-red-600 hover:bg-red-700"
           >
             <Play className="w-4 h-4 mr-2" />
             {t('live.startLive', 'Start Live')}
+          </Button>
+        ) : (
+          <Button 
+            onClick={() => setShowRequestForm(true)}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            <Hand className="w-4 h-4 mr-2" />
+            {isFr ? 'Demander un Live' : 'Request Live'}
           </Button>
         )}
       </div>
@@ -262,6 +357,22 @@ const LiveStreamPage = () => {
               </span>
             </div>
             
+            {/* Schedule Option */}
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                {isFr ? 'Programmer pour plus tard (optionnel)' : 'Schedule for later (optional)'}
+              </label>
+              <Input
+                type="datetime-local"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                className="bg-black border-zinc-700"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {isFr ? 'Laissez vide pour démarrer maintenant' : 'Leave empty to start now'}
+              </p>
+            </div>
+            
             <div className="flex gap-4 pt-4">
               <Button 
                 onClick={createLive}
@@ -270,10 +381,12 @@ const LiveStreamPage = () => {
               >
                 {loading ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : scheduledTime ? (
+                  <Calendar className="w-4 h-4 mr-2" />
                 ) : (
                   <Play className="w-4 h-4 mr-2" />
                 )}
-                {t('live.goLive', 'Go Live')}
+                {scheduledTime ? (isFr ? 'Programmer' : 'Schedule') : (isFr ? 'Démarrer Live' : 'Go Live')}
               </Button>
               <Button 
                 variant="outline" 
@@ -283,6 +396,143 @@ const LiveStreamPage = () => {
                 {t('common.cancel', 'Cancel')}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Request Live Form (Subscribers) */}
+      {showRequestForm && !isAdmin && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <Hand className="w-5 h-5 text-purple-500" />
+            {isFr ? 'Demander une session Live' : 'Request a Live Session'}
+          </h2>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                {isFr ? 'Sujet souhaité' : 'Desired topic'}
+              </label>
+              <Input
+                value={requestTitle}
+                onChange={(e) => setRequestTitle(e.target.value)}
+                placeholder={isFr ? "Ex: Questions sur la nutrition" : "Ex: Questions about nutrition"}
+                className="bg-black border-zinc-700"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                {isFr ? 'Message (optionnel)' : 'Message (optional)'}
+              </label>
+              <textarea
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                placeholder={isFr ? "Décrivez ce que vous aimeriez aborder..." : "Describe what you'd like to discuss..."}
+                className="w-full bg-black border border-zinc-700 rounded-md p-3 text-white min-h-[100px]"
+              />
+            </div>
+            
+            <div className="flex gap-4">
+              <Button 
+                onClick={requestLive}
+                disabled={loading}
+                className="bg-purple-600 hover:bg-purple-700 flex-1"
+              >
+                {loading ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isFr ? 'Envoyer la demande' : 'Send Request'}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowRequestForm(false)}
+                className="border-zinc-700"
+              >
+                {isFr ? 'Annuler' : 'Cancel'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scheduled Lives */}
+      {scheduledLives.length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-500" />
+            {isFr ? 'Lives Programmés' : 'Scheduled Lives'}
+          </h2>
+          
+          <div className="grid gap-3">
+            {scheduledLives.map(live => (
+              <div 
+                key={live.live_id}
+                className="bg-zinc-900 border border-blue-500/30 rounded-lg p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold">{live.title}</h3>
+                      <p className="text-blue-400 text-sm flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        {new Date(live.scheduled_time).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  {live.is_vip && (
+                    <span className="bg-amber-500 text-black text-xs px-2 py-1 rounded font-bold">VIP</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Live Requests (Admin view) */}
+      {isAdmin && liveRequests.length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <Hand className="w-5 h-5 text-purple-500" />
+            {isFr ? 'Demandes de Live' : 'Live Requests'}
+            <span className="bg-purple-500 text-white text-xs px-2 py-1 rounded-full">{liveRequests.filter(r => r.status === 'pending').length}</span>
+          </h2>
+          
+          <div className="grid gap-3">
+            {liveRequests.filter(r => r.status === 'pending').map(request => (
+              <div 
+                key={request.request_id}
+                className="bg-zinc-900 border border-purple-500/30 rounded-lg p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold">{request.user_name}</p>
+                    <p className="text-gray-400">{request.title}</p>
+                    {request.message && <p className="text-gray-500 text-sm mt-1">"{request.message}"</p>}
+                    <p className="text-gray-600 text-xs mt-2">{new Date(request.created_at).toLocaleString()}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setLiveTitle(request.title);
+                        setShowCreateForm(true);
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Play className="w-4 h-4 mr-1" />
+                      {isFr ? 'Accepter' : 'Accept'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

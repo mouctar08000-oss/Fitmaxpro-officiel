@@ -28,7 +28,37 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels Audio/V
 - **Admin Utilisateur** : L'admin peut lui-même faire des courses, sauvegarder et voir sa progression
 - **Endpoints API** : `/api/running/*`, `/api/notifications/*`, `/api/admin/notifications/broadcast`
 
-### 🍽️ RECETTES COMPLÈTES ✅ NEW
+### 🎁 SYSTÈME DE RÉCOMPENSES ✅ NEW
+- **Page /rewards** : Boutique de récompenses avec points
+- **Catalogue** : 6 récompenses échangeables
+  - 👑 Accès VIP 1 jour (200 pts)
+  - 🏆 Accès VIP 7 jours (1000 pts)
+  - 💪 Session coaching gratuite (500 pts)
+  - 🥗 Plan nutrition personnalisé (750 pts)
+  - 🥇 Badge Or Exclusif (300 pts)
+  - ⭐ Priorité Live (150 pts)
+- **Onglets** : Shop, My Rewards, History
+- **Section "Comment gagner des points"** explicative
+- **Admin** : Endpoint pour donner des points bonus
+- **Endpoints API** : `/api/rewards/*`, `/api/admin/rewards/*`
+
+### 📺 LIVE STREAMING AMÉLIORÉ ✅ NEW
+- **Demande de Live** : Les abonnés peuvent demander une session live au coach
+- **Programmation** : L'admin peut programmer des lives à l'avance
+- **Notifications** : Les abonnés sont notifiés des lives programmés
+- **Acceptation** : L'admin peut accepter les demandes et démarrer un live
+- **Section "Lives Programmés"** avec date et heure
+- **Section "Demandes de Live"** pour l'admin (avec badge de comptage)
+
+### 📱 RÉSEAUX SOCIAUX VISIBLES ✅ NEW
+- **Dashboard** : Section "SUIVEZ-NOUS" avec boutons colorés
+  - Instagram (gradient violet/rose)
+  - YouTube (rouge)
+  - TikTok (noir)
+  - Facebook (bleu)
+  - Snapchat (jaune)
+- **Boutons d'action rapide** : Running, Live, Rewards, Progress
+- **Footer** : Liens sociaux sur toutes les pages publiques
 - **Toutes les recettes mises à jour** avec détails complets :
   - Ingrédients avec quantités précises
   - Étapes numérotées et détaillées
@@ -144,35 +174,15 @@ GET /api/workouts?program_type=yoga
 ## Changelog
 
 ### March 3, 2026 - Session 2
-- ✅ **Course à Pied** - Fonctionnalité complète
-  - Page /running avec 5 onglets (Courir, Historique, Stats, Classement, Défis)
-  - Suivi GPS, Distance, Durée, Allure, Calories
-  - Graphique de progression (7 derniers jours)
-  - Records personnels
-  - Admin: Stats globales, Top Runners, détails par utilisateur
-- ✅ **Partage Social des Courses** - NEW
-  - Modal de partage avec carte visuelle (stats de la course)
-  - Partage vers Instagram, TikTok, X (Twitter), WhatsApp
-  - Bouton "Copier les stats" pour le presse-papiers
-- ✅ **Classement / Leaderboard** - NEW
-  - Podium Top 3 avec médailles or/argent/bronze
-  - Liste complète des coureurs avec rang
-  - Badge "You" pour identifier l'utilisateur connecté
-- ✅ **Défis Hebdomadaires + Badges** - NEW
-  - 7 défis hebdomadaires avec barres de progression
-  - 7 badges permanents à débloquer (First Run, Marathon, Century, etc.)
-  - Système de points pour les défis complétés
-- ✅ **Notifications Push** - NEW
-  - Service Worker pour les notifications push
-  - Bouton "Enable notifs" dans la page Running
-  - Notifications automatiques quand défi presque complété
-  - Notifications quand quelqu'un vous dépasse au classement
-  - Admin: Bouton "Notify all" pour broadcast à tous les abonnés
-- ✅ **Admin Running** - L'admin peut également faire des courses et voir sa progression
-- ✅ **Recettes Complètes** - 26+ recettes mises à jour
-  - Ingrédients précis, étapes détaillées
-  - Conseils du chef, substitutions possibles
-  - Interface améliorée avec sections dédiées
+- ✅ **Course à Pied** - Fonctionnalité complète (5 onglets)
+- ✅ **Partage Social** - Instagram, TikTok, X, WhatsApp
+- ✅ **Classement / Leaderboard** - Podium Top 3, badges
+- ✅ **Défis Hebdomadaires + Badges** - 7 défis, 7 badges
+- ✅ **Notifications Push** - Service Worker, alertes automatiques
+- ✅ **Système de Récompenses** - Boutique de points, 6 récompenses échangeables
+- ✅ **Live Streaming Amélioré** - Demande de live, programmation, notifications
+- ✅ **Réseaux Sociaux Visibles** - Dashboard avec boutons colorés, action rapide
+- ✅ **Recettes Complètes** - 26+ recettes détaillées
 
 ### March 3, 2026 - Session 1
 - ✅ Live Streaming interface
