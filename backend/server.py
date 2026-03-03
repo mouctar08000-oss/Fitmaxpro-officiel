@@ -2759,6 +2759,201 @@ async def admin_get_inactivity_alerts(admin: User = Depends(verify_admin)):
     return {"alerts": alerts}
 
 
+# ==================== REVIEWS/AVIS SYSTEM ====================
+
+class ReviewCreate(BaseModel):
+    rating: int  # 1-5 stars
+    title: str
+    content: str
+    is_public: bool = True
+
+@api_router.post("/reviews")
+async def create_review(review: ReviewCreate, current_user: User = Depends(get_current_user)):
+    """Create a new review"""
+    review_data = {
+        "review_id": str(uuid.uuid4()),
+        "user_id": current_user.user_id,
+        "user_name": current_user.name,
+        "rating": min(5, max(1, review.rating)),
+        "title": review.title,
+        "content": review.content,
+        "is_public": review.is_public,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "admin_response": None,
+        "admin_response_at": None
+    }
+    await db.reviews.insert_one(review_data)
+    return {"message": "Review created", "review_id": review_data["review_id"]}
+
+@api_router.get("/reviews")
+async def get_public_reviews():
+    """Get all public reviews"""
+    reviews = await db.reviews.find(
+        {"is_public": True},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Calculate average rating
+    all_reviews = await db.reviews.find({}, {"rating": 1}).to_list(1000)
+    avg_rating = sum(r.get("rating", 0) for r in all_reviews) / len(all_reviews) if all_reviews else 0
+    
+    return {
+        "reviews": reviews,
+        "total_reviews": len(all_reviews),
+        "average_rating": round(avg_rating, 1)
+    }
+
+@api_router.get("/user/reviews")
+async def get_user_reviews(current_user: User = Depends(get_current_user)):
+    """Get current user's reviews"""
+    reviews = await db.reviews.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return {"reviews": reviews}
+
+@api_router.get("/admin/reviews")
+async def admin_get_all_reviews(admin: User = Depends(verify_admin)):
+    """Admin: Get all reviews"""
+    reviews = await db.reviews.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    # Calculate stats
+    total = len(reviews)
+    avg_rating = sum(r.get("rating", 0) for r in reviews) / total if total else 0
+    rating_distribution = {i: len([r for r in reviews if r.get("rating") == i]) for i in range(1, 6)}
+    
+    return {
+        "reviews": reviews,
+        "stats": {
+            "total": total,
+            "average_rating": round(avg_rating, 1),
+            "distribution": rating_distribution
+        }
+    }
+
+@api_router.put("/admin/reviews/{review_id}/respond")
+async def admin_respond_to_review(review_id: str, response: str, admin: User = Depends(verify_admin)):
+    """Admin: Respond to a review"""
+    await db.reviews.update_one(
+        {"review_id": review_id},
+        {"$set": {
+            "admin_response": response,
+            "admin_response_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    return {"message": "Response added"}
+
+@api_router.delete("/admin/reviews/{review_id}")
+async def admin_delete_review(review_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Delete a review"""
+    await db.reviews.delete_one({"review_id": review_id})
+    return {"message": "Review deleted"}
+
+
+# ==================== SOCIAL MEDIA LINKS ====================
+
+@api_router.get("/social-links")
+async def get_social_links():
+    """Get social media links"""
+    links = await db.settings.find_one({"type": "social_links"}, {"_id": 0})
+    return links or {"type": "social_links", "links": {}}
+
+@api_router.put("/admin/social-links")
+async def admin_update_social_links(links: dict, admin: User = Depends(verify_admin)):
+    """Admin: Update social media links"""
+    await db.settings.update_one(
+        {"type": "social_links"},
+        {"$set": {"type": "social_links", "links": links}},
+        upsert=True
+    )
+    return {"message": "Social links updated"}
+
+
+# ==================== PROGRESS PHOTOS (BEFORE/AFTER) ====================
+
+class ProgressPhotoCreate(BaseModel):
+    photo_type: str  # "before" or "after"
+    photo_url: str
+    weight_kg: Optional[float] = None
+    notes: Optional[str] = None
+
+@api_router.post("/progress-photos")
+async def create_progress_photo(photo: ProgressPhotoCreate, current_user: User = Depends(get_current_user)):
+    """Upload a progress photo"""
+    photo_data = {
+        "photo_id": str(uuid.uuid4()),
+        "user_id": current_user.user_id,
+        "user_name": current_user.name,
+        "photo_type": photo.photo_type,
+        "photo_url": photo.photo_url,
+        "weight_kg": photo.weight_kg,
+        "notes": photo.notes,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.progress_photos.insert_one(photo_data)
+    return {"message": "Photo saved", "photo_id": photo_data["photo_id"]}
+
+@api_router.get("/progress-photos")
+async def get_user_progress_photos(current_user: User = Depends(get_current_user)):
+    """Get current user's progress photos"""
+    photos = await db.progress_photos.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return {"photos": photos}
+
+@api_router.delete("/progress-photos/{photo_id}")
+async def delete_progress_photo(photo_id: str, current_user: User = Depends(get_current_user)):
+    """Delete a progress photo"""
+    await db.progress_photos.delete_one({
+        "photo_id": photo_id,
+        "user_id": current_user.user_id
+    })
+    return {"message": "Photo deleted"}
+
+@api_router.get("/admin/progress-photos")
+async def admin_get_all_progress_photos(admin: User = Depends(verify_admin)):
+    """Admin: Get all users' progress photos"""
+    photos = await db.progress_photos.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    # Group by user
+    users_photos = {}
+    for photo in photos:
+        user_id = photo.get("user_id")
+        if user_id not in users_photos:
+            users_photos[user_id] = {
+                "user_id": user_id,
+                "user_name": photo.get("user_name", "Unknown"),
+                "before_photos": [],
+                "after_photos": []
+            }
+        if photo.get("photo_type") == "before":
+            users_photos[user_id]["before_photos"].append(photo)
+        else:
+            users_photos[user_id]["after_photos"].append(photo)
+    
+    return {"users": list(users_photos.values())}
+
+@api_router.get("/admin/user/{user_id}/progress-photos")
+async def admin_get_user_progress_photos(user_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Get specific user's progress photos"""
+    photos = await db.progress_photos.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(50)
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    
+    before_photos = [p for p in photos if p.get("photo_type") == "before"]
+    after_photos = [p for p in photos if p.get("photo_type") == "after"]
+    
+    return {
+        "user": user,
+        "before_photos": before_photos,
+        "after_photos": after_photos
+    }
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'

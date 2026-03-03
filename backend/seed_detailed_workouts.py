@@ -356,9 +356,9 @@ pro_perte_fr = [
 async def seed_detailed_workouts():
     print("🏋️ Ajout de programmes d'entraînement détaillés...")
     
-    # Supprimer les anciens workouts
-    await db.workouts.delete_many({})
-    print("✅ Anciens workouts supprimés")
+    # Supprimer uniquement les workouts mass_gain et weight_loss (pas abs, legs_glutes, women)
+    await db.workouts.delete_many({'program_type': {'$in': ['mass_gain', 'weight_loss']}})
+    print("✅ Anciens workouts masse/perte supprimés")
     
     # Combiner tous les programmes FR
     all_workouts_fr = (

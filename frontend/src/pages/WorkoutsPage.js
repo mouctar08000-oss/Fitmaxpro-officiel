@@ -52,7 +52,14 @@ const WorkoutsPage = () => {
   };
 
   const getTypeColor = (type) => {
-    return type === 'mass_gain' ? '#EF4444' : '#3B82F6';
+    switch(type) {
+      case 'mass_gain': return '#EF4444';
+      case 'weight_loss': return '#3B82F6';
+      case 'legs_glutes': return '#EC4899';
+      case 'women': return '#A855F7';
+      case 'abs': return '#F97316';
+      default: return '#6B7280';
+    }
   };
 
   return (
@@ -97,6 +104,9 @@ const WorkoutsPage = () => {
                 <option value="all">{t('workouts.all')}</option>
                 <option value="mass_gain">{t('workouts.massGain')}</option>
                 <option value="weight_loss">{t('workouts.weightLoss')}</option>
+                <option value="legs_glutes">{i18n.language?.startsWith('fr') ? 'Jambes & Fessiers' : 'Legs & Glutes'}</option>
+                <option value="women">{i18n.language?.startsWith('fr') ? 'Spécial Femme' : 'Women Special'}</option>
+                <option value="abs">{i18n.language?.startsWith('fr') ? 'Abdominaux' : 'Abs'}</option>
               </select>
             </div>
           </div>

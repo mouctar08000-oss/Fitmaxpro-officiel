@@ -38,7 +38,9 @@ import {
   LineChart,
   Mail,
   Bell,
-  AlertTriangle
+  AlertTriangle,
+  Star,
+  Instagram
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -121,6 +123,26 @@ const AdminPage = () => {
   const [allSubscribersEvolution, setAllSubscribersEvolution] = useState([]);
   const [sendingAlerts, setSendingAlerts] = useState(false);
   const [alertsHistory, setAlertsHistory] = useState([]);
+  
+  // Reviews management states
+  const [allReviews, setAllReviews] = useState([]);
+  const [reviewStats, setReviewStats] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  
+  // Social links states
+  const [socialLinks, setSocialLinks] = useState({
+    instagram: '',
+    youtube: '',
+    tiktok: '',
+    snapchat: '',
+    facebook: ''
+  });
+  const [savingSocial, setSavingSocial] = useState(false);
+  
+  // Progress photos states
+  const [usersProgressPhotos, setUsersProgressPhotos] = useState([]);
+  const [selectedUserPhotos, setSelectedUserPhotos] = useState(null);
   
   // New workout creation states
   const [showCreateWorkout, setShowCreateWorkout] = useState(false);
@@ -314,6 +336,85 @@ const AdminPage = () => {
       setSelectedUserProgress(response.data);
     } catch (error) {
       console.error('Error fetching user sessions:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  // Reviews management
+  const fetchAllReviews = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/reviews`, { headers: getAuthHeaders() });
+      setAllReviews(response.data.reviews || []);
+      setReviewStats(response.data.stats);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    }
+  }, []);
+
+  const respondToReview = async (reviewId) => {
+    if (!replyText.trim()) return;
+    try {
+      await axios.put(`${API}/admin/reviews/${reviewId}/respond?response=${encodeURIComponent(replyText)}`, {}, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Réponse envoyée!' : 'Response sent!');
+      setReplyingTo(null);
+      setReplyText('');
+      fetchAllReviews();
+    } catch (error) {
+      console.error('Error responding to review:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  const deleteReview = async (reviewId) => {
+    if (!window.confirm(isFr ? 'Supprimer cet avis?' : 'Delete this review?')) return;
+    try {
+      await axios.delete(`${API}/admin/reviews/${reviewId}`, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Avis supprimé' : 'Review deleted');
+      fetchAllReviews();
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
+  // Social links management
+  const fetchSocialLinks = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/social-links`);
+      setSocialLinks(response.data.links || {});
+    } catch (error) {
+      console.error('Error fetching social links:', error);
+    }
+  }, []);
+
+  const saveSocialLinks = async () => {
+    setSavingSocial(true);
+    try {
+      await axios.put(`${API}/admin/social-links`, socialLinks, { headers: getAuthHeaders() });
+      toast.success(isFr ? 'Liens enregistrés!' : 'Links saved!');
+    } catch (error) {
+      console.error('Error saving social links:', error);
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+    setSavingSocial(false);
+  };
+
+  // Progress photos management
+  const fetchUsersProgressPhotos = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/progress-photos`, { headers: getAuthHeaders() });
+      setUsersProgressPhotos(response.data.users || []);
+    } catch (error) {
+      console.error('Error fetching progress photos:', error);
+    }
+  }, []);
+
+  const fetchUserProgressPhotos = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/user/${userId}/progress-photos`, { headers: getAuthHeaders() });
+      setSelectedUserPhotos(response.data);
+    } catch (error) {
+      console.error('Error fetching user photos:', error);
       toast.error(isFr ? 'Erreur' : 'Error');
     }
   };
@@ -589,12 +690,15 @@ const AdminPage = () => {
         fetchRoutineSessions(),
         fetchEvolutionData(),
         fetchAllSubscribersEvolution(),
-        fetchAlertsHistory()
+        fetchAlertsHistory(),
+        fetchAllReviews(),
+        fetchSocialLinks(),
+        fetchUsersProgressPhotos()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos]);
 
   // Check if user is admin
   useEffect(() => {
@@ -704,7 +808,10 @@ const AdminPage = () => {
               { id: 'coaching', icon: UserCog, label: isFr ? 'Coaching' : 'Coaching' },
               { id: 'progress', icon: TrendingUp, label: isFr ? 'Progrès' : 'Progress' },
               { id: 'discipline', icon: Timer, label: isFr ? 'Discipline' : 'Discipline' },
+              { id: 'reviews', icon: MessageCircle, label: isFr ? 'Avis' : 'Reviews', badge: allReviews.length },
+              { id: 'photos', icon: Image, label: isFr ? 'Photos Avant/Après' : 'Before/After Photos' },
               { id: 'messages', icon: MessageCircle, label: isFr ? 'Messages' : 'Messages', badge: unreadCount },
+              { id: 'social', icon: Users, label: isFr ? 'Réseaux Sociaux' : 'Social Media' },
               { id: 'analytics', icon: Activity, label: isFr ? 'Analytiques' : 'Analytics' },
               { id: 'workouts', icon: Dumbbell, label: isFr ? 'Séances' : 'Workouts' },
               { id: 'routines', icon: Flame, label: isFr ? 'Échauffement/Étirements' : 'Warm-Up/Stretching' },
@@ -1297,6 +1404,328 @@ const AdminPage = () => {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Reviews Tab */}
+          {activeTab === 'reviews' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-yellow-400" />
+                {isFr ? 'Gestion des Avis Clients' : 'Customer Reviews Management'}
+              </h2>
+
+              {/* Stats */}
+              {reviewStats && (
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center">
+                    <p className="text-3xl font-bold text-yellow-400">{reviewStats.average_rating}</p>
+                    <p className="text-gray-500 text-xs">{isFr ? 'Note moyenne' : 'Avg Rating'}</p>
+                  </div>
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-4 text-center">
+                    <p className="text-3xl font-bold">{reviewStats.total}</p>
+                    <p className="text-gray-500 text-xs">{isFr ? 'Total' : 'Total'}</p>
+                  </div>
+                  {[5,4,3,2,1].map(star => (
+                    <div key={star} className="bg-[#121212] border border-[#27272a] rounded-lg p-3 text-center">
+                      <p className="text-xl font-bold">{reviewStats.distribution?.[star] || 0}</p>
+                      <p className="text-gray-500 text-xs flex items-center justify-center gap-1">
+                        {star} <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Reviews List */}
+              <div className="space-y-4">
+                {allReviews.length === 0 ? (
+                  <div className="bg-[#121212] border border-[#27272a] rounded-lg p-8 text-center">
+                    <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">{isFr ? 'Aucun avis' : 'No reviews'}</p>
+                  </div>
+                ) : (
+                  allReviews.map(review => (
+                    <div key={review.review_id} className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-bold">{review.user_name}</span>
+                            <div className="flex gap-0.5">
+                              {[1,2,3,4,5].map(s => (
+                                <Star key={s} className={`w-4 h-4 ${s <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'}`} />
+                              ))}
+                            </div>
+                            <span className="text-gray-500 text-xs">
+                              {new Date(review.created_at).toLocaleDateString(isFr ? 'fr-FR' : 'en-US')}
+                            </span>
+                            {!review.is_public && (
+                              <span className="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-xs">
+                                {isFr ? 'Privé' : 'Private'}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="font-bold mb-1">{review.title}</h3>
+                          <p className="text-gray-400 text-sm">{review.content}</p>
+                          
+                          {/* Admin Response */}
+                          {review.admin_response && (
+                            <div className="mt-3 bg-green-500/10 border border-green-500/30 rounded p-3">
+                              <p className="text-green-400 text-xs mb-1 font-bold">{isFr ? 'Votre réponse:' : 'Your response:'}</p>
+                              <p className="text-gray-300 text-sm">{review.admin_response}</p>
+                            </div>
+                          )}
+                          
+                          {/* Reply Form */}
+                          {replyingTo === review.review_id && (
+                            <div className="mt-3 flex gap-2">
+                              <Input
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder={isFr ? "Votre réponse..." : "Your response..."}
+                                className="bg-[#09090b] border-[#27272a] flex-1"
+                              />
+                              <Button onClick={() => respondToReview(review.review_id)} className="bg-green-500">
+                                <Send className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" onClick={() => { setReplyingTo(null); setReplyText(''); }}>
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          {!review.admin_response && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setReplyingTo(review.review_id)}
+                              className="border-green-500/30 text-green-400"
+                            >
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => deleteReview(review.review_id)}
+                            className="border-red-500/30 text-red-400"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Photos Tab */}
+          {activeTab === 'photos' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Image className="w-5 h-5 text-green-400" />
+                {isFr ? 'Photos Avant/Après des Abonnés' : 'Subscribers Before/After Photos'}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {isFr 
+                  ? 'Visualisez la progression de vos abonnés grâce à leurs photos avant et après.'
+                  : 'View your subscribers\' progress through their before and after photos.'}
+              </p>
+
+              {/* Users with photos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {usersProgressPhotos.length === 0 ? (
+                  <div className="col-span-full bg-[#121212] border border-[#27272a] rounded-lg p-8 text-center">
+                    <Image className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">{isFr ? 'Aucune photo de progression' : 'No progress photos'}</p>
+                  </div>
+                ) : (
+                  usersProgressPhotos.map(userPhotos => (
+                    <div 
+                      key={userPhotos.user_id} 
+                      className="bg-[#121212] border border-[#27272a] rounded-lg p-4 cursor-pointer hover:border-green-500/50 transition-colors"
+                      onClick={() => fetchUserProgressPhotos(userPhotos.user_id)}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-bold">{userPhotos.user_name}</h3>
+                        <Eye className="w-4 h-4 text-gray-500" />
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <p className="text-orange-400 text-xs mb-1">{isFr ? 'AVANT' : 'BEFORE'}</p>
+                          {userPhotos.before_photos.length > 0 ? (
+                            <img 
+                              src={userPhotos.before_photos[0].photo_url} 
+                              alt="Before" 
+                              className="w-full h-24 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-full h-24 bg-[#09090b] rounded flex items-center justify-center">
+                              <span className="text-gray-600 text-xs">0</span>
+                            </div>
+                          )}
+                          <p className="text-center text-gray-500 text-xs mt-1">{userPhotos.before_photos.length} photos</p>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-green-400 text-xs mb-1">{isFr ? 'APRÈS' : 'AFTER'}</p>
+                          {userPhotos.after_photos.length > 0 ? (
+                            <img 
+                              src={userPhotos.after_photos[0].photo_url} 
+                              alt="After" 
+                              className="w-full h-24 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-full h-24 bg-[#09090b] rounded flex items-center justify-center">
+                              <span className="text-gray-600 text-xs">0</span>
+                            </div>
+                          )}
+                          <p className="text-center text-gray-500 text-xs mt-1">{userPhotos.after_photos.length} photos</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Selected user photos detail */}
+              {selectedUserPhotos && (
+                <div className="bg-[#121212] border border-green-500/30 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg">
+                      {selectedUserPhotos.user?.name} - {isFr ? 'Progression' : 'Progress'}
+                    </h3>
+                    <Button variant="ghost" onClick={() => setSelectedUserPhotos(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div>
+                      <h4 className="text-orange-400 font-bold mb-3">{isFr ? 'PHOTOS AVANT' : 'BEFORE PHOTOS'}</h4>
+                      <div className="space-y-3">
+                        {selectedUserPhotos.before_photos?.map((photo, idx) => (
+                          <div key={idx} className="bg-[#09090b] rounded-lg overflow-hidden">
+                            <img src={photo.photo_url} alt="Before" className="w-full h-48 object-cover" />
+                            <div className="p-3">
+                              <p className="text-gray-500 text-xs">
+                                {new Date(photo.created_at).toLocaleDateString(isFr ? 'fr-FR' : 'en-US')}
+                                {photo.weight_kg && ` • ${photo.weight_kg} kg`}
+                              </p>
+                              {photo.notes && <p className="text-gray-400 text-sm mt-1">{photo.notes}</p>}
+                            </div>
+                          </div>
+                        ))}
+                        {selectedUserPhotos.before_photos?.length === 0 && (
+                          <p className="text-gray-500 text-center py-4">{isFr ? 'Aucune photo' : 'No photos'}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-green-400 font-bold mb-3">{isFr ? 'PHOTOS APRÈS' : 'AFTER PHOTOS'}</h4>
+                      <div className="space-y-3">
+                        {selectedUserPhotos.after_photos?.map((photo, idx) => (
+                          <div key={idx} className="bg-[#09090b] rounded-lg overflow-hidden">
+                            <img src={photo.photo_url} alt="After" className="w-full h-48 object-cover" />
+                            <div className="p-3">
+                              <p className="text-gray-500 text-xs">
+                                {new Date(photo.created_at).toLocaleDateString(isFr ? 'fr-FR' : 'en-US')}
+                                {photo.weight_kg && ` • ${photo.weight_kg} kg`}
+                              </p>
+                              {photo.notes && <p className="text-gray-400 text-sm mt-1">{photo.notes}</p>}
+                            </div>
+                          </div>
+                        ))}
+                        {selectedUserPhotos.after_photos?.length === 0 && (
+                          <p className="text-gray-500 text-center py-4">{isFr ? 'Aucune photo' : 'No photos'}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Social Media Tab */}
+          {activeTab === 'social' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Users className="w-5 h-5 text-pink-400" />
+                {isFr ? 'Gestion des Réseaux Sociaux' : 'Social Media Management'}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {isFr 
+                  ? 'Ajoutez vos liens de réseaux sociaux. Ils seront affichés dans le footer du site et permettront aux abonnés de vous suivre.'
+                  : 'Add your social media links. They will be displayed in the site footer and allow subscribers to follow you.'}
+              </p>
+
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6 space-y-4">
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
+                    <Instagram className="w-4 h-4 text-pink-400" /> Instagram
+                  </label>
+                  <Input
+                    value={socialLinks.instagram || ''}
+                    onChange={(e) => setSocialLinks({...socialLinks, instagram: e.target.value})}
+                    placeholder="https://instagram.com/votre-compte"
+                    className="bg-[#09090b] border-[#27272a]"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
+                    <Video className="w-4 h-4 text-red-500" /> YouTube
+                  </label>
+                  <Input
+                    value={socialLinks.youtube || ''}
+                    onChange={(e) => setSocialLinks({...socialLinks, youtube: e.target.value})}
+                    placeholder="https://youtube.com/@votre-chaine"
+                    className="bg-[#09090b] border-[#27272a]"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block">TikTok</label>
+                  <Input
+                    value={socialLinks.tiktok || ''}
+                    onChange={(e) => setSocialLinks({...socialLinks, tiktok: e.target.value})}
+                    placeholder="https://tiktok.com/@votre-compte"
+                    className="bg-[#09090b] border-[#27272a]"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block">Snapchat</label>
+                  <Input
+                    value={socialLinks.snapchat || ''}
+                    onChange={(e) => setSocialLinks({...socialLinks, snapchat: e.target.value})}
+                    placeholder="https://snapchat.com/add/votre-compte"
+                    className="bg-[#09090b] border-[#27272a]"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block">Facebook</label>
+                  <Input
+                    value={socialLinks.facebook || ''}
+                    onChange={(e) => setSocialLinks({...socialLinks, facebook: e.target.value})}
+                    placeholder="https://facebook.com/votre-page"
+                    className="bg-[#09090b] border-[#27272a]"
+                  />
+                </div>
+
+                <Button onClick={saveSocialLinks} className="bg-[#EF4444] w-full mt-4" disabled={savingSocial}>
+                  {savingSocial ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  {isFr ? 'Enregistrer les liens' : 'Save links'}
+                </Button>
+              </div>
             </div>
           )}
 

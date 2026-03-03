@@ -18,6 +18,8 @@ import QRCodePage from './pages/QRCodePage';
 import MyProgressPage from './pages/MyProgressPage';
 import MessagesPage from './pages/MessagesPage';
 import RemindersPage from './pages/RemindersPage';
+import ReviewsPage from './pages/ReviewsPage';
+import ProgressPhotosPage from './pages/ProgressPhotosPage';
 import './i18n';
 import './App.css';
 
@@ -36,6 +38,7 @@ function AppRouter() {
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/qrcode" element={<QRCodePage />} />
       <Route path="/success" element={<SuccessPage />} />
+      <Route path="/reviews" element={<ReviewsPage />} />
       
       <Route path="/dashboard" element={
         <ProtectedRoute>
@@ -82,6 +85,12 @@ function AppRouter() {
       <Route path="/reminders" element={
         <ProtectedRoute>
           <RemindersPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/progress-photos" element={
+        <ProtectedRoute>
+          <ProgressPhotosPage />
         </ProtectedRoute>
       } />
     </Routes>
