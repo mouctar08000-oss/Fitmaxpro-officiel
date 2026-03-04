@@ -4373,18 +4373,61 @@ class LiveCreate(BaseModel):
     title: str
     description: str = ""
     vip_only: bool = False
+    scheduled_at: str = None  # ISO datetime for scheduled lives
+    category: str = "general"  # workout, yoga, nutrition, motivation, qa
 
 class LiveChat(BaseModel):
     message: str
 
+class LiveSettings(BaseModel):
+    max_viewers: int = 1000
+    chat_enabled: bool = True
+    reactions_enabled: bool = True
+    quality: str = "720p"  # 480p, 720p, 1080p
+
+# Live streaming configuration
+LIVE_SETTINGS = {
+    "max_duration_hours": 4,
+    "max_viewers_free": 100,
+    "max_viewers_premium": 1000,
+    "chat_rate_limit": 5,  # messages per minute
+    "recording_enabled": True,
+    "qualities": ["480p", "720p", "1080p"]
+}
+
 @api_router.get("/lives")
 async def get_active_lives(current_user: User = Depends(get_current_user)):
-    """Get all active live sessions"""
-    lives = await db.lives.find({"status": "active"}).to_list(100)
-    for live in lives:
+    """Get all active and upcoming live sessions"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Get active lives
+    active_lives = await db.lives.find({"status": "active"}).to_list(100)
+    
+    # Get upcoming scheduled lives (next 24 hours)
+    tomorrow = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    scheduled_lives = await db.lives.find({
+        "status": "scheduled",
+        "scheduled_at": {"$gte": now, "$lte": tomorrow}
+    }).sort("scheduled_at", 1).to_list(20)
+    
+    all_lives = active_lives + scheduled_lives
+    
+    for live in all_lives:
         live['live_id'] = str(live.get('live_id', live.get('_id')))
         live.pop('_id', None)
-    return lives
+        
+        # Add LiveKit info if available
+        if LIVEKIT_AVAILABLE and live.get('status') == 'active':
+            live['streaming_ready'] = True
+            live['livekit_room'] = live.get('livekit_room_name')
+        else:
+            live['streaming_ready'] = False
+    
+    return {
+        "active": [l for l in all_lives if l.get('status') == 'active'],
+        "scheduled": [l for l in all_lives if l.get('status') == 'scheduled'],
+        "total_active": len(active_lives)
+    }
 
 @api_router.post("/lives")
 async def create_live(live: LiveCreate, current_user: User = Depends(get_current_user)):
@@ -4393,55 +4436,121 @@ async def create_live(live: LiveCreate, current_user: User = Depends(get_current
         raise HTTPException(status_code=403, detail="Only admin can start lives")
     
     live_id = f"live_{uuid.uuid4().hex[:12]}"
+    livekit_room_name = f"fitmaxpro_live_{live_id}"
+    
+    # Determine if scheduled or immediate
+    is_scheduled = live.scheduled_at is not None
+    status = "scheduled" if is_scheduled else "active"
+    
     live_doc = {
         "live_id": live_id,
         "title": live.title,
         "description": live.description,
+        "category": live.category,
         "vip_only": live.vip_only,
         "host_id": current_user.user_id,
         "host_name": current_user.name,
-        "status": "active",
+        "status": status,
         "viewer_count": 0,
+        "peak_viewers": 0,
         "viewers": [],
         "chat_messages": [],
-        "created_at": datetime.utcnow().isoformat(),
-        "started_at": datetime.utcnow().isoformat()
+        "reactions": {"fire": 0, "heart": 0, "muscle": 0, "clap": 0},
+        "livekit_room_name": livekit_room_name,
+        "settings": {
+            "chat_enabled": True,
+            "reactions_enabled": True,
+            "quality": "720p",
+            "max_viewers": LIVE_SETTINGS["max_viewers_premium"]
+        },
+        "scheduled_at": live.scheduled_at,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": None if is_scheduled else datetime.now(timezone.utc).isoformat()
     }
     
     await db.lives.insert_one(live_doc)
     live_doc.pop('_id', None)
     
-    # Send push notifications to all subscribers when live starts NOW
-    asyncio.create_task(notify_live_started(live.title, live.vip_only, live_id))
+    # Generate host token for LiveKit if available and live is starting now
+    host_token = None
+    if LIVEKIT_AVAILABLE and not is_scheduled:
+        try:
+            livekit_url = os.environ.get('LIVEKIT_URL')
+            livekit_api_key = os.environ.get('LIVEKIT_API_KEY')
+            livekit_api_secret = os.environ.get('LIVEKIT_API_SECRET')
+            
+            if livekit_url and livekit_api_key and livekit_api_secret:
+                token = livekit_api.AccessToken(livekit_api_key, livekit_api_secret)
+                token.with_identity(current_user.user_id)
+                token.with_name(current_user.name)
+                token.with_grants(livekit_api.VideoGrants(
+                    room_join=True,
+                    room=livekit_room_name,
+                    can_publish=True,
+                    can_subscribe=True,
+                    can_publish_data=True
+                ))
+                host_token = token.to_jwt()
+                live_doc['host_token'] = host_token
+                live_doc['livekit_url'] = livekit_url
+        except Exception as e:
+            print(f"LiveKit token generation error: {e}")
+    
+    # Send push notifications
+    if is_scheduled:
+        # Notify about upcoming live
+        asyncio.create_task(notify_live_scheduled(live.title, live.scheduled_at, live.vip_only, live_id))
+    else:
+        # Notify live starting now
+        asyncio.create_task(notify_live_started(live.title, live.vip_only, live_id))
     
     return live_doc
 
+async def notify_live_scheduled(title: str, scheduled_at: str, vip_only: bool, live_id: str):
+    """Send push notifications when a live is scheduled"""
+    try:
+        subs = await db.push_subscriptions.find({"enabled": True}).to_list(1000)
+        
+        # Parse scheduled time
+        scheduled_dt = datetime.fromisoformat(scheduled_at.replace('Z', '+00:00'))
+        time_str = scheduled_dt.strftime("%H:%M")
+        
+        for sub in subs:
+            user_id = sub.get("user_id")
+            
+            if vip_only:
+                user = await db.users.find_one({"user_id": user_id})
+                if user and user.get("subscription_tier") != "vip" and user.get("role") != "admin":
+                    continue
+            
+            await send_push_notification(
+                user_id,
+                "📅 Live Programmé !",
+                f"'{title}' commence à {time_str} - Ne manquez pas !",
+                {"url": "/live", "type": "live_scheduled", "live_id": live_id}
+            )
+    except Exception as e:
+        print(f"Error sending scheduled live notifications: {e}")
 
 async def notify_live_started(title: str, vip_only: bool, live_id: str):
     """Send push notifications when a live starts"""
     try:
-        # Get all enabled push subscriptions
         subs = await db.push_subscriptions.find({"enabled": True}).to_list(1000)
         
         for sub in subs:
             user_id = sub.get("user_id")
             
-            # Check VIP restriction
             if vip_only:
                 user = await db.users.find_one({"user_id": user_id})
                 if user:
-                    user_sub = user.get("subscription", {})
-                    if user_sub.get("type") != "vip" and user.get("role") != "admin":
-                        continue  # Skip non-VIP users for VIP-only lives
+                    if user.get("subscription_tier") != "vip" and user.get("role") != "admin":
+                        continue
             
-            # Check if this user requested a similar topic
-            # Find pending requests from this user
             user_requests = await db.live_requests.find({
                 "user_id": user_id,
                 "status": "pending"
             }).to_list(10)
             
-            # Personalize message if user requested this type
             if user_requests:
                 body = f"🎉 Le coach est EN DIRECT maintenant ! '{title}' - Votre demande a peut-être été entendue !"
             else:
@@ -4456,41 +4565,172 @@ async def notify_live_started(title: str, vip_only: bool, live_id: str):
     except Exception as e:
         print(f"Error sending live notifications: {e}")
 
+@api_router.post("/lives/{live_id}/start")
+async def start_scheduled_live(live_id: str, current_user: User = Depends(get_current_user)):
+    """Start a scheduled live session"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can start lives")
+    
+    live = await db.lives.find_one({"live_id": live_id})
+    if not live:
+        raise HTTPException(status_code=404, detail="Live not found")
+    
+    if live.get('status') != 'scheduled':
+        raise HTTPException(status_code=400, detail="Live is not in scheduled status")
+    
+    # Update to active
+    await db.lives.update_one(
+        {"live_id": live_id},
+        {"$set": {
+            "status": "active",
+            "started_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Generate host token
+    host_token = None
+    livekit_url = None
+    if LIVEKIT_AVAILABLE:
+        try:
+            livekit_url = os.environ.get('LIVEKIT_URL')
+            livekit_api_key = os.environ.get('LIVEKIT_API_KEY')
+            livekit_api_secret = os.environ.get('LIVEKIT_API_SECRET')
+            
+            if livekit_url and livekit_api_key and livekit_api_secret:
+                token = livekit_api.AccessToken(livekit_api_key, livekit_api_secret)
+                token.with_identity(current_user.user_id)
+                token.with_name(current_user.name)
+                token.with_grants(livekit_api.VideoGrants(
+                    room_join=True,
+                    room=live.get('livekit_room_name'),
+                    can_publish=True,
+                    can_subscribe=True,
+                    can_publish_data=True
+                ))
+                host_token = token.to_jwt()
+        except Exception as e:
+            print(f"LiveKit error: {e}")
+    
+    # Send notifications
+    asyncio.create_task(notify_live_started(live.get('title'), live.get('vip_only', False), live_id))
+    
+    return {
+        "success": True,
+        "live_id": live_id,
+        "host_token": host_token,
+        "livekit_url": livekit_url,
+        "room_name": live.get('livekit_room_name')
+    }
+
 @api_router.post("/lives/{live_id}/join")
 async def join_live(live_id: str, current_user: User = Depends(get_current_user)):
     """Join a live session as viewer"""
     live = await db.lives.find_one({"live_id": live_id, "status": "active"})
     if not live:
-        raise HTTPException(status_code=404, detail="Live session not found")
+        raise HTTPException(status_code=404, detail="Live session not found or not active")
     
     # Check VIP access
     if live.get('vip_only'):
-        user_sub = current_user.subscription or {}
-        if user_sub.get('type') != 'vip' and current_user.role != 'admin':
+        if current_user.subscription_tier != 'vip' and current_user.role != 'admin':
             raise HTTPException(status_code=403, detail="This session is VIP only")
     
-    # Add viewer
+    # Check max viewers
+    settings = live.get('settings', {})
+    max_viewers = settings.get('max_viewers', LIVE_SETTINGS['max_viewers_premium'])
+    if live.get('viewer_count', 0) >= max_viewers:
+        raise HTTPException(status_code=429, detail="Live session is full")
+    
+    # Update viewer count
+    new_count = live.get('viewer_count', 0) + 1
+    peak = max(live.get('peak_viewers', 0), new_count)
+    
     await db.lives.update_one(
         {"live_id": live_id},
         {
             "$addToSet": {"viewers": current_user.user_id},
-            "$inc": {"viewer_count": 1}
+            "$set": {"viewer_count": new_count, "peak_viewers": peak}
         }
     )
     
-    return {"success": True, "token": f"viewer_{uuid.uuid4().hex[:8]}"}
+    # Generate viewer token for LiveKit
+    viewer_token = None
+    livekit_url = None
+    
+    if LIVEKIT_AVAILABLE:
+        try:
+            livekit_url = os.environ.get('LIVEKIT_URL')
+            livekit_api_key = os.environ.get('LIVEKIT_API_KEY')
+            livekit_api_secret = os.environ.get('LIVEKIT_API_SECRET')
+            
+            if livekit_url and livekit_api_key and livekit_api_secret:
+                token = livekit_api.AccessToken(livekit_api_key, livekit_api_secret)
+                token.with_identity(current_user.user_id)
+                token.with_name(current_user.name)
+                token.with_grants(livekit_api.VideoGrants(
+                    room_join=True,
+                    room=live.get('livekit_room_name'),
+                    can_publish=False,  # Viewers can't publish
+                    can_subscribe=True,
+                    can_publish_data=True  # For chat/reactions
+                ))
+                viewer_token = token.to_jwt()
+        except Exception as e:
+            print(f"LiveKit viewer token error: {e}")
+    
+    return {
+        "success": True,
+        "viewer_token": viewer_token,
+        "livekit_url": livekit_url,
+        "room_name": live.get('livekit_room_name'),
+        "settings": live.get('settings', {}),
+        "viewer_count": new_count
+    }
 
 @api_router.post("/lives/{live_id}/leave")
 async def leave_live(live_id: str, current_user: User = Depends(get_current_user)):
     """Leave a live session"""
-    await db.lives.update_one(
-        {"live_id": live_id},
-        {
-            "$pull": {"viewers": current_user.user_id},
-            "$inc": {"viewer_count": -1}
-        }
-    )
+    live = await db.lives.find_one({"live_id": live_id})
+    if live and current_user.user_id in live.get('viewers', []):
+        new_count = max(0, live.get('viewer_count', 1) - 1)
+        await db.lives.update_one(
+            {"live_id": live_id},
+            {
+                "$pull": {"viewers": current_user.user_id},
+                "$set": {"viewer_count": new_count}
+            }
+        )
     return {"success": True}
+
+@api_router.post("/lives/{live_id}/reaction")
+async def send_reaction(live_id: str, reaction_type: str, current_user: User = Depends(get_current_user)):
+    """Send a reaction to a live (fire, heart, muscle, clap)"""
+    valid_reactions = ["fire", "heart", "muscle", "clap"]
+    if reaction_type not in valid_reactions:
+        raise HTTPException(status_code=400, detail=f"Invalid reaction. Use: {valid_reactions}")
+    
+    await db.lives.update_one(
+        {"live_id": live_id, "status": "active"},
+        {"$inc": {f"reactions.{reaction_type}": 1}}
+    )
+    
+    return {"success": True, "reaction": reaction_type}
+
+@api_router.get("/lives/{live_id}/stats")
+async def get_live_stats(live_id: str, current_user: User = Depends(get_current_user)):
+    """Get real-time stats for a live session"""
+    live = await db.lives.find_one({"live_id": live_id}, {"_id": 0})
+    if not live:
+        raise HTTPException(status_code=404, detail="Live not found")
+    
+    return {
+        "viewer_count": live.get('viewer_count', 0),
+        "peak_viewers": live.get('peak_viewers', 0),
+        "reactions": live.get('reactions', {}),
+        "chat_count": len(live.get('chat_messages', [])),
+        "duration_minutes": 0 if not live.get('started_at') else 
+            int((datetime.now(timezone.utc) - datetime.fromisoformat(live['started_at'].replace('Z', '+00:00'))).total_seconds() / 60),
+        "status": live.get('status')
+    }
 
 @api_router.post("/lives/{live_id}/end")
 async def end_live(live_id: str, current_user: User = Depends(get_current_user)):
@@ -4498,29 +4738,63 @@ async def end_live(live_id: str, current_user: User = Depends(get_current_user))
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Only admin can end lives")
     
+    live = await db.lives.find_one({"live_id": live_id})
+    if not live:
+        raise HTTPException(status_code=404, detail="Live not found")
+    
+    # Calculate duration
+    started_at = live.get('started_at')
+    duration_minutes = 0
+    if started_at:
+        started_dt = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+        duration_minutes = int((datetime.now(timezone.utc) - started_dt).total_seconds() / 60)
+    
     result = await db.lives.update_one(
         {"live_id": live_id},
         {
             "$set": {
                 "status": "ended",
-                "ended_at": datetime.utcnow().isoformat()
+                "ended_at": datetime.now(timezone.utc).isoformat(),
+                "duration_minutes": duration_minutes,
+                "final_viewer_count": live.get('viewer_count', 0)
             }
         }
     )
     
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Live not found")
+    # Notify viewers that live ended
+    for viewer_id in live.get('viewers', []):
+        await send_push_notification(
+            viewer_id,
+            "📺 Live terminé",
+            f"'{live.get('title')}' est terminé. Merci d'avoir regardé !",
+            {"type": "live_ended", "live_id": live_id}
+        )
     
-    return {"success": True}
+    return {
+        "success": True,
+        "duration_minutes": duration_minutes,
+        "peak_viewers": live.get('peak_viewers', 0),
+        "total_reactions": sum(live.get('reactions', {}).values())
+    }
 
 @api_router.post("/lives/{live_id}/chat")
 async def send_chat_message(live_id: str, chat: LiveChat, current_user: User = Depends(get_current_user)):
     """Send a chat message in a live session"""
+    live = await db.lives.find_one({"live_id": live_id, "status": "active"})
+    if not live:
+        raise HTTPException(status_code=404, detail="Live not found or ended")
+    
+    # Check if chat is enabled
+    if not live.get('settings', {}).get('chat_enabled', True):
+        raise HTTPException(status_code=403, detail="Chat is disabled for this live")
+    
     message_doc = {
+        "message_id": f"msg_{uuid.uuid4().hex[:8]}",
         "user_id": current_user.user_id,
         "user_name": current_user.name,
-        "message": chat.message,
-        "timestamp": datetime.utcnow().isoformat()
+        "message": chat.message[:500],  # Limit message length
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "is_host": current_user.user_id == live.get('host_id')
     }
     
     await db.lives.update_one(
@@ -4528,15 +4802,23 @@ async def send_chat_message(live_id: str, chat: LiveChat, current_user: User = D
         {"$push": {"chat_messages": message_doc}}
     )
     
-    return {"success": True}
+    return {"success": True, "message": message_doc}
 
 @api_router.get("/lives/{live_id}/chat")
-async def get_chat_messages(live_id: str, current_user: User = Depends(get_current_user)):
+async def get_chat_messages(live_id: str, since: str = None, current_user: User = Depends(get_current_user)):
     """Get chat messages for a live session"""
     live = await db.lives.find_one({"live_id": live_id}, {"chat_messages": 1})
     if not live:
         raise HTTPException(status_code=404, detail="Live not found")
-    return live.get('chat_messages', [])
+    
+    messages = live.get('chat_messages', [])
+    
+    # Filter messages if 'since' timestamp provided
+    if since:
+        messages = [m for m in messages if m.get('timestamp', '') > since]
+    
+    # Return last 100 messages
+    return messages[-100:]
 
 @api_router.get("/admin/lives/history")
 async def get_live_history(current_user: User = Depends(get_current_user)):
@@ -4548,6 +4830,45 @@ async def get_live_history(current_user: User = Depends(get_current_user)):
     for live in lives:
         live['live_id'] = str(live.get('live_id', live.get('_id')))
         live.pop('_id', None)
+    
+    # Stats summary
+    total_lives = len(lives)
+    total_viewers = sum(l.get('peak_viewers', 0) for l in lives)
+    total_duration = sum(l.get('duration_minutes', 0) for l in lives)
+    
+    return {
+        "lives": lives,
+        "stats": {
+            "total_lives": total_lives,
+            "total_peak_viewers": total_viewers,
+            "total_duration_minutes": total_duration,
+            "average_viewers": total_viewers // total_lives if total_lives > 0 else 0
+        }
+    }
+
+@api_router.get("/lives/livekit-status")
+async def get_livekit_live_status():
+    """Check if LiveKit is configured for live streaming"""
+    livekit_url = os.environ.get('LIVEKIT_URL')
+    livekit_api_key = os.environ.get('LIVEKIT_API_KEY')
+    livekit_api_secret = os.environ.get('LIVEKIT_API_SECRET')
+    
+    configured = bool(livekit_url and livekit_api_key and livekit_api_secret and LIVEKIT_AVAILABLE)
+    
+    return {
+        "livekit_available": LIVEKIT_AVAILABLE,
+        "configured": configured,
+        "server_url": livekit_url if configured else None,
+        "features": {
+            "video_streaming": configured,
+            "audio_streaming": configured,
+            "screen_sharing": configured,
+            "recording": False,  # Requires additional setup
+            "chat": True,  # Always available via API
+            "reactions": True
+        },
+        "message": "LiveKit is ready for live streaming" if configured else "Configure LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env to enable real-time streaming"
+    }
     return lives
 
 # ==================== LIVEKIT WEBRTC REAL-TIME COMMUNICATION ====================
