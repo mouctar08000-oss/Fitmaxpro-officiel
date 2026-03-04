@@ -5,11 +5,108 @@ import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import Footer from '../components/Footer';
 import { Button } from '../components/ui/button.jsx';
-import { Dumbbell, Pill, TrendingUp, CreditCard, Instagram, Youtube, Gift, Footprints, Radio, Star, MessageSquare, Trophy, Flame, Target, Zap } from 'lucide-react';
+import { Dumbbell, Pill, TrendingUp, CreditCard, Instagram, Youtube, Gift, Footprints, Radio, Star, MessageSquare, Trophy, Flame, Target, Zap, Award, Crown, Gem, Medal } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Badge System Configuration
+const POINT_BADGES = [
+  { 
+    id: 'starter', 
+    name_fr: 'Débutant', 
+    name_en: 'Starter', 
+    threshold: 0, 
+    icon: Medal, 
+    color: 'from-gray-400 to-gray-600', 
+    textColor: 'text-gray-400',
+    bgColor: 'bg-gray-500/20'
+  },
+  { 
+    id: 'bronze', 
+    name_fr: 'Bronze', 
+    name_en: 'Bronze', 
+    threshold: 100, 
+    icon: Medal, 
+    color: 'from-amber-600 to-amber-800', 
+    textColor: 'text-amber-500',
+    bgColor: 'bg-amber-500/20'
+  },
+  { 
+    id: 'silver', 
+    name_fr: 'Argent', 
+    name_en: 'Silver', 
+    threshold: 500, 
+    icon: Award, 
+    color: 'from-slate-300 to-slate-500', 
+    textColor: 'text-slate-300',
+    bgColor: 'bg-slate-400/20'
+  },
+  { 
+    id: 'gold', 
+    name_fr: 'Or', 
+    name_en: 'Gold', 
+    threshold: 1000, 
+    icon: Trophy, 
+    color: 'from-yellow-400 to-yellow-600', 
+    textColor: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/20'
+  },
+  { 
+    id: 'platinum', 
+    name_fr: 'Platine', 
+    name_en: 'Platinum', 
+    threshold: 2500, 
+    icon: Crown, 
+    color: 'from-cyan-300 to-cyan-500', 
+    textColor: 'text-cyan-300',
+    bgColor: 'bg-cyan-400/20'
+  },
+  { 
+    id: 'diamond', 
+    name_fr: 'Diamant', 
+    name_en: 'Diamond', 
+    threshold: 5000, 
+    icon: Gem, 
+    color: 'from-blue-400 to-purple-500', 
+    textColor: 'text-blue-400',
+    bgColor: 'bg-blue-500/20'
+  },
+  { 
+    id: 'legend', 
+    name_fr: 'Légende', 
+    name_en: 'Legend', 
+    threshold: 10000, 
+    icon: Crown, 
+    color: 'from-red-500 via-purple-500 to-blue-500', 
+    textColor: 'text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-purple-400 to-blue-400',
+    bgColor: 'bg-gradient-to-r from-red-500/20 via-purple-500/20 to-blue-500/20'
+  }
+];
+
+// Get current badge based on points
+const getCurrentBadge = (points) => {
+  let currentBadge = POINT_BADGES[0];
+  for (const badge of POINT_BADGES) {
+    if (points >= badge.threshold) {
+      currentBadge = badge;
+    } else {
+      break;
+    }
+  }
+  return currentBadge;
+};
+
+// Get next badge
+const getNextBadge = (points) => {
+  for (const badge of POINT_BADGES) {
+    if (points < badge.threshold) {
+      return badge;
+    }
+  }
+  return null; // Max level reached
+};
 
 // Custom icons
 const TikTokIcon = () => (
@@ -193,79 +290,136 @@ const Dashboard = () => {
               )}
             </div>
 
-            {/* Points Dashboard Widget */}
-            <div 
-              className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 p-6 rounded-md cursor-pointer hover:border-purple-400/50 transition-all"
-              onClick={() => navigate('/rewards')}
-              data-testid="points-dashboard-widget"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-500/20 rounded-full">
-                    <Trophy className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <h3 className="text-xl font-bold" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                    {isFr ? 'MES POINTS' : 'MY POINTS'}
-                  </h3>
-                </div>
-                <Zap className="w-5 h-5 text-yellow-400" />
-              </div>
+            {/* Points Dashboard Widget with Badges */}
+            {(() => {
+              const currentBadge = getCurrentBadge(pointsData.lifetime_points);
+              const nextBadge = getNextBadge(pointsData.lifetime_points);
+              const BadgeIcon = currentBadge.icon;
+              const progressToNext = nextBadge 
+                ? ((pointsData.lifetime_points - currentBadge.threshold) / (nextBadge.threshold - currentBadge.threshold)) * 100 
+                : 100;
               
-              {/* Main Points Display */}
-              <div className="text-center mb-4">
-                <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                  {pointsData.total_points.toLocaleString()}
-                </div>
-                <p className="text-gray-400 text-sm">{isFr ? 'points disponibles' : 'points available'}</p>
-              </div>
-              
-              {/* Stats Row */}
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-black/30 rounded-lg p-2">
-                  <div className="flex items-center justify-center gap-1 text-orange-400 mb-1">
-                    <Flame className="w-4 h-4" />
-                    <span className="font-bold">{workoutStats.streak_days}</span>
+              return (
+                <div 
+                  className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 p-6 rounded-md cursor-pointer hover:border-purple-400/50 transition-all"
+                  onClick={() => navigate('/rewards')}
+                  data-testid="points-dashboard-widget"
+                >
+                  {/* Header with Current Badge */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full bg-gradient-to-br ${currentBadge.color}`}>
+                        <BadgeIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                          {isFr ? 'MES POINTS' : 'MY POINTS'}
+                        </h3>
+                        <p className={`text-xs font-semibold ${currentBadge.textColor}`}>
+                          {isFr ? currentBadge.name_fr : currentBadge.name_en}
+                        </p>
+                      </div>
+                    </div>
+                    <Zap className="w-5 h-5 text-yellow-400 animate-pulse" />
                   </div>
-                  <p className="text-xs text-gray-500">{isFr ? 'jours' : 'days'}</p>
-                </div>
-                <div className="bg-black/30 rounded-lg p-2">
-                  <div className="flex items-center justify-center gap-1 text-green-400 mb-1">
-                    <Target className="w-4 h-4" />
-                    <span className="font-bold">{workoutStats.completed_sessions}</span>
+                  
+                  {/* Main Points Display */}
+                  <div className="text-center mb-3">
+                    <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                      {pointsData.total_points.toLocaleString()}
+                    </div>
+                    <p className="text-gray-400 text-xs">{isFr ? 'points disponibles' : 'points available'}</p>
                   </div>
-                  <p className="text-xs text-gray-500">{isFr ? 'séances' : 'sessions'}</p>
-                </div>
-                <div className="bg-black/30 rounded-lg p-2">
-                  <div className="flex items-center justify-center gap-1 text-blue-400 mb-1">
-                    <Star className="w-4 h-4" />
-                    <span className="font-bold">{pointsData.lifetime_points.toLocaleString()}</span>
+                  
+                  {/* Progress to Next Badge */}
+                  {nextBadge && (
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className={currentBadge.textColor}>{isFr ? currentBadge.name_fr : currentBadge.name_en}</span>
+                        <span className={nextBadge.textColor}>{isFr ? nextBadge.name_fr : nextBadge.name_en}</span>
+                      </div>
+                      <div className="h-2 bg-black/40 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full bg-gradient-to-r ${nextBadge.color} transition-all duration-500`}
+                          style={{ width: `${Math.min(progressToNext, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 text-center mt-1">
+                        {nextBadge.threshold - pointsData.lifetime_points} pts {isFr ? 'pour' : 'to'} {isFr ? nextBadge.name_fr : nextBadge.name_en}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Badge Showcase - Mini */}
+                  <div className="flex justify-center gap-1 mb-3">
+                    {POINT_BADGES.slice(1).map((badge) => {
+                      const isUnlocked = pointsData.lifetime_points >= badge.threshold;
+                      const Icon = badge.icon;
+                      return (
+                        <div 
+                          key={badge.id}
+                          className={`p-1.5 rounded-full transition-all ${
+                            isUnlocked 
+                              ? `bg-gradient-to-br ${badge.color} scale-100` 
+                              : 'bg-gray-800/50 scale-90 opacity-40'
+                          }`}
+                          title={`${isFr ? badge.name_fr : badge.name_en} (${badge.threshold} pts)`}
+                        >
+                          <Icon className={`w-3 h-3 ${isUnlocked ? 'text-white' : 'text-gray-600'}`} />
+                        </div>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-gray-500">{isFr ? 'total' : 'total'}</p>
+                  
+                  {/* Stats Row */}
+                  <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                    <div className="bg-black/30 rounded-lg p-2">
+                      <div className="flex items-center justify-center gap-1 text-orange-400 mb-1">
+                        <Flame className="w-4 h-4" />
+                        <span className="font-bold">{workoutStats.streak_days}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">{isFr ? 'jours' : 'days'}</p>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2">
+                      <div className="flex items-center justify-center gap-1 text-green-400 mb-1">
+                        <Target className="w-4 h-4" />
+                        <span className="font-bold">{workoutStats.completed_sessions}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">{isFr ? 'séances' : 'sessions'}</p>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2">
+                      <div className="flex items-center justify-center gap-1 text-blue-400 mb-1">
+                        <Star className="w-4 h-4" />
+                        <span className="font-bold">{pointsData.lifetime_points.toLocaleString()}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">{isFr ? 'total' : 'total'}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Active Rewards Badge */}
+                  {pointsData.active_rewards?.length > 0 && (
+                    <div className="mb-3 pt-2 border-t border-purple-500/20">
+                      <p className="text-xs text-purple-300 flex items-center gap-1">
+                        <Gift className="w-3 h-3" />
+                        {pointsData.active_rewards.length} {isFr ? 'récompense(s) active(s)' : 'active reward(s)'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Call to Action */}
+                  <Button
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/rewards');
+                    }}
+                  >
+                    <Gift className="w-4 h-4 mr-2" />
+                    {isFr ? 'Échanger mes points' : 'Redeem points'}
+                  </Button>
                 </div>
-              </div>
-              
-              {/* Active Rewards Badge */}
-              {pointsData.active_rewards?.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-purple-500/20">
-                  <p className="text-xs text-purple-300 flex items-center gap-1">
-                    <Gift className="w-3 h-3" />
-                    {pointsData.active_rewards.length} {isFr ? 'récompense(s) active(s)' : 'active reward(s)'}
-                  </p>
-                </div>
-              )}
-              
-              {/* Call to Action */}
-              <Button
-                className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate('/rewards');
-                }}
-              >
-                <Gift className="w-4 h-4 mr-2" />
-                {isFr ? 'Échanger mes points' : 'Redeem points'}
-              </Button>
-            </div>
+              );
+            })()}
 
             {/* Quick Stats */}
             <div className="bg-[#121212] border border-[#27272a] p-6 rounded-md">

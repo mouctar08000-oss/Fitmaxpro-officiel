@@ -148,12 +148,17 @@ Pour activer toutes les fonctionnalités, configurer dans `.env` :
 - ✅ **Intégration WebRTC Complète** - CallPage.js refait avec LiveKit
 - ✅ **Automatisation Points Workout** - Points pour séances terminées
 - ✅ **Intégration RevenueCat Complète** - Vérification automatique des achats
-- ✅ **Tableau de Bord des Points** - Widget visuel sur le Dashboard avec:
-  - Points disponibles en grand
-  - Série de jours consécutifs (🔥)
-  - Nombre de séances complétées
-  - Points totaux à vie
-  - Bouton d'échange rapide
+- ✅ **Tableau de Bord des Points** - Widget visuel sur le Dashboard
+- ✅ **Système de Badges par Paliers** - 7 niveaux de badges:
+  - 🔘 Débutant (0 pts)
+  - 🥉 Bronze (100 pts)
+  - 🥈 Argent (500 pts)
+  - 🥇 Or (1000 pts)
+  - 💎 Platine (2500 pts)
+  - 💠 Diamant (5000 pts)
+  - 👑 Légende (10000 pts)
+  - Barre de progression vers le prochain niveau
+  - Mini-badges visuels (débloqués/verrouillés)
 - ✅ **Archive Code Source** - ZIP propre sans données sensibles
 
 ### March 3, 2026 - Sessions 1-4
