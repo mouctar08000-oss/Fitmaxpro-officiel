@@ -37,6 +37,22 @@ export const LiveKitVideoRoom = ({
   participantName = 'User'
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+
+  // Request camera permission on mount for broadcaster
+  useEffect(() => {
+    if (isBroadcaster) {
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(() => {
+          console.log('Camera and microphone access granted');
+          setCameraError(null);
+        })
+        .catch((err) => {
+          console.error('Camera access error:', err);
+          setCameraError(err.message);
+        });
+    }
+  }, [isBroadcaster]);
 
   if (!token || !serverUrl) {
     return (
@@ -49,14 +65,35 @@ export const LiveKitVideoRoom = ({
     );
   }
 
+  if (cameraError && isBroadcaster) {
+    return (
+      <div className="flex items-center justify-center h-full bg-black text-white p-8">
+        <div className="text-center max-w-md">
+          <VideoOff className="w-16 h-16 mx-auto mb-4 text-red-500" />
+          <h3 className="text-xl font-bold mb-2">Accès caméra refusé</h3>
+          <p className="text-gray-400 mb-4">{cameraError}</p>
+          <p className="text-sm text-gray-500">
+            Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur, puis rafraîchissez la page.
+          </p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-red-600 hover:bg-red-700"
+          >
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'relative'} bg-black rounded-lg overflow-hidden`}>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'relative h-full'} bg-black rounded-lg overflow-hidden`}>
       <LKRoom
         token={token}
         serverUrl={serverUrl}
         connect={true}
         video={isBroadcaster}
-        audio={true}
+        audio={isBroadcaster}
         onDisconnected={() => {
           console.log('Disconnected from room');
           onDisconnect?.();
@@ -64,47 +101,71 @@ export const LiveKitVideoRoom = ({
         onError={(error) => {
           console.error('LiveKit error:', error);
         }}
+        options={{
+          adaptiveStream: true,
+          dynacast: true,
+          publishDefaults: {
+            videoSimulcastLayers: [
+              { width: 640, height: 360, bitrate: 500000 },
+              { width: 1280, height: 720, bitrate: 1500000 },
+            ],
+          },
+        }}
       >
-        <div className="h-full flex flex-col">
-          {/* Video Grid */}
-          <div className="flex-1 relative">
-            <VideoConference />
+        <RoomContent 
+          isBroadcaster={isBroadcaster} 
+          roomName={roomName}
+          isFullscreen={isFullscreen}
+          setIsFullscreen={setIsFullscreen}
+          onDisconnect={onDisconnect}
+        />
+      </LKRoom>
+    </div>
+  );
+};
+
+// Room content component (inside LKRoom context)
+const RoomContent = ({ isBroadcaster, roomName, isFullscreen, setIsFullscreen, onDisconnect }) => {
+  return (
+    <div className="h-full flex flex-col">
+      {/* Video Grid */}
+      <div className="flex-1 relative min-h-0">
+        <VideoConference />
+      </div>
+      
+      {/* Controls */}
+      <div className="bg-[#1a1a1a] p-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            <span className="text-white text-sm font-medium">EN DIRECT</span>
+            <span className="text-gray-400 text-sm">• {roomName}</span>
+            <ParticipantCount />
           </div>
-          
-          {/* Controls */}
-          <div className="bg-[#1a1a1a] p-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-white text-sm">{roomName}</span>
-                <ParticipantCount />
-              </div>
-              <div className="flex items-center gap-2">
-                <ControlBar 
-                  variation="minimal"
-                  controls={{
-                    microphone: true,
-                    camera: isBroadcaster,
-                    screenShare: isBroadcaster,
-                    leave: true,
-                    chat: false,
-                  }}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="text-white"
-                >
-                  {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            <ControlBar 
+              variation="minimal"
+              controls={{
+                microphone: true,
+                camera: isBroadcaster,
+                screenShare: isBroadcaster,
+                leave: true,
+                chat: false,
+              }}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="text-white hover:bg-white/10"
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </Button>
           </div>
         </div>
-        
-        {/* Audio Renderer (for subscribers) */}
-        <RoomAudioRenderer />
-      </LKRoom>
+      </div>
+      
+      <RoomAudioRenderer />
     </div>
   );
 };

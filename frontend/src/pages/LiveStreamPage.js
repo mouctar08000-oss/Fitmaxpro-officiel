@@ -276,12 +276,18 @@ const LiveStreamPage = () => {
         setShowCreateForm(false);
         fetchActiveLives();
         
-        // If LiveKit is configured, get token for broadcasting
-        if (liveKitStatus.configured && response.data.live_id) {
-          const roomName = `live_${response.data.live_id}`;
-          const lkToken = await getLiveKitToken(roomName, true); // canPublish = true for broadcaster
+        // Use the host token directly from the response
+        if (response.data.host_token && response.data.livekit_url) {
+          setLiveKitToken(response.data.host_token);
+          setLiveKitServerUrl(response.data.livekit_url);
+          setIsWebRTCConnected(true);
+          toast.success(isFr ? '🎥 Caméra prête ! Vous êtes en direct.' : '🎥 Camera ready! You are live.');
+        } else if (liveKitStatus.configured && response.data.live_id) {
+          // Fallback: get token via API
+          const roomName = response.data.livekit_room_name || `live_${response.data.live_id}`;
+          const lkToken = await getLiveKitToken(roomName, true);
           if (lkToken) {
-            toast.success(isFr ? 'WebRTC connecté ! Vous êtes en direct.' : 'WebRTC connected! You are live.');
+            toast.success(isFr ? 'WebRTC connecté !' : 'WebRTC connected!');
           }
         }
       }
