@@ -5742,8 +5742,35 @@ async def get_user_points(current_user: User = Depends(get_current_user)):
         "active_rewards": active_rewards
     }
 
+# Badge System Configuration
+POINT_BADGES = [
+    {"id": "starter", "name_fr": "Débutant", "name_en": "Starter", "threshold": 0, "emoji": "🔘"},
+    {"id": "bronze", "name_fr": "Bronze", "name_en": "Bronze", "threshold": 100, "emoji": "🥉"},
+    {"id": "silver", "name_fr": "Argent", "name_en": "Silver", "threshold": 500, "emoji": "🥈"},
+    {"id": "gold", "name_fr": "Or", "name_en": "Gold", "threshold": 1000, "emoji": "🥇"},
+    {"id": "platinum", "name_fr": "Platine", "name_en": "Platinum", "threshold": 2500, "emoji": "💎"},
+    {"id": "diamond", "name_fr": "Diamant", "name_en": "Diamond", "threshold": 5000, "emoji": "💠"},
+    {"id": "legend", "name_fr": "Légende", "name_en": "Legend", "threshold": 10000, "emoji": "👑"}
+]
+
+def get_badge_for_points(points: int) -> dict:
+    """Get the badge for a given point amount"""
+    current_badge = POINT_BADGES[0]
+    for badge in POINT_BADGES:
+        if points >= badge["threshold"]:
+            current_badge = badge
+        else:
+            break
+    return current_badge
+
 async def add_points(user_id: str, points: int, reason: str, reason_id: str = None):
-    """Add points to user's balance"""
+    """Add points to user's balance and check for badge upgrades"""
+    
+    # Get current points before update
+    user_data = await db.user_points.find_one({"user_id": user_id})
+    old_lifetime_points = user_data.get("lifetime_points", 0) if user_data else 0
+    old_badge = get_badge_for_points(old_lifetime_points)
+    
     # Update or create user points
     result = await db.user_points.update_one(
         {"user_id": user_id},
@@ -5763,6 +5790,29 @@ async def add_points(user_id: str, points: int, reason: str, reason_id: str = No
         "type": "earned" if points > 0 else "spent",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
+    
+    # Check for badge upgrade (only for positive points)
+    if points > 0:
+        new_lifetime_points = old_lifetime_points + points
+        new_badge = get_badge_for_points(new_lifetime_points)
+        
+        if new_badge["id"] != old_badge["id"] and new_badge["threshold"] > old_badge["threshold"]:
+            # Badge upgraded! Send notification
+            await send_push_notification(
+                user_id,
+                f"{new_badge['emoji']} Nouveau Badge Débloqué !",
+                f"Félicitations ! Vous avez atteint le niveau {new_badge['name_fr']} ! Continuez comme ça ! 💪",
+                {"url": "/rewards", "type": "badge_unlocked", "badge_id": new_badge["id"]}
+            )
+            
+            # Log badge unlock
+            await db.badge_unlocks.insert_one({
+                "user_id": user_id,
+                "badge_id": new_badge["id"],
+                "badge_name": new_badge["name_fr"],
+                "points_at_unlock": new_lifetime_points,
+                "unlocked_at": datetime.now(timezone.utc).isoformat()
+            })
     
     return True
 
@@ -5825,6 +5875,57 @@ async def get_my_rewards(current_user: User = Depends(get_current_user)):
     ).sort("redeemed_at", -1).to_list(50)
     
     return {"rewards": rewards}
+
+@api_router.get("/rewards/badges")
+async def get_user_badges(current_user: User = Depends(get_current_user)):
+    """Get user's badge status and unlocked badges"""
+    # Get user points
+    user_data = await db.user_points.find_one({"user_id": current_user.user_id})
+    lifetime_points = user_data.get("lifetime_points", 0) if user_data else 0
+    
+    current_badge = get_badge_for_points(lifetime_points)
+    
+    # Get next badge
+    next_badge = None
+    for badge in POINT_BADGES:
+        if lifetime_points < badge["threshold"]:
+            next_badge = badge
+            break
+    
+    # Calculate progress to next badge
+    progress = 100
+    points_to_next = 0
+    if next_badge:
+        prev_threshold = current_badge["threshold"]
+        points_to_next = next_badge["threshold"] - lifetime_points
+        progress = ((lifetime_points - prev_threshold) / (next_badge["threshold"] - prev_threshold)) * 100
+    
+    # Get unlocked badges history
+    badge_unlocks = await db.badge_unlocks.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("unlocked_at", -1).to_list(20)
+    
+    # Build badges list with unlock status
+    badges_status = []
+    for badge in POINT_BADGES:
+        is_unlocked = lifetime_points >= badge["threshold"]
+        unlock_info = next((u for u in badge_unlocks if u["badge_id"] == badge["id"]), None)
+        badges_status.append({
+            **badge,
+            "unlocked": is_unlocked,
+            "unlocked_at": unlock_info["unlocked_at"] if unlock_info else None
+        })
+    
+    return {
+        "lifetime_points": lifetime_points,
+        "current_badge": current_badge,
+        "next_badge": next_badge,
+        "progress_to_next": round(progress, 1),
+        "points_to_next": points_to_next,
+        "all_badges": badges_status,
+        "unlock_history": badge_unlocks
+    }
 
 # Admin: Give points to user
 class GivePointsRequest(BaseModel):

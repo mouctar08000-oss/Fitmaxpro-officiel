@@ -149,16 +149,11 @@ Pour activer toutes les fonctionnalités, configurer dans `.env` :
 - ✅ **Automatisation Points Workout** - Points pour séances terminées
 - ✅ **Intégration RevenueCat Complète** - Vérification automatique des achats
 - ✅ **Tableau de Bord des Points** - Widget visuel sur le Dashboard
-- ✅ **Système de Badges par Paliers** - 7 niveaux de badges:
-  - 🔘 Débutant (0 pts)
-  - 🥉 Bronze (100 pts)
-  - 🥈 Argent (500 pts)
-  - 🥇 Or (1000 pts)
-  - 💎 Platine (2500 pts)
-  - 💠 Diamant (5000 pts)
-  - 👑 Légende (10000 pts)
-  - Barre de progression vers le prochain niveau
-  - Mini-badges visuels (débloqués/verrouillés)
+- ✅ **Système de Badges par Paliers** - 7 niveaux de badges avec progression
+- ✅ **Notifications Push Badge** - Envoi automatique quand un badge est débloqué:
+  - "🥈 Nouveau Badge Débloqué ! Félicitations ! Vous avez atteint le niveau Argent !"
+  - Historique des badges débloqués avec timestamps
+  - API `/api/rewards/badges` pour récupérer tous les badges
 - ✅ **Archive Code Source** - ZIP propre sans données sensibles
 
 ### March 3, 2026 - Sessions 1-4
