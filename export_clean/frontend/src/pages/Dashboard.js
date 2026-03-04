@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import Footer from '../components/Footer';
 import { Button } from '../components/ui/button.jsx';
-import { Dumbbell, Pill, TrendingUp, CreditCard, Instagram, Youtube, Gift, Footprints, Radio, Star, MessageSquare } from 'lucide-react';
+import { Dumbbell, Pill, TrendingUp, CreditCard, Instagram, Youtube, Gift, Footprints, Radio, Star, MessageSquare, Trophy, Flame, Target, Zap } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -25,11 +25,15 @@ const Dashboard = () => {
   const [subscription, setSubscription] = useState(null);
   const [socialLinks, setSocialLinks] = useState({});
   const [reviewStats, setReviewStats] = useState({ total_reviews: 0, average_rating: 0 });
+  const [pointsData, setPointsData] = useState({ total_points: 0, lifetime_points: 0, transactions: [], active_rewards: [] });
+  const [workoutStats, setWorkoutStats] = useState({ total_sessions: 0, completed_sessions: 0, streak_days: 0 });
 
   useEffect(() => {
     fetchSubscription();
     fetchSocialLinks();
     fetchReviewStats();
+    fetchPointsData();
+    fetchWorkoutStats();
   }, []);
 
   const fetchReviewStats = async () => {
@@ -59,6 +63,67 @@ const Dashboard = () => {
       setSocialLinks(response.data.links || {});
     } catch (error) {
       console.error('Error fetching social links:', error);
+    }
+  };
+
+  const fetchPointsData = async () => {
+    try {
+      const token = localStorage.getItem('session_token');
+      if (!token) return;
+      const response = await axios.get(`${API}/rewards/points`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPointsData(response.data);
+    } catch (error) {
+      console.error('Error fetching points:', error);
+    }
+  };
+
+  const fetchWorkoutStats = async () => {
+    try {
+      const token = localStorage.getItem('session_token');
+      if (!token) return;
+      const response = await axios.get(`${API}/workout/my-sessions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const stats = response.data.stats || {};
+      
+      // Calculate streak from sessions
+      const sessions = response.data.sessions || [];
+      let streakDays = 0;
+      if (sessions.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let checkDate = new Date(today);
+        
+        for (let i = 0; i < 30; i++) {
+          const dayStart = new Date(checkDate);
+          const dayEnd = new Date(checkDate);
+          dayEnd.setDate(dayEnd.getDate() + 1);
+          
+          const hasSession = sessions.some(s => {
+            const sessionDate = new Date(s.started_at);
+            return sessionDate >= dayStart && sessionDate < dayEnd && s.completed;
+          });
+          
+          if (hasSession) {
+            streakDays++;
+            checkDate.setDate(checkDate.getDate() - 1);
+          } else if (i > 0) {
+            break;
+          } else {
+            checkDate.setDate(checkDate.getDate() - 1);
+          }
+        }
+      }
+      
+      setWorkoutStats({
+        total_sessions: stats.total_sessions || 0,
+        completed_sessions: stats.completed_sessions || 0,
+        streak_days: streakDays
+      });
+    } catch (error) {
+      console.error('Error fetching workout stats:', error);
     }
   };
 
@@ -126,6 +191,80 @@ const Dashboard = () => {
                   {t('dashboard.upgrade')}
                 </Button>
               )}
+            </div>
+
+            {/* Points Dashboard Widget */}
+            <div 
+              className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 p-6 rounded-md cursor-pointer hover:border-purple-400/50 transition-all"
+              onClick={() => navigate('/rewards')}
+              data-testid="points-dashboard-widget"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/20 rounded-full">
+                    <Trophy className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <h3 className="text-xl font-bold" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                    {isFr ? 'MES POINTS' : 'MY POINTS'}
+                  </h3>
+                </div>
+                <Zap className="w-5 h-5 text-yellow-400" />
+              </div>
+              
+              {/* Main Points Display */}
+              <div className="text-center mb-4">
+                <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                  {pointsData.total_points.toLocaleString()}
+                </div>
+                <p className="text-gray-400 text-sm">{isFr ? 'points disponibles' : 'points available'}</p>
+              </div>
+              
+              {/* Stats Row */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-black/30 rounded-lg p-2">
+                  <div className="flex items-center justify-center gap-1 text-orange-400 mb-1">
+                    <Flame className="w-4 h-4" />
+                    <span className="font-bold">{workoutStats.streak_days}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">{isFr ? 'jours' : 'days'}</p>
+                </div>
+                <div className="bg-black/30 rounded-lg p-2">
+                  <div className="flex items-center justify-center gap-1 text-green-400 mb-1">
+                    <Target className="w-4 h-4" />
+                    <span className="font-bold">{workoutStats.completed_sessions}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">{isFr ? 'séances' : 'sessions'}</p>
+                </div>
+                <div className="bg-black/30 rounded-lg p-2">
+                  <div className="flex items-center justify-center gap-1 text-blue-400 mb-1">
+                    <Star className="w-4 h-4" />
+                    <span className="font-bold">{pointsData.lifetime_points.toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">{isFr ? 'total' : 'total'}</p>
+                </div>
+              </div>
+              
+              {/* Active Rewards Badge */}
+              {pointsData.active_rewards?.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-purple-500/20">
+                  <p className="text-xs text-purple-300 flex items-center gap-1">
+                    <Gift className="w-3 h-3" />
+                    {pointsData.active_rewards.length} {isFr ? 'récompense(s) active(s)' : 'active reward(s)'}
+                  </p>
+                </div>
+              )}
+              
+              {/* Call to Action */}
+              <Button
+                className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/rewards');
+                }}
+              >
+                <Gift className="w-4 h-4 mr-2" />
+                {isFr ? 'Échanger mes points' : 'Redeem points'}
+              </Button>
             </div>
 
             {/* Quick Stats */}

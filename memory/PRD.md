@@ -148,6 +148,12 @@ Pour activer toutes les fonctionnalités, configurer dans `.env` :
 - ✅ **Intégration WebRTC Complète** - CallPage.js refait avec LiveKit
 - ✅ **Automatisation Points Workout** - Points pour séances terminées
 - ✅ **Intégration RevenueCat Complète** - Vérification automatique des achats
+- ✅ **Tableau de Bord des Points** - Widget visuel sur le Dashboard avec:
+  - Points disponibles en grand
+  - Série de jours consécutifs (🔥)
+  - Nombre de séances complétées
+  - Points totaux à vie
+  - Bouton d'échange rapide
 - ✅ **Archive Code Source** - ZIP propre sans données sensibles
 
 ### March 3, 2026 - Sessions 1-4
