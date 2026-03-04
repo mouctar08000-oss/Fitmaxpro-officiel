@@ -179,6 +179,17 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
         await db.user_sessions.delete_one({"session_token": session_token})
         raise HTTPException(status_code=401, detail="Session expired")
     
+    # Auto-renew session on activity (extend by another year)
+    # This keeps the user logged in as long as they're active
+    new_expires_at = (datetime.now(timezone.utc) + timedelta(days=365)).isoformat()
+    await db.user_sessions.update_one(
+        {"session_token": session_token},
+        {"$set": {
+            "expires_at": new_expires_at,
+            "last_activity": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
     user_doc = await db.users.find_one({"user_id": session_doc["user_id"]}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
@@ -228,8 +239,9 @@ async def create_session(request: SessionRequest, response: Response):
         session_doc = {
             "user_id": user_id,
             "session_token": session_token,
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),  # 1 year - permanent until logout
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_activity": datetime.now(timezone.utc).isoformat()
         }
         await db.user_sessions.insert_one(session_doc)
         
@@ -240,7 +252,7 @@ async def create_session(request: SessionRequest, response: Response):
             secure=True,
             samesite="none",
             path="/",
-            max_age=7*24*60*60
+            max_age=365*24*60*60  # 1 year
         )
         
         user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
@@ -294,7 +306,7 @@ async def register(request: RegisterRequest, response: Response):
         session_doc = {
             "user_id": user_id,
             "session_token": session_token,
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),  # 1 year - permanent until logout
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.user_sessions.insert_one(session_doc)
@@ -307,7 +319,7 @@ async def register(request: RegisterRequest, response: Response):
             secure=True,
             samesite="none",
             path="/",
-            max_age=7*24*60*60
+            max_age=365*24*60*60  # 1 year
         )
         
         # Return user (without password)
@@ -345,7 +357,7 @@ async def login(request: LoginRequest, response: Response):
         session_doc = {
             "user_id": user_id,
             "session_token": session_token,
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),  # 1 year - permanent until logout
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.user_sessions.insert_one(session_doc)
@@ -358,7 +370,7 @@ async def login(request: LoginRequest, response: Response):
             secure=True,
             samesite="none",
             path="/",
-            max_age=7*24*60*60
+            max_age=365*24*60*60  # 1 year
         )
         
         # Return user (without password)
