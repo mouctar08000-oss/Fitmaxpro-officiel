@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Navigation from '../components/Navigation';
+import VideoUploader from '../components/VideoUploader';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 import { 
@@ -171,6 +172,9 @@ const AdminPage = () => {
   });
   const [savingSocial, setSavingSocial] = useState(false);
   const [savingPlatform, setSavingPlatform] = useState(null); // Track which platform is being saved
+  
+  // Uploaded videos state
+  const [uploadedVideos, setUploadedVideos] = useState([]);
   
   // Progress photos states
   const [usersProgressPhotos, setUsersProgressPhotos] = useState([]);
@@ -463,6 +467,16 @@ const AdminPage = () => {
       setSocialLinks(response.data.links || {});
     } catch (error) {
       console.error('Error fetching social links:', error);
+    }
+  }, []);
+
+  // Fetch uploaded videos
+  const fetchUploadedVideos = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/admin/videos`, { headers: getAuthHeaders() });
+      setUploadedVideos(response.data.videos || []);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
     }
   }, []);
 
@@ -915,6 +929,7 @@ const AdminPage = () => {
         fetchAlertsHistory(),
         fetchAllReviews(),
         fetchSocialLinks(),
+        fetchUploadedVideos(),
         fetchUsersProgressPhotos(),
         fetchRunningStats(),
         fetchAllRunningData(),
@@ -926,7 +941,7 @@ const AdminPage = () => {
       setLoading(false);
     };
     loadData();
-  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUsersProgressPhotos, fetchRunningStats, fetchAllRunningData, fetchInactiveUsers, fetchCancellationRequests, fetchWeeklyEmailSettings, fetchEmailHistory]);
+  }, [fetchStats, fetchSubscribers, fetchWorkoutAnalytics, fetchWorkouts, fetchSupplements, fetchUserProgress, fetchUsersWithMessages, fetchUnreadCount, fetchRoutines, fetchRoutineStats, fetchRoutineSessions, fetchEvolutionData, fetchAllSubscribersEvolution, fetchAlertsHistory, fetchAllReviews, fetchSocialLinks, fetchUploadedVideos, fetchUsersProgressPhotos, fetchRunningStats, fetchAllRunningData, fetchInactiveUsers, fetchCancellationRequests, fetchWeeklyEmailSettings, fetchEmailHistory]);
 
   // Check if user is admin
   useEffect(() => {
@@ -1044,6 +1059,7 @@ const AdminPage = () => {
               { id: 'motivation', icon: Mail, label: isFr ? 'Emails Motivation' : 'Motivation Emails' },
               { id: 'subscriptions', icon: Crown, label: isFr ? 'Abonnements' : 'Subscriptions' },
               { id: 'social', icon: Users, label: isFr ? 'Réseaux Sociaux' : 'Social Media' },
+              { id: 'videos', icon: Video, label: isFr ? 'Vidéos' : 'Videos' },
               { id: 'analytics', icon: Activity, label: isFr ? 'Analytiques' : 'Analytics' },
               { id: 'workouts', icon: Dumbbell, label: isFr ? 'Séances' : 'Workouts' },
               { id: 'routines', icon: Flame, label: isFr ? 'Échauffement/Étirements' : 'Warm-Up/Stretching' },
@@ -2821,6 +2837,142 @@ const AdminPage = () => {
             </div>
           )}
 
+          {/* Videos Management Tab */}
+          {activeTab === 'videos' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Video className="w-5 h-5 text-[#EF4444]" />
+                  {isFr ? 'Gestion des Vidéos' : 'Video Management'}
+                </h2>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const response = await axios.get(`${API}/admin/videos`, { headers: getAuthHeaders() });
+                      setUploadedVideos(response.data.videos || []);
+                    } catch (error) {
+                      console.error('Error fetching videos:', error);
+                    }
+                  }}
+                  variant="outline"
+                  className="border-[#27272a]"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {isFr ? 'Actualiser' : 'Refresh'}
+                </Button>
+              </div>
+
+              {/* Upload New Video */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-green-400" />
+                  {isFr ? 'Uploader une nouvelle vidéo' : 'Upload New Video'}
+                </h3>
+                <VideoUploader
+                  value=""
+                  onChange={() => {}}
+                  onUploadComplete={async () => {
+                    // Refresh video list after upload
+                    try {
+                      const response = await axios.get(`${API}/admin/videos`, { headers: getAuthHeaders() });
+                      setUploadedVideos(response.data.videos || []);
+                    } catch (error) {
+                      console.error('Error refreshing videos:', error);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Video Library */}
+              <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Video className="w-4 h-4 text-blue-400" />
+                  {isFr ? 'Bibliothèque de Vidéos' : 'Video Library'} ({uploadedVideos.length})
+                </h3>
+                
+                {uploadedVideos.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Video className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>{isFr ? 'Aucune vidéo uploadée' : 'No videos uploaded'}</p>
+                    <p className="text-sm">{isFr ? 'Uploadez vos vidéos d\'exercices ci-dessus' : 'Upload your exercise videos above'}</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {uploadedVideos.map((video) => (
+                      <div key={video.video_id} className="bg-[#09090b] border border-[#27272a] rounded-lg overflow-hidden">
+                        <div className="aspect-video bg-black flex items-center justify-center">
+                          <video
+                            src={`${API.replace('/api', '')}${video.url}`}
+                            className="w-full h-full object-cover"
+                            preload="metadata"
+                          />
+                        </div>
+                        <div className="p-3">
+                          <p className="font-medium text-sm truncate">{video.original_name}</p>
+                          <p className="text-gray-400 text-xs">
+                            {(video.size / (1024 * 1024)).toFixed(1)} MB • {new Date(video.uploaded_at).toLocaleDateString('fr-FR')}
+                          </p>
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(`${API.replace('/api', '')}${video.url}`, '_blank')}
+                              className="flex-1"
+                            >
+                              <Eye className="w-3 h-3 mr-1" />
+                              {isFr ? 'Voir' : 'View'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                navigator.clipboard.writeText(video.url);
+                                toast.success(isFr ? 'URL copiée !' : 'URL copied!');
+                              }}
+                              className="flex-1"
+                            >
+                              <Copy className="w-3 h-3 mr-1" />
+                              {isFr ? 'Copier URL' : 'Copy URL'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={async () => {
+                                if (window.confirm(isFr ? 'Supprimer cette vidéo ?' : 'Delete this video?')) {
+                                  try {
+                                    await axios.delete(`${API}/admin/videos/${video.video_id}`, { headers: getAuthHeaders() });
+                                    setUploadedVideos(prev => prev.filter(v => v.video_id !== video.video_id));
+                                    toast.success(isFr ? 'Vidéo supprimée' : 'Video deleted');
+                                  } catch (error) {
+                                    toast.error(isFr ? 'Erreur' : 'Error');
+                                  }
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Help Section */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h4 className="font-bold text-blue-400 mb-2">{isFr ? 'Comment utiliser les vidéos' : 'How to use videos'}</h4>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• {isFr ? 'Uploadez vos vidéos d\'exercices (MP4, WebM, MOV, AVI - max 500MB)' : 'Upload your exercise videos (MP4, WebM, MOV, AVI - max 500MB)'}</li>
+                  <li>• {isFr ? 'Lors de la création d\'un exercice, utilisez le composant "Uploader" ou collez un lien YouTube' : 'When creating an exercise, use the "Upload" component or paste a YouTube link'}</li>
+                  <li>• {isFr ? 'Les vidéos uploadées sont streamées avec support du seek (avance/retour)' : 'Uploaded videos are streamed with seek support (forward/backward)'}</li>
+                  <li>• {isFr ? 'Les abonnés peuvent regarder les vidéos en temps réel pendant leurs exercices' : 'Subscribers can watch videos in real-time during their exercises'}</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* Analytics Tab */}
           {activeTab === 'analytics' && (
             <div className="space-y-6">
@@ -4266,13 +4418,10 @@ const AdminPage = () => {
                         className="bg-[#09090b] border-[#27272a]"
                       />
                     </div>
-                    <div>
-                      <label className="text-gray-400 text-xs block mb-1">Video YouTube URL</label>
-                      <Input
+                    <div className="lg:col-span-2">
+                      <VideoUploader
                         value={newExercise.video_url}
-                        onChange={(e) => setNewExercise(prev => ({ ...prev, video_url: e.target.value }))}
-                        placeholder="https://www.youtube.com/embed/..."
-                        className="bg-[#09090b] border-[#27272a]"
+                        onChange={(url) => setNewExercise(prev => ({ ...prev, video_url: url }))}
                       />
                     </div>
                     <div>
@@ -4554,12 +4703,12 @@ const AdminPage = () => {
                                 onChange={(e) => setNewRoutineExercise({...newRoutineExercise, image_url: e.target.value})}
                                 className="bg-[#121212] border-[#27272a]"
                               />
-                              <Input
-                                placeholder="Video URL (YouTube embed)"
-                                value={newRoutineExercise.video_url}
-                                onChange={(e) => setNewRoutineExercise({...newRoutineExercise, video_url: e.target.value})}
-                                className="bg-[#121212] border-[#27272a]"
-                              />
+                              <div className="col-span-2">
+                                <VideoUploader
+                                  value={newRoutineExercise.video_url}
+                                  onChange={(url) => setNewRoutineExercise({...newRoutineExercise, video_url: url})}
+                                />
+                              </div>
                             </div>
                             <Button
                               onClick={() => addRoutineExercise(routine.routine_id)}

@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Header
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Header, UploadFile, File
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -7,6 +8,7 @@ import os
 import logging
 import json
 import asyncio
+import aiofiles
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict
@@ -791,6 +793,152 @@ async def verify_admin(current_user: User = Depends(get_current_user)):
     if current_user.subscription_tier != "vip":
         raise HTTPException(status_code=403, detail="Admin access required (VIP)")
     return current_user
+
+# ==================== VIDEO UPLOAD SYSTEM ====================
+
+UPLOAD_DIR = ROOT_DIR / "uploads" / "videos"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Allowed video formats
+ALLOWED_VIDEO_TYPES = {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+    "video/x-msvideo": ".avi",
+    "video/x-matroska": ".mkv"
+}
+
+MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
+
+@api_router.post("/admin/upload-video")
+async def admin_upload_video(
+    file: UploadFile = File(...),
+    admin: User = Depends(verify_admin)
+):
+    """Admin: Upload a video file for exercises"""
+    content_type = file.content_type
+    if content_type not in ALLOWED_VIDEO_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Type de fichier non supporté. Utilisez: MP4, WebM, MOV, AVI, MKV"
+        )
+    
+    extension = ALLOWED_VIDEO_TYPES[content_type]
+    video_id = f"video_{uuid.uuid4().hex[:12]}"
+    filename = f"{video_id}{extension}"
+    filepath = UPLOAD_DIR / filename
+    
+    try:
+        total_size = 0
+        async with aiofiles.open(filepath, 'wb') as out_file:
+            while chunk := await file.read(1024 * 1024):
+                total_size += len(chunk)
+                if total_size > MAX_VIDEO_SIZE:
+                    await out_file.close()
+                    filepath.unlink(missing_ok=True)
+                    raise HTTPException(status_code=400, detail=f"Fichier trop volumineux. Maximum: 500 MB")
+                await out_file.write(chunk)
+        
+        video_doc = {
+            "video_id": video_id,
+            "filename": filename,
+            "original_name": file.filename,
+            "content_type": content_type,
+            "size": total_size,
+            "uploaded_by": admin.user_id,
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+            "url": f"/api/videos/{video_id}"
+        }
+        await db.uploaded_videos.insert_one(video_doc)
+        video_doc.pop("_id", None)
+        
+        return {
+            "success": True,
+            "video_id": video_id,
+            "url": f"/api/videos/{video_id}",
+            "filename": file.filename,
+            "size": total_size
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        filepath.unlink(missing_ok=True)
+        logging.error(f"Video upload error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de l'upload")
+
+@api_router.get("/videos/{video_id}")
+async def get_video(video_id: str, request: Request):
+    """Stream a video file with range support for seeking"""
+    video = await db.uploaded_videos.find_one({"video_id": video_id})
+    if not video:
+        raise HTTPException(status_code=404, detail="Vidéo non trouvée")
+    
+    filepath = UPLOAD_DIR / video["filename"]
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Fichier vidéo non trouvé")
+    
+    file_size = filepath.stat().st_size
+    content_type = video.get("content_type", "video/mp4")
+    range_header = request.headers.get("range")
+    
+    if range_header:
+        range_match = range_header.replace("bytes=", "").split("-")
+        start = int(range_match[0]) if range_match[0] else 0
+        end = int(range_match[1]) if range_match[1] else file_size - 1
+        
+        if start >= file_size:
+            raise HTTPException(status_code=416, detail="Range not satisfiable")
+        
+        chunk_size = end - start + 1
+        
+        async def stream_video():
+            async with aiofiles.open(filepath, 'rb') as video_file:
+                await video_file.seek(start)
+                remaining = chunk_size
+                while remaining > 0:
+                    read_size = min(remaining, 1024 * 1024)
+                    chunk = await video_file.read(read_size)
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+        
+        from starlette.responses import StreamingResponse
+        return StreamingResponse(
+            stream_video(),
+            status_code=206,
+            headers={
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(chunk_size),
+                "Content-Type": content_type,
+            }
+        )
+    else:
+        return FileResponse(
+            filepath,
+            media_type=content_type,
+            headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)}
+        )
+
+@api_router.get("/admin/videos")
+async def admin_list_videos(admin: User = Depends(verify_admin)):
+    """Admin: List all uploaded videos"""
+    videos = await db.uploaded_videos.find({}, {"_id": 0}).sort("uploaded_at", -1).to_list(100)
+    return {"videos": videos}
+
+@api_router.delete("/admin/videos/{video_id}")
+async def admin_delete_video(video_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Delete an uploaded video"""
+    video = await db.uploaded_videos.find_one({"video_id": video_id})
+    if not video:
+        raise HTTPException(status_code=404, detail="Vidéo non trouvée")
+    
+    filepath = UPLOAD_DIR / video["filename"]
+    filepath.unlink(missing_ok=True)
+    await db.uploaded_videos.delete_one({"video_id": video_id})
+    
+    return {"success": True, "message": "Vidéo supprimée"}
 
 # --- WORKOUTS ADMIN ---
 

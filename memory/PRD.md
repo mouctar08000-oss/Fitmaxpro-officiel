@@ -277,10 +277,14 @@ GET /api/workouts?program_type=yoga
   - Lien "Mot de passe oublié ?" avec page dédiée
   - Session persistante (localStorage) - plus besoin de se reconnecter
   - API /api/auth/forgot-password pour réinitialisation
-- ✅ **Vidéos d'Exercices** :
-  - Support YouTube, Vimeo et fichiers MP4 directs
-  - Modal vidéo amélioré pour regarder pendant l'exercice
-  - Admin peut ajouter video_url pour chaque exercice
+- ✅ **Système d'Upload de Vidéos d'Exercices** :
+  - Nouvel onglet "Vidéos" dans l'admin panel
+  - Upload de vidéos (MP4, WebM, MOV, AVI - max 500MB)
+  - Streaming vidéo avec support du seek (avance/retour)
+  - Composant VideoUploader intégré dans les formulaires d'exercices
+  - Bibliothèque de vidéos avec prévisualisation, copie URL, suppression
+  - Alternative : coller un lien YouTube/Vimeo
+  - APIs: POST /api/admin/upload-video, GET /api/videos/{id}, GET /api/admin/videos, DELETE /api/admin/videos/{id}
 - ✅ **Tests complets** - Backend et Frontend 100% passés
 
 ## Test Reports
