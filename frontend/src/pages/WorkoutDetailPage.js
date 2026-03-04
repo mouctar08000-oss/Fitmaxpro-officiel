@@ -3,12 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import ExercisePlayer from '../components/ExercisePlayer';
 import { Button } from '../components/ui/button.jsx';
 import { 
   ArrowLeft, Clock, Dumbbell, Play, X, 
   PlayCircle, StopCircle, PauseCircle, 
   Timer, TrendingUp, CheckCircle2, Flame,
-  Sparkles, ChevronDown, ChevronUp
+  Sparkles, ChevronDown, ChevronUp, MonitorPlay
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -28,6 +29,10 @@ const WorkoutDetailPage = () => {
   const [stretchingRoutine, setStretchingRoutine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeVideo, setActiveVideo] = useState(null);
+  
+  // Real-time exercise player mode
+  const [showExercisePlayer, setShowExercisePlayer] = useState(false);
+  const [exercisePlayerType, setExercisePlayerType] = useState(null); // 'workout', 'warmup', 'stretching'
   
   // Expanded sections
   const [warmupExpanded, setWarmupExpanded] = useState(false);
@@ -370,14 +375,29 @@ const WorkoutDetailPage = () => {
             {user && (
               <div className="flex gap-2 mb-4">
                 {!isActive ? (
-                  <Button
-                    onClick={(e) => { e.stopPropagation(); onStart(); }}
-                    className={isWarmup ? 'bg-orange-500 hover:bg-orange-600' : 'bg-purple-500 hover:bg-purple-600'}
-                    data-testid={`start-${type}-btn`}
-                  >
-                    <PlayCircle className="w-5 h-5 mr-2" />
-                    {isFr ? 'DÉMARRER' : 'START'}
-                  </Button>
+                  <>
+                    <Button
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setExercisePlayerType(type);
+                        setShowExercisePlayer(true);
+                      }}
+                      variant="outline"
+                      className={isWarmup ? 'border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white' : 'border-purple-500 text-purple-500 hover:bg-purple-500 hover:text-white'}
+                      data-testid={`${type}-video-mode-btn`}
+                    >
+                      <MonitorPlay className="w-5 h-5 mr-2" />
+                      {isFr ? 'MODE VIDÉO' : 'VIDEO MODE'}
+                    </Button>
+                    <Button
+                      onClick={(e) => { e.stopPropagation(); onStart(); }}
+                      className={isWarmup ? 'bg-orange-500 hover:bg-orange-600' : 'bg-purple-500 hover:bg-purple-600'}
+                      data-testid={`start-${type}-btn`}
+                    >
+                      <PlayCircle className="w-5 h-5 mr-2" />
+                      {isFr ? 'DÉMARRER' : 'START'}
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button
@@ -535,7 +555,19 @@ const WorkoutDetailPage = () => {
             style={{ backgroundImage: `url(${workout.image_url})` }}
           >
             {!sessionActive && !warmupActive && user && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-4">
+                <Button
+                  onClick={() => {
+                    setExercisePlayerType('warmup');
+                    setShowExercisePlayer(true);
+                  }}
+                  variant="outline"
+                  className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white px-6 py-5 text-lg font-bold rounded-sm"
+                  data-testid="warmup-video-mode-btn"
+                >
+                  <MonitorPlay className="w-6 h-6 mr-2" />
+                  {isFr ? 'MODE VIDÉO' : 'VIDEO MODE'}
+                </Button>
                 <Button
                   onClick={startWarmup}
                   className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-6 text-xl font-bold rounded-sm hover:shadow-[0_0_30px_rgba(249,115,22,0.5)] transition-all hover:scale-105"
@@ -605,14 +637,28 @@ const WorkoutDetailPage = () => {
                 {isFr ? 'SÉANCE PRINCIPALE' : 'MAIN WORKOUT'}
               </h2>
               {user && !sessionActive && (
-                <Button
-                  onClick={startSession}
-                  className="bg-[#EF4444] hover:bg-[#DC2626]"
-                  data-testid="start-session-btn"
-                >
-                  <PlayCircle className="w-5 h-5 mr-2" />
-                  {isFr ? 'DÉMARRER' : 'START'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      setExercisePlayerType('workout');
+                      setShowExercisePlayer(true);
+                    }}
+                    variant="outline"
+                    className="border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white"
+                    data-testid="video-mode-btn"
+                  >
+                    <MonitorPlay className="w-5 h-5 mr-2" />
+                    {isFr ? 'MODE VIDÉO' : 'VIDEO MODE'}
+                  </Button>
+                  <Button
+                    onClick={startSession}
+                    className="bg-[#EF4444] hover:bg-[#DC2626]"
+                    data-testid="start-session-btn"
+                  >
+                    <PlayCircle className="w-5 h-5 mr-2" />
+                    {isFr ? 'DÉMARRER' : 'START'}
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -762,6 +808,24 @@ const WorkoutDetailPage = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Real-time Exercise Player */}
+          {showExercisePlayer && (
+            <ExercisePlayer
+              exercises={
+                exercisePlayerType === 'workout' 
+                  ? workout?.exercises || []
+                  : exercisePlayerType === 'warmup'
+                    ? warmupRoutine?.exercises || []
+                    : stretchingRoutine?.exercises || []
+              }
+              onComplete={() => {
+                setShowExercisePlayer(false);
+                toast.success(isFr ? '🎉 Séance terminée ! Bravo !' : '🎉 Workout complete! Great job!');
+              }}
+              onClose={() => setShowExercisePlayer(false)}
+            />
           )}
         </div>
       </div>

@@ -275,7 +275,7 @@ GET /api/workouts?program_type=yoga
 - ✅ **Authentification Améliorée** :
   - Bouton œil pour voir/masquer mot de passe (Login + Signup)
   - Lien "Mot de passe oublié ?" avec page dédiée
-  - Session persistante (localStorage) - plus besoin de se reconnecter
+  - Session persistante (1 an + auto-renouvellement) - plus besoin de se reconnecter
   - API /api/auth/forgot-password pour réinitialisation
 - ✅ **Système d'Upload de Vidéos d'Exercices** :
   - Nouvel onglet "Vidéos" dans l'admin panel
@@ -284,7 +284,17 @@ GET /api/workouts?program_type=yoga
   - Composant VideoUploader intégré dans les formulaires d'exercices
   - Bibliothèque de vidéos avec prévisualisation, copie URL, suppression
   - Alternative : coller un lien YouTube/Vimeo
-  - APIs: POST /api/admin/upload-video, GET /api/videos/{id}, GET /api/admin/videos, DELETE /api/admin/videos/{id}
+- ✅ **Mode "Vidéo en Temps Réel" pour Séances** :
+  - Bouton "MODE VIDÉO" sur toutes les séances (workout, échauffement, étirements)
+  - ExercisePlayer plein écran avec vidéo + instructions
+  - Timer automatique pour exercices chronométrés et temps de repos
+  - Navigation entre exercices avec liste complète
+  - Suivi des sets complétés
+  - Support vidéos YouTube et uploadées
+- ✅ **Séances Abdominaux Complètes** :
+  - 18 programmes d'abdos (Débutant, Intermédiaire, Avancé)
+  - FR + EN disponibles
+  - Chaque exercice avec vidéo YouTube explicative
 - ✅ **Tests complets** - Backend et Frontend 100% passés
 
 ## Test Reports
