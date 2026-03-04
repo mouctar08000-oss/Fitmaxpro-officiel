@@ -25,6 +25,7 @@ import LiveStreamPage from './pages/LiveStreamPage';
 import CallPage from './pages/CallPage';
 import RunningPage from './pages/RunningPage';
 import RewardsPage from './pages/RewardsPage';
+import HallOfFamePage from './pages/HallOfFamePage';
 import './i18n';
 import './App.css';
 
@@ -123,6 +124,8 @@ function AppRouter() {
           <RewardsPage />
         </ProtectedRoute>
       } />
+      
+      <Route path="/hall-of-fame" element={<HallOfFamePage />} />
     </Routes>
   );
 }

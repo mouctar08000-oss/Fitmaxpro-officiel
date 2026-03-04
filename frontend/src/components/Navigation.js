@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button.jsx';
-import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video, Footprints, Gift, Radio, Star } from 'lucide-react';
+import { Menu, X, Dumbbell, LogOut, User, Globe, Settings, TrendingUp, MessageCircle, Bell, Video, Footprints, Gift, Radio, Star, Trophy } from 'lucide-react';
 
 const Navigation = () => {
   const { t, i18n } = useTranslation();
@@ -147,6 +147,16 @@ const Navigation = () => {
                 >
                   <Gift className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Récompenses' : 'Rewards'}
+                </button>
+                <button
+                  data-testid="nav-hall-of-fame"
+                  onClick={() => navigate('/hall-of-fame')}
+                  className={`flex items-center gap-1 hover:text-yellow-400 transition-colors ${
+                    isActive('/hall-of-fame') ? 'text-yellow-400' : 'text-gray-400'
+                  }`}
+                >
+                  <Trophy className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Classement' : 'Rankings'}
                 </button>
                 <button
                   data-testid="nav-reviews"
@@ -300,6 +310,13 @@ const Navigation = () => {
                 >
                   <Gift className="w-4 h-4" />
                   {i18n.language?.startsWith('fr') ? 'Récompenses' : 'Rewards'}
+                </button>
+                <button
+                  onClick={() => { navigate('/hall-of-fame'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left text-yellow-400 hover:text-white transition-colors"
+                >
+                  <Trophy className="w-4 h-4" />
+                  {i18n.language?.startsWith('fr') ? 'Hall of Fame' : 'Hall of Fame'}
                 </button>
                 <button
                   onClick={() => { navigate('/reviews'); setMobileMenuOpen(false); }}

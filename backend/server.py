@@ -5927,6 +5927,68 @@ async def get_user_badges(current_user: User = Depends(get_current_user)):
         "unlock_history": badge_unlocks
     }
 
+@api_router.get("/rewards/hall-of-fame")
+async def get_hall_of_fame(limit: int = 50):
+    """Get the Hall of Fame - Top users ranked by badges and points"""
+    # Get all users with points
+    users_with_points = await db.user_points.find(
+        {"lifetime_points": {"$gt": 0}},
+        {"_id": 0}
+    ).sort("lifetime_points", -1).limit(limit).to_list(limit)
+    
+    # Enrich with user info and badge data
+    hall_of_fame = []
+    for i, user_data in enumerate(users_with_points):
+        user_id = user_data.get("user_id")
+        lifetime_points = user_data.get("lifetime_points", 0)
+        
+        # Get user info
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+        if not user:
+            continue
+        
+        # Get badge info
+        current_badge = get_badge_for_points(lifetime_points)
+        
+        # Get badge unlock count
+        badges_unlocked = sum(1 for b in POINT_BADGES if lifetime_points >= b["threshold"])
+        
+        # Get recent activity
+        recent_workout = await db.workout_sessions.find_one(
+            {"user_id": user_id, "completed": True},
+            {"_id": 0},
+            sort=[("ended_at", -1)]
+        )
+        
+        hall_of_fame.append({
+            "rank": i + 1,
+            "user_id": user_id,
+            "name": user.get("name", "Anonymous"),
+            "picture": user.get("picture"),
+            "lifetime_points": lifetime_points,
+            "total_points": user_data.get("total_points", 0),
+            "badge": current_badge,
+            "badges_unlocked": badges_unlocked,
+            "total_badges": len(POINT_BADGES),
+            "subscription_tier": user.get("subscription_tier", "none"),
+            "last_active": recent_workout.get("ended_at") if recent_workout else None
+        })
+    
+    # Get badge distribution stats
+    badge_distribution = {}
+    for badge in POINT_BADGES:
+        count = await db.user_points.count_documents({
+            "lifetime_points": {"$gte": badge["threshold"]}
+        })
+        badge_distribution[badge["id"]] = count
+    
+    return {
+        "hall_of_fame": hall_of_fame,
+        "total_users": len(hall_of_fame),
+        "badge_distribution": badge_distribution,
+        "badges_info": POINT_BADGES
+    }
+
 # Admin: Give points to user
 class GivePointsRequest(BaseModel):
     user_id: str

@@ -150,10 +150,13 @@ Pour activer toutes les fonctionnalités, configurer dans `.env` :
 - ✅ **Intégration RevenueCat Complète** - Vérification automatique des achats
 - ✅ **Tableau de Bord des Points** - Widget visuel sur le Dashboard
 - ✅ **Système de Badges par Paliers** - 7 niveaux de badges avec progression
-- ✅ **Notifications Push Badge** - Envoi automatique quand un badge est débloqué:
-  - "🥈 Nouveau Badge Débloqué ! Félicitations ! Vous avez atteint le niveau Argent !"
-  - Historique des badges débloqués avec timestamps
-  - API `/api/rewards/badges` pour récupérer tous les badges
+- ✅ **Notifications Push Badge** - Envoi automatique quand badge débloqué
+- ✅ **Hall of Fame** - Page de classement des utilisateurs par badges:
+  - Podium Top 3 visuel avec stands
+  - Distribution des badges (filtres cliquables)
+  - Classement complet avec rang, badge, points
+  - Statistiques globales (membres, légendes, moyenne, record)
+  - Lien dans la navigation "Classement"
 - ✅ **Archive Code Source** - ZIP propre sans données sensibles
 
 ### March 3, 2026 - Sessions 1-4
