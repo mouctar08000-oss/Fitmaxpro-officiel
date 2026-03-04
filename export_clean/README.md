@@ -1,28 +1,29 @@
-# FitMaxPro - Application de Fitness Complète
+# FitMaxPro - Application de Fitness Complète 💪
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://reactjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-6+-47A248.svg)](https://www.mongodb.com/)
 
 Application de fitness professionnelle avec programmes d'entraînement, défis hebdomadaires, système de badges, appels vidéo, live streaming, et bien plus.
 
 ## 🚀 Fonctionnalités
 
 ### Pour les utilisateurs
-- **138+ programmes d'entraînement** (Prise de masse, Perte de poids, Abdos, Jambes, Yoga, Programme Femmes)
-- **Vidéos explicatives** pour chaque exercice
+- **138+ programmes d'entraînement** avec vidéos explicatives
 - **Défis hebdomadaires** avec récompenses en points
-- **Système de badges** (Débutant → Bronze → Argent → Or → Platine → Diamant → Légende)
-- **Hall of Fame** - Classement des membres par badges
-- **Suivi de course à pied** avec GPS, historique, statistiques et classements
-- **Plans nutritionnels** avec recettes détaillées
-- **Système de points et récompenses**
+- **Système de badges** (Débutant → Légende)
+- **Hall of Fame** - Classement communautaire
+- **Suivi de course à pied** avec GPS
+- **Plans nutritionnels** détaillés
 - **Messagerie avec le coach**
-- **Appels audio/vidéo** avec le coach (via LiveKit)
+- **Appels audio/vidéo** (via LiveKit)
 - **Live streaming** pour les séances en groupe
 
 ### Pour l'administrateur
 - Gestion complète des utilisateurs et abonnements
-- Création et modification des programmes
-- Upload de vidéos d'exercices
-- Gestion des réseaux sociaux
-- Attribution de points bonus
+- Création/modification des programmes et exercices
+- Upload de vidéos personnalisées
 - Statistiques détaillées
 - Notifications push broadcast
 
@@ -31,11 +32,18 @@ Application de fitness professionnelle avec programmes d'entraînement, défis h
 - Node.js 18+
 - Python 3.9+
 - MongoDB 6+
-- Yarn (recommandé) ou npm
+- Yarn (recommandé)
 
 ## 🛠️ Installation
 
-### Backend
+### 1. Cloner le repository
+
+```bash
+git clone https://github.com/your-username/fitmaxpro.git
+cd fitmaxpro
+```
+
+### 2. Configuration Backend
 
 ```bash
 cd backend
@@ -50,13 +58,13 @@ pip install -r requirements.txt
 
 # Configurer les variables d'environnement
 cp .env.example .env
-# Éditez .env avec vos clés API
+# ⚠️ IMPORTANT: Éditez .env avec vos vraies valeurs
 
 # Lancer le serveur
 uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-### Frontend
+### 3. Configuration Frontend
 
 ```bash
 cd frontend
@@ -66,116 +74,119 @@ yarn install
 
 # Configurer les variables d'environnement
 cp .env.example .env
-# Éditez .env avec l'URL de votre backend
+# ⚠️ IMPORTANT: Éditez .env avec vos vraies valeurs
 
 # Lancer en développement
 yarn start
-
-# Build pour production
-yarn build
 ```
 
-## 🔑 Configuration des Services
+## 🔑 Configuration des Services Externes
 
 ### Stripe (Paiements) - Obligatoire
 1. Créez un compte sur [stripe.com](https://stripe.com)
-2. Dashboard > Developers > API Keys
-3. Copiez `STRIPE_API_KEY` (secret) et `STRIPE_PUBLIC_KEY` dans `.env`
+2. Récupérez vos clés dans Dashboard > Developers > API Keys
+3. Ajoutez-les dans `backend/.env` et `frontend/.env`
 
 ### Resend (Emails) - Recommandé
 1. Créez un compte sur [resend.com](https://resend.com)
 2. Créez une clé API
-3. Ajoutez `RESEND_API_KEY` dans `.env`
+3. Ajoutez-la dans `backend/.env`
 
 ### LiveKit (Appels Vidéo) - Optionnel
-1. Créez un compte sur [cloud.livekit.io](https://cloud.livekit.io) (gratuit)
-2. Créez un projet
-3. Settings > Keys
-4. Ajoutez `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
+1. Créez un compte sur [cloud.livekit.io](https://cloud.livekit.io)
+2. Créez un projet et récupérez vos clés
+3. Ajoutez-les dans `backend/.env`
+4. *Note: L'app fonctionne en mode démo sans ces clés*
 
-### RevenueCat (Achats In-App) - Pour mobile
+### RevenueCat (In-App Purchases) - Mobile uniquement
 1. Créez un compte sur [revenuecat.com](https://revenuecat.com)
 2. Configurez vos produits iOS/Android
-3. Ajoutez `REVENUECAT_API_KEY`
-
-## 📱 Déploiement Mobile (Capacitor)
-
-```bash
-cd frontend
-
-# Build production
-yarn build
-
-# Synchroniser avec Capacitor
-npx cap sync
-
-# Ouvrir dans Android Studio
-npx cap open android
-
-# Ouvrir dans Xcode
-npx cap open ios
-```
+3. Ajoutez la clé dans `backend/.env`
 
 ## 📁 Structure du Projet
 
 ```
 fitmaxpro/
 ├── backend/
-│   ├── server.py           # API FastAPI (~6500 lignes)
+│   ├── server.py           # API FastAPI
 │   ├── requirements.txt    # Dépendances Python
 │   ├── uploads/videos/     # Vidéos uploadées
-│   └── .env.example        # Template configuration
+│   └── .env.example        # Template config
 ├── frontend/
 │   ├── src/
-│   │   ├── components/     # Composants React réutilisables
-│   │   ├── pages/          # Pages de l'application
-│   │   ├── context/        # Contextes React (Auth)
-│   │   └── hooks/          # Hooks personnalisés
+│   │   ├── components/     # Composants React
+│   │   ├── pages/          # Pages de l'app
+│   │   └── context/        # Contextes React
 │   ├── public/             # Assets statiques
-│   ├── package.json        # Dépendances Node
-│   └── .env.example        # Template configuration
-├── README.md
-├── docker-compose.yml      # Configuration Docker
-└── GUIDE_APP_STORES.md     # Guide publication stores
+│   └── .env.example        # Template config
+├── docker-compose.yml      # Config Docker
+└── README.md
 ```
 
-## 🎯 Fonctionnalités Principales
+## 🐳 Déploiement avec Docker
 
-### Défis Hebdomadaires
-- 6 défis différents chaque semaine
-- Récompenses de 50 à 150 points
-- Progression en temps réel
-- Notifications à la complétion
+```bash
+# Build et lancement
+docker-compose up -d
 
-### Système de Badges
-| Badge | Points requis | Emoji |
-|-------|--------------|-------|
-| Débutant | 0 | 🔘 |
-| Bronze | 100 | 🥉 |
-| Argent | 500 | 🥈 |
-| Or | 1000 | 🥇 |
-| Platine | 2500 | 💎 |
-| Diamant | 5000 | 💠 |
-| Légende | 10000 | 👑 |
+# Vérifier les logs
+docker-compose logs -f
+```
 
-### Points Automatiques
-- +15 pts par séance complétée
-- +1 pt par minute d'entraînement (max 30)
-- +25 pts premier workout du jour
-- +5-50 pts bonus série de jours consécutifs
-- +25 pts par avis laissé
+## 📱 Déploiement Mobile (Capacitor)
+
+```bash
+cd frontend
+yarn build
+npx cap sync
+npx cap open android  # ou: npx cap open ios
+```
 
 ## 🔒 Sécurité
 
-- **Ne jamais commiter** les fichiers `.env`
-- Utilisez des clés de test Stripe en développement
+⚠️ **IMPORTANT pour les repositories publics :**
+
+- **NE JAMAIS** commiter les fichiers `.env`
+- Utilisez toujours `.env.example` comme template
 - Les mots de passe sont hashés avec bcrypt
 - Sessions JWT avec expiration
+- Validez le `.gitignore` avant chaque commit
 
-## 📞 Support
+## 🎯 Système de Points
 
-Pour toute question, contactez l'équipe de développement.
+| Action | Points |
+|--------|--------|
+| Séance complétée | +15 pts |
+| Bonus par minute | +1 pt (max 30) |
+| Premier workout du jour | +25 pts |
+| Série de jours | +5-50 pts |
+| Avis laissé | +25 pts |
+| Défi hebdomadaire | +50-150 pts |
+
+## 🏆 Badges
+
+| Badge | Points requis |
+|-------|--------------|
+| 🔘 Débutant | 0 |
+| 🥉 Bronze | 100 |
+| 🥈 Argent | 500 |
+| 🥇 Or | 1000 |
+| 💎 Platine | 2500 |
+| 💠 Diamant | 5000 |
+| 👑 Légende | 10000 |
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
 
 ## 📄 Licence
 
-Propriétaire - Tous droits réservés
+Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
+
+## 📞 Support
+
+Pour toute question, ouvrez une issue sur GitHub.
+
+---
+
+Développé avec ❤️ par l'équipe FitMaxPro

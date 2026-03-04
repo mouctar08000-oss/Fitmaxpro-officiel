@@ -1,62 +1,88 @@
 # ===========================================
-# FitMaxPro .gitignore
+# FitMaxPro - Git Ignore
 # ===========================================
 
-# Dependencies
+# ==================== ENVIRONMENT FILES ====================
+# CRITICAL: Never commit these files!
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+backend/.env
+frontend/.env
+
+# ==================== DEPENDENCIES ====================
 node_modules/
 __pycache__/
 *.pyc
 *.pyo
-.venv/
+*.pyd
+.Python
 venv/
 env/
+.venv/
+ENV/
 
-# Environment files (IMPORTANT: Never commit these!)
-.env
-.env.local
-.env.production
-.env.development
-backend/.env
-frontend/.env
-
-# Build outputs
+# ==================== BUILD OUTPUTS ====================
 build/
 dist/
 *.egg-info/
 .eggs/
+frontend/build/
+*.bundle.js
+*.bundle.js.map
 
-# IDE
+# ==================== IDE & EDITORS ====================
 .idea/
 .vscode/
 *.swp
 *.swo
-.DS_Store
+*.sublime-workspace
+*.sublime-project
+.project
+.settings/
+.classpath
 
-# Logs
+# ==================== OS FILES ====================
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ==================== LOGS ====================
 *.log
 logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Testing
+# ==================== TESTING ====================
 coverage/
 .coverage
 htmlcov/
 .pytest_cache/
+.tox/
+.nox/
 
-# Uploads (user content)
+# ==================== UPLOADS (User Content) ====================
 backend/uploads/videos/*
 !backend/uploads/videos/.gitkeep
 
-# Mobile builds
+# ==================== MOBILE BUILDS ====================
 android/
 ios/
 *.apk
 *.ipa
 *.aab
 
-# Misc
+# ==================== MISC ====================
 *.zip
+*.tar.gz
+*.rar
 .emergent/
 test_reports/
+*.bak
+*.tmp
