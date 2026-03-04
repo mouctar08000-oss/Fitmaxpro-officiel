@@ -371,6 +371,70 @@ async def login(request: LoginRequest, response: Response):
         logging.error(f"Login error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Send password reset email"""
+    try:
+        user = await db.users.find_one({"email": request.email})
+        
+        if user:
+            # Generate reset token
+            reset_token = f"reset_{uuid.uuid4().hex}"
+            expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+            
+            # Store reset token
+            await db.password_resets.update_one(
+                {"user_id": user["user_id"]},
+                {"$set": {
+                    "user_id": user["user_id"],
+                    "token": reset_token,
+                    "expires_at": expires_at,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }},
+                upsert=True
+            )
+            
+            # Send email with reset link (using Resend if configured)
+            app_url = os.environ.get("APP_URL", "https://fitmax-gains.preview.emergentagent.com")
+            reset_link = f"{app_url}/reset-password?token={reset_token}"
+            
+            # Try to send email
+            try:
+                resend_key = os.environ.get("RESEND_API_KEY")
+                sender_email = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+                
+                if resend_key:
+                    import resend
+                    resend.api_key = resend_key
+                    
+                    resend.Emails.send({
+                        "from": f"FitMaxPro <{sender_email}>",
+                        "to": request.email,
+                        "subject": "Réinitialisation de votre mot de passe FitMaxPro",
+                        "html": f"""
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #EF4444;">FitMaxPro</h2>
+                            <p>Bonjour {user.get('name', '')},</p>
+                            <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
+                            <p>Cliquez sur le lien ci-dessous pour créer un nouveau mot de passe :</p>
+                            <p><a href="{reset_link}" style="background-color: #EF4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Réinitialiser mon mot de passe</a></p>
+                            <p style="color: #666; font-size: 12px;">Ce lien expire dans 1 heure.</p>
+                            <p style="color: #666; font-size: 12px;">Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+                        </div>
+                        """
+                    })
+            except Exception as email_error:
+                logging.error(f"Email send error: {email_error}")
+        
+        # Always return success (security - don't reveal if email exists)
+        return {"message": "If an account exists with this email, a reset link has been sent."}
+    except Exception as e:
+        logging.error(f"Forgot password error: {e}")
+        return {"message": "If an account exists with this email, a reset link has been sent."}
+
 # Payment Endpoints
 import stripe
 

@@ -272,6 +272,15 @@ GET /api/workouts?program_type=yoga
   - Chaque réseau social peut être enregistré séparément (bouton ✓ vert)
   - Suppression individuelle (bouton poubelle rouge)
   - APIs: PUT /api/admin/social-link, DELETE /api/admin/social-link/{platform}
+- ✅ **Authentification Améliorée** :
+  - Bouton œil pour voir/masquer mot de passe (Login + Signup)
+  - Lien "Mot de passe oublié ?" avec page dédiée
+  - Session persistante (localStorage) - plus besoin de se reconnecter
+  - API /api/auth/forgot-password pour réinitialisation
+- ✅ **Vidéos d'Exercices** :
+  - Support YouTube, Vimeo et fichiers MP4 directs
+  - Modal vidéo amélioré pour regarder pendant l'exercice
+  - Admin peut ajouter video_url pour chaque exercice
 - ✅ **Tests complets** - Backend et Frontend 100% passés
 
 ## Test Reports

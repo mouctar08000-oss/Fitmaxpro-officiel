@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 import Navigation from '../components/Navigation';
-import { LogIn } from 'lucide-react';
+import { LogIn, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,7 @@ const LoginPage = () => {
   const { setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = () => {
@@ -42,9 +43,14 @@ const LoginPage = () => {
         { withCredentials: true }
       );
 
-      // Store token in localStorage as backup
+      // Store token in localStorage for persistent login
       if (response.data.session_token) {
         localStorage.setItem('session_token', response.data.session_token);
+      }
+      
+      // Store user data in localStorage for persistence
+      if (response.data.user) {
+        localStorage.setItem('user_data', JSON.stringify(response.data.user));
       }
 
       setUser(response.data.user);
@@ -89,24 +95,44 @@ const LoginPage = () => {
                 />
               </div>
               
-              <div>
+              <div className="relative">
                 <Input
                   data-testid="password-input"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder={t('login.password')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0"
+                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0 pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-2"
+                  data-testid="toggle-password-visibility"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {/* Forgot Password Link */}
+              <div className="text-right">
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                  data-testid="forgot-password-link"
+                >
+                  Mot de passe oublié ?
+                </Link>
               </div>
 
               <Button 
                 data-testid="login-submit-btn"
                 type="submit"
+                disabled={loading}
                 className="w-full bg-[#FAFAFA] text-[#09090b] hover:bg-white font-bold py-6 rounded-sm hover:shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-all hover:-translate-y-1"
               >
                 <LogIn className="w-5 h-5 mr-2" />
-                {t('login.loginBtn')}
+                {loading ? 'Connexion...' : t('login.loginBtn')}
               </Button>
             </form>
 

@@ -701,30 +701,64 @@ const WorkoutDetailPage = () => {
             isCompleted={stretchingCompleted}
           />
 
-          {/* Video Modal */}
+          {/* Video Modal - Enhanced for real-time workout viewing */}
           {activeVideo && (
             <div 
-              className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
               onClick={() => setActiveVideo(null)}
             >
               <div 
-                className="relative w-full max-w-4xl bg-[#121212] rounded-md overflow-hidden"
+                className="relative w-full max-w-5xl bg-[#121212] rounded-lg overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
-                <button
-                  onClick={() => setActiveVideo(null)}
-                  className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-                <div className="aspect-video">
-                  <iframe
-                    src={`${activeVideo}?autoplay=1`}
-                    title="Exercise Video"
-                    className="w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                <div className="flex items-center justify-between p-4 bg-[#09090b] border-b border-[#27272a]">
+                  <div className="flex items-center gap-3">
+                    <Play className="w-5 h-5 text-[#EF4444]" />
+                    <span className="font-bold">{isFr ? 'Vidéo Explicative' : 'Exercise Video'}</span>
+                  </div>
+                  <button
+                    onClick={() => setActiveVideo(null)}
+                    className="w-10 h-10 bg-white/10 hover:bg-red-500/20 rounded-full flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                <div className="aspect-video bg-black">
+                  {/* Support for YouTube, Vimeo, and direct video URLs */}
+                  {activeVideo.includes('youtube.com') || activeVideo.includes('youtu.be') ? (
+                    <iframe
+                      src={activeVideo.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/') + (activeVideo.includes('?') ? '&' : '?') + 'autoplay=1'}
+                      title="Exercise Video"
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : activeVideo.includes('vimeo.com') ? (
+                    <iframe
+                      src={activeVideo.replace('vimeo.com/', 'player.vimeo.com/video/') + '?autoplay=1'}
+                      title="Exercise Video"
+                      className="w-full h-full"
+                      allow="autoplay; fullscreen; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      src={activeVideo}
+                      className="w-full h-full"
+                      controls
+                      autoPlay
+                      loop
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                </div>
+                <div className="p-4 bg-[#09090b] border-t border-[#27272a]">
+                  <p className="text-gray-400 text-sm text-center">
+                    {isFr 
+                      ? '💡 Astuce : Regardez la vidéo et faites l\'exercice en même temps pour une forme parfaite !'
+                      : '💡 Tip: Watch the video and do the exercise at the same time for perfect form!'}
+                  </p>
                 </div>
               </div>
             </div>

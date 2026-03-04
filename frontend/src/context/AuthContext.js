@@ -19,9 +19,21 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const checkAuth = async () => {
+    // Check for OAuth redirect
     if (window.location.hash?.includes('session_id=')) {
       setLoading(false);
       return;
+    }
+
+    // First, try to load cached user from localStorage for instant UI
+    const cachedUser = localStorage.getItem('user_data');
+    if (cachedUser) {
+      try {
+        const userData = JSON.parse(cachedUser);
+        setUser(userData);
+      } catch (e) {
+        localStorage.removeItem('user_data');
+      }
     }
 
     try {
@@ -33,10 +45,20 @@ export const AuthProvider = ({ children }) => {
         withCredentials: true,
         headers
       });
+      
+      // Update user with fresh data from server
       setUser(response.data);
+      // Update cached user data
+      localStorage.setItem('user_data', JSON.stringify(response.data));
     } catch (error) {
-      setUser(null);
-      localStorage.removeItem('session_token');
+      // Only clear if we get an auth error, not network error
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setUser(null);
+        localStorage.removeItem('session_token');
+        localStorage.removeItem('user_data');
+      }
+      // If network error but we have cached user, keep them logged in
+      // The cached user data will be used
     } finally {
       setLoading(false);
     }
@@ -55,17 +77,27 @@ export const AuthProvider = ({ children }) => {
         withCredentials: true,
         headers
       });
-      setUser(null);
-      localStorage.removeItem('session_token');
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      // Always clear local storage on logout
+      setUser(null);
       localStorage.removeItem('session_token');
+      localStorage.removeItem('user_data');
+    }
+  };
+
+  // Function to update user and persist
+  const updateUser = (userData) => {
+    setUser(userData);
+    if (userData) {
+      localStorage.setItem('user_data', JSON.stringify(userData));
     }
   };
 
   const value = {
     user,
-    setUser,
+    setUser: updateUser,
     loading,
     logout,
     checkAuth

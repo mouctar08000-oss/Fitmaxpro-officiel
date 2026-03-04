@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 import Navigation from '../components/Navigation';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +22,8 @@ const SignupPage = () => {
     password: '',
     confirmPassword: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -66,6 +68,16 @@ const SignupPage = () => {
         },
         { withCredentials: true }
       );
+
+      // Store token in localStorage for persistent login
+      if (response.data.session_token) {
+        localStorage.setItem('session_token', response.data.session_token);
+      }
+      
+      // Store user data in localStorage for persistence
+      if (response.data.user) {
+        localStorage.setItem('user_data', JSON.stringify(response.data.user));
+      }
 
       setUser(response.data.user);
       toast.success('Compte créé avec succès !');
@@ -122,28 +134,44 @@ const SignupPage = () => {
                 />
               </div>
               
-              <div>
+              <div className="relative">
                 <Input
                   data-testid="password-input"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   placeholder="Mot de passe (min. 6 caractères)"
                   value={formData.password}
                   onChange={handleChange}
-                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0"
+                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0 pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-2"
+                  data-testid="toggle-password-visibility"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
               
-              <div>
+              <div className="relative">
                 <Input
                   data-testid="confirm-password-input"
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
                   placeholder="Confirmer le mot de passe"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0"
+                  className="bg-transparent border-b border-white/20 rounded-none focus:border-white focus:ring-0 px-0 pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-2"
+                  data-testid="toggle-confirm-password-visibility"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
 
               <Button 
