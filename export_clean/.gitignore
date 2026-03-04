@@ -1,0 +1,62 @@
+# ===========================================
+# FitMaxPro .gitignore
+# ===========================================
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Environment files (IMPORTANT: Never commit these!)
+.env
+.env.local
+.env.production
+.env.development
+backend/.env
+frontend/.env
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Uploads (user content)
+backend/uploads/videos/*
+!backend/uploads/videos/.gitkeep
+
+# Mobile builds
+android/
+ios/
+*.apk
+*.ipa
+*.aab
+
+# Misc
+*.zip
+.emergent/
+test_reports/
