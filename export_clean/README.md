@@ -1,12 +1,15 @@
 # FitMaxPro - Application de Fitness Complète
 
-Application de fitness professionnelle avec programmes d'entraînement, suivi nutritionnel, appels vidéo, live streaming, et système de récompenses.
+Application de fitness professionnelle avec programmes d'entraînement, défis hebdomadaires, système de badges, appels vidéo, live streaming, et bien plus.
 
-## Fonctionnalités
+## 🚀 Fonctionnalités
 
 ### Pour les utilisateurs
 - **138+ programmes d'entraînement** (Prise de masse, Perte de poids, Abdos, Jambes, Yoga, Programme Femmes)
 - **Vidéos explicatives** pour chaque exercice
+- **Défis hebdomadaires** avec récompenses en points
+- **Système de badges** (Débutant → Bronze → Argent → Or → Platine → Diamant → Légende)
+- **Hall of Fame** - Classement des membres par badges
 - **Suivi de course à pied** avec GPS, historique, statistiques et classements
 - **Plans nutritionnels** avec recettes détaillées
 - **Système de points et récompenses**
@@ -19,15 +22,18 @@ Application de fitness professionnelle avec programmes d'entraînement, suivi nu
 - Création et modification des programmes
 - Upload de vidéos d'exercices
 - Gestion des réseaux sociaux
+- Attribution de points bonus
 - Statistiques détaillées
 - Notifications push broadcast
 
-## Installation
+## 📋 Prérequis
 
-### Prérequis
 - Node.js 18+
 - Python 3.9+
 - MongoDB 6+
+- Yarn (recommandé) ou npm
+
+## 🛠️ Installation
 
 ### Backend
 
@@ -69,70 +75,30 @@ yarn start
 yarn build
 ```
 
-## Configuration des Services Externes
+## 🔑 Configuration des Services
 
-### Stripe (Paiements)
+### Stripe (Paiements) - Obligatoire
 1. Créez un compte sur [stripe.com](https://stripe.com)
-2. Récupérez vos clés API dans Dashboard > Developers > API Keys
-3. Ajoutez `STRIPE_API_KEY` et `STRIPE_PUBLIC_KEY` dans `.env`
+2. Dashboard > Developers > API Keys
+3. Copiez `STRIPE_API_KEY` (secret) et `STRIPE_PUBLIC_KEY` dans `.env`
 
-### Resend (Emails)
+### Resend (Emails) - Recommandé
 1. Créez un compte sur [resend.com](https://resend.com)
 2. Créez une clé API
 3. Ajoutez `RESEND_API_KEY` dans `.env`
 
-### LiveKit (Appels Vidéo)
-1. Créez un compte sur [livekit.io](https://livekit.io)
-2. Créez un projet cloud gratuit
-3. Ajoutez `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` dans `.env`
+### LiveKit (Appels Vidéo) - Optionnel
+1. Créez un compte sur [cloud.livekit.io](https://cloud.livekit.io) (gratuit)
+2. Créez un projet
+3. Settings > Keys
+4. Ajoutez `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
 
-### RevenueCat (Achats In-App)
+### RevenueCat (Achats In-App) - Pour mobile
 1. Créez un compte sur [revenuecat.com](https://revenuecat.com)
 2. Configurez vos produits iOS/Android
-3. Ajoutez `REVENUECAT_API_KEY` dans `.env`
+3. Ajoutez `REVENUECAT_API_KEY`
 
-## Structure du Projet
-
-```
-fitmaxpro/
-├── backend/
-│   ├── server.py          # API FastAPI principale
-│   ├── requirements.txt   # Dépendances Python
-│   ├── uploads/           # Fichiers uploadés
-│   └── .env.example       # Template des variables
-├── frontend/
-│   ├── src/
-│   │   ├── components/    # Composants React
-│   │   ├── pages/         # Pages de l'application
-│   │   └── context/       # Contextes React
-│   ├── public/            # Assets statiques
-│   ├── package.json       # Dépendances Node
-│   └── .env.example       # Template des variables
-└── README.md
-```
-
-## API Endpoints Principaux
-
-### Authentification
-- `POST /api/auth/register` - Inscription
-- `POST /api/auth/login` - Connexion
-- `POST /api/auth/forgot-password` - Mot de passe oublié
-
-### Workouts
-- `GET /api/workouts` - Liste des programmes
-- `POST /api/workout/start` - Démarrer une séance
-- `POST /api/workout/end` - Terminer (+ points automatiques)
-
-### Course à Pied
-- `POST /api/running/log` - Enregistrer une course
-- `GET /api/running/stats` - Statistiques
-- `GET /api/running/leaderboard` - Classement
-
-### Paiements
-- `POST /api/checkout/create` - Créer une session Stripe
-- `POST /api/iap/verify-purchase` - Vérifier achat in-app
-
-## Déploiement Mobile (Capacitor)
+## 📱 Déploiement Mobile (Capacitor)
 
 ```bash
 cd frontend
@@ -150,14 +116,66 @@ npx cap open android
 npx cap open ios
 ```
 
-## Compte Admin par Défaut
+## 📁 Structure du Projet
 
-Après le premier démarrage, créez un compte admin en base de données ou utilisez le seed script fourni.
+```
+fitmaxpro/
+├── backend/
+│   ├── server.py           # API FastAPI (~6500 lignes)
+│   ├── requirements.txt    # Dépendances Python
+│   ├── uploads/videos/     # Vidéos uploadées
+│   └── .env.example        # Template configuration
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # Composants React réutilisables
+│   │   ├── pages/          # Pages de l'application
+│   │   ├── context/        # Contextes React (Auth)
+│   │   └── hooks/          # Hooks personnalisés
+│   ├── public/             # Assets statiques
+│   ├── package.json        # Dépendances Node
+│   └── .env.example        # Template configuration
+├── README.md
+├── docker-compose.yml      # Configuration Docker
+└── GUIDE_APP_STORES.md     # Guide publication stores
+```
 
-## Support
+## 🎯 Fonctionnalités Principales
+
+### Défis Hebdomadaires
+- 6 défis différents chaque semaine
+- Récompenses de 50 à 150 points
+- Progression en temps réel
+- Notifications à la complétion
+
+### Système de Badges
+| Badge | Points requis | Emoji |
+|-------|--------------|-------|
+| Débutant | 0 | 🔘 |
+| Bronze | 100 | 🥉 |
+| Argent | 500 | 🥈 |
+| Or | 1000 | 🥇 |
+| Platine | 2500 | 💎 |
+| Diamant | 5000 | 💠 |
+| Légende | 10000 | 👑 |
+
+### Points Automatiques
+- +15 pts par séance complétée
+- +1 pt par minute d'entraînement (max 30)
+- +25 pts premier workout du jour
+- +5-50 pts bonus série de jours consécutifs
+- +25 pts par avis laissé
+
+## 🔒 Sécurité
+
+- **Ne jamais commiter** les fichiers `.env`
+- Utilisez des clés de test Stripe en développement
+- Les mots de passe sont hashés avec bcrypt
+- Sessions JWT avec expiration
+
+## 📞 Support
 
 Pour toute question, contactez l'équipe de développement.
 
-## Licence
+## 📄 Licence
 
 Propriétaire - Tous droits réservés

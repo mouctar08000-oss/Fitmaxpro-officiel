@@ -15,7 +15,10 @@ import {
   Sparkles,
   Award,
   ShoppingBag,
-  History
+  History,
+  Target,
+  Flame,
+  Timer
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -30,13 +33,16 @@ const RewardsPage = () => {
   
   const isFr = t('language') === 'fr' || navigator.language?.startsWith('fr');
   
-  const [activeTab, setActiveTab] = useState('shop');
+  const [activeTab, setActiveTab] = useState('challenges');
   const [catalog, setCatalog] = useState([]);
   const [userPoints, setUserPoints] = useState(0);
   const [lifetimePoints, setLifetimePoints] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [myRewards, setMyRewards] = useState([]);
+  const [challenges, setChallenges] = useState([]);
+  const [challengesInfo, setChallengesInfo] = useState({});
   const [loading, setLoading] = useState(false);
+  const [claimingId, setClaimingId] = useState(null);
 
   const fetchCatalog = useCallback(async () => {
     try {
@@ -76,11 +82,54 @@ const RewardsPage = () => {
     }
   }, []);
 
+  const fetchChallenges = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.get(`${API}/api/challenges/weekly`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setChallenges(response.data.challenges || []);
+      setChallengesInfo({
+        week_start: response.data.week_start,
+        week_end: response.data.week_end,
+        days_remaining: response.data.days_remaining
+      });
+    } catch (err) {
+      console.error('Error fetching challenges:', err);
+    }
+  }, []);
+
+  const claimChallenge = async (challengeId) => {
+    setClaimingId(challengeId);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('session_token');
+      const response = await axios.post(
+        `${API}/api/challenges/claim/${challengeId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      toast.success(isFr 
+        ? `🎉 +${response.data.points_awarded} points gagnés !` 
+        : `🎉 +${response.data.points_awarded} points earned!`
+      );
+      
+      // Refresh data
+      fetchChallenges();
+      fetchPoints();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Error claiming reward');
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   useEffect(() => {
     fetchCatalog();
+    fetchChallenges();
     fetchPoints();
     fetchMyRewards();
-  }, [fetchCatalog, fetchPoints, fetchMyRewards]);
+  }, [fetchCatalog, fetchChallenges, fetchPoints, fetchMyRewards]);
 
   const handleRedeem = async (rewardId) => {
     setLoading(true);
@@ -165,26 +214,163 @@ const RewardsPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 bg-zinc-900 p-1 rounded-lg">
+        <div className="flex gap-2 mb-6 bg-zinc-900 p-1 rounded-lg overflow-x-auto">
           {[
+            { id: 'challenges', label: isFr ? 'Défis' : 'Challenges', icon: Target },
             { id: 'shop', label: isFr ? 'Boutique' : 'Shop', icon: ShoppingBag },
-            { id: 'my-rewards', label: isFr ? 'Mes Récompenses' : 'My Rewards', icon: Award },
+            { id: 'my-rewards', label: isFr ? 'Récompenses' : 'Rewards', icon: Award },
             { id: 'history', label: isFr ? 'Historique' : 'History', icon: History }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-colors whitespace-nowrap ${
                 activeTab === tab.id 
                   ? 'bg-purple-500 text-white' 
                   : 'text-gray-400 hover:text-white'
               }`}
             >
               <tab.icon className="w-4 h-4" />
-              {tab.label}
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
+
+        {/* Challenges Tab */}
+        {activeTab === 'challenges' && (
+          <div>
+            {/* Week Info */}
+            <div className="flex items-center justify-between mb-4 bg-gradient-to-r from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <Flame className="w-6 h-6 text-orange-500" />
+                <div>
+                  <h3 className="font-bold">{isFr ? 'Défis Hebdomadaires' : 'Weekly Challenges'}</h3>
+                  <p className="text-sm text-gray-400">
+                    {isFr 
+                      ? `Se termine dans ${challengesInfo.days_remaining || 0} jours` 
+                      : `Ends in ${challengesInfo.days_remaining || 0} days`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-orange-400">
+                <Timer className="w-5 h-5" />
+                <span className="font-bold">{challengesInfo.days_remaining || 0}j</span>
+              </div>
+            </div>
+
+            {/* Challenges Grid */}
+            <div className="space-y-3">
+              {challenges.map((challenge) => {
+                const isCompleted = challenge.is_completed;
+                const isClaimed = challenge.is_claimed;
+                
+                return (
+                  <div 
+                    key={challenge.id}
+                    className={`bg-zinc-900 border rounded-xl p-4 transition-all ${
+                      isClaimed 
+                        ? 'border-green-500/30 bg-green-500/5' 
+                        : isCompleted 
+                          ? 'border-yellow-500/50 bg-yellow-500/5' 
+                          : 'border-zinc-800 hover:border-purple-500/50'
+                    }`}
+                    data-testid={`challenge-${challenge.id}`}
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Emoji */}
+                      <div className={`text-3xl p-2 rounded-lg ${
+                        isClaimed ? 'bg-green-500/20' : isCompleted ? 'bg-yellow-500/20' : 'bg-zinc-800'
+                      }`}>
+                        {challenge.emoji}
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold">
+                            {isFr ? challenge.name_fr : challenge.name_en}
+                          </h3>
+                          {isClaimed && (
+                            <span className="bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              {isFr ? 'Réclamé' : 'Claimed'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-400 text-sm mb-3">
+                          {isFr ? challenge.description_fr : challenge.description_en}
+                        </p>
+                        
+                        {/* Progress Bar */}
+                        <div className="mb-2">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">
+                              {challenge.progress}/{challenge.target}
+                            </span>
+                            <span className={`font-bold ${
+                              isCompleted ? 'text-green-400' : 'text-purple-400'
+                            }`}>
+                              {challenge.percentage}%
+                            </span>
+                          </div>
+                          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full transition-all duration-500 ${
+                                isClaimed 
+                                  ? 'bg-green-500' 
+                                  : isCompleted 
+                                    ? 'bg-yellow-500' 
+                                    : 'bg-purple-500'
+                              }`}
+                              style={{ width: `${challenge.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Reward & Action */}
+                      <div className="text-right">
+                        <div className="flex items-center gap-1 text-yellow-500 mb-2">
+                          <Star className="w-4 h-4 fill-yellow-500" />
+                          <span className="font-bold">+{challenge.points_reward}</span>
+                        </div>
+                        
+                        {isCompleted && !isClaimed && (
+                          <Button
+                            size="sm"
+                            onClick={() => claimChallenge(challenge.id)}
+                            disabled={claimingId === challenge.id}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-black"
+                          >
+                            {claimingId === challenge.id ? (
+                              <span className="animate-spin">⏳</span>
+                            ) : (
+                              isFr ? 'Réclamer' : 'Claim'
+                            )}
+                          </Button>
+                        )}
+                        
+                        {isClaimed && (
+                          <div className="flex items-center gap-1 text-green-400 text-sm">
+                            <Check className="w-4 h-4" />
+                            {isFr ? 'Terminé' : 'Done'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {challenges.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>{isFr ? 'Aucun défi disponible' : 'No challenges available'}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Shop Tab */}
         {activeTab === 'shop' && (

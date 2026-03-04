@@ -144,20 +144,22 @@ Pour activer toutes les fonctionnalités, configurer dans `.env` :
 
 ## Changelog
 
-### March 4, 2026 - Session 5
+### March 4, 2026 - Session 5 (FINAL)
 - ✅ **Intégration WebRTC Complète** - CallPage.js refait avec LiveKit
 - ✅ **Automatisation Points Workout** - Points pour séances terminées
 - ✅ **Intégration RevenueCat Complète** - Vérification automatique des achats
 - ✅ **Tableau de Bord des Points** - Widget visuel sur le Dashboard
 - ✅ **Système de Badges par Paliers** - 7 niveaux de badges avec progression
 - ✅ **Notifications Push Badge** - Envoi automatique quand badge débloqué
-- ✅ **Hall of Fame** - Page de classement des utilisateurs par badges:
-  - Podium Top 3 visuel avec stands
-  - Distribution des badges (filtres cliquables)
-  - Classement complet avec rang, badge, points
-  - Statistiques globales (membres, légendes, moyenne, record)
-  - Lien dans la navigation "Classement"
-- ✅ **Archive Code Source** - ZIP propre sans données sensibles
+- ✅ **Hall of Fame** - Page de classement des utilisateurs par badges
+- ✅ **Défis Hebdomadaires** - 6 défis avec récompenses:
+  - 💪 Workout Warrior (5 séances) - 100 pts
+  - 🔥 Daily Dedication (7 jours série) - 150 pts
+  - 🏃 Distance Runner (20 km) - 120 pts
+  - 🌅 Early Bird (3 séances avant 9h) - 80 pts
+  - 🎯 Variety Master (3 types différents) - 75 pts
+  - ⭐ Community Star (2 avis) - 50 pts
+- ✅ **Archive GitHub Ready** - Code source complet sans données sensibles
 
 ### March 3, 2026 - Sessions 1-4
 - ✅ Système d'Avis Amélioré avec likes

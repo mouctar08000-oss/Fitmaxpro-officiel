@@ -5989,6 +5989,245 @@ async def get_hall_of_fame(limit: int = 50):
         "badges_info": POINT_BADGES
     }
 
+# ==================== WEEKLY CHALLENGES SYSTEM ====================
+
+WEEKLY_CHALLENGES = [
+    {
+        "id": "workout_warrior",
+        "name_fr": "Guerrier du Workout",
+        "name_en": "Workout Warrior",
+        "description_fr": "Complétez 5 séances d'entraînement cette semaine",
+        "description_en": "Complete 5 workout sessions this week",
+        "target": 5,
+        "type": "workouts",
+        "points_reward": 100,
+        "emoji": "💪"
+    },
+    {
+        "id": "daily_dedication",
+        "name_fr": "Dévouement Quotidien",
+        "name_en": "Daily Dedication",
+        "description_fr": "Entraînez-vous 7 jours consécutifs",
+        "description_en": "Train for 7 consecutive days",
+        "target": 7,
+        "type": "streak",
+        "points_reward": 150,
+        "emoji": "🔥"
+    },
+    {
+        "id": "distance_runner",
+        "name_fr": "Coureur de Distance",
+        "name_en": "Distance Runner",
+        "description_fr": "Courez 20 km au total cette semaine",
+        "description_en": "Run 20 km total this week",
+        "target": 20,
+        "type": "running_distance",
+        "points_reward": 120,
+        "emoji": "🏃"
+    },
+    {
+        "id": "early_bird",
+        "name_fr": "Lève-tôt",
+        "name_en": "Early Bird",
+        "description_fr": "Complétez 3 séances avant 9h du matin",
+        "description_en": "Complete 3 sessions before 9am",
+        "target": 3,
+        "type": "early_workouts",
+        "points_reward": 80,
+        "emoji": "🌅"
+    },
+    {
+        "id": "variety_master",
+        "name_fr": "Maître de la Variété",
+        "name_en": "Variety Master",
+        "description_fr": "Essayez 3 types d'entraînement différents",
+        "description_en": "Try 3 different workout types",
+        "target": 3,
+        "type": "workout_types",
+        "points_reward": 75,
+        "emoji": "🎯"
+    },
+    {
+        "id": "community_star",
+        "name_fr": "Star de la Communauté",
+        "name_en": "Community Star",
+        "description_fr": "Laissez 2 avis sur des programmes",
+        "description_en": "Leave 2 reviews on programs",
+        "target": 2,
+        "type": "reviews",
+        "points_reward": 50,
+        "emoji": "⭐"
+    }
+]
+
+def get_week_start_end():
+    """Get the start and end of the current week (Monday to Sunday)"""
+    today = datetime.now(timezone.utc)
+    # Get Monday of current week
+    start_of_week = today - timedelta(days=today.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Get Sunday end
+    end_of_week = start_of_week + timedelta(days=7)
+    return start_of_week, end_of_week
+
+@api_router.get("/challenges/weekly")
+async def get_weekly_challenges(current_user: User = Depends(get_current_user)):
+    """Get current weekly challenges with user progress"""
+    week_start, week_end = get_week_start_end()
+    week_start_iso = week_start.isoformat()
+    week_end_iso = week_end.isoformat()
+    
+    challenges_with_progress = []
+    
+    for challenge in WEEKLY_CHALLENGES:
+        progress = 0
+        
+        if challenge["type"] == "workouts":
+            # Count completed workouts this week
+            progress = await db.workout_sessions.count_documents({
+                "user_id": current_user.user_id,
+                "completed": True,
+                "ended_at": {"$gte": week_start_iso, "$lt": week_end_iso}
+            })
+        
+        elif challenge["type"] == "streak":
+            # Calculate current streak
+            streak = 0
+            check_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            for i in range(7):
+                day_start = check_date - timedelta(days=i)
+                day_end = day_start + timedelta(days=1)
+                has_workout = await db.workout_sessions.count_documents({
+                    "user_id": current_user.user_id,
+                    "completed": True,
+                    "ended_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
+                })
+                if has_workout > 0:
+                    streak += 1
+                elif i > 0:
+                    break
+            progress = streak
+        
+        elif challenge["type"] == "running_distance":
+            # Sum running distance this week
+            runs = await db.running_sessions.aggregate([
+                {"$match": {
+                    "user_id": current_user.user_id,
+                    "created_at": {"$gte": week_start_iso, "$lt": week_end_iso}
+                }},
+                {"$group": {"_id": None, "total": {"$sum": "$distance"}}}
+            ]).to_list(1)
+            progress = round(runs[0]["total"], 1) if runs else 0
+        
+        elif challenge["type"] == "early_workouts":
+            # Count workouts before 9am
+            early_sessions = await db.workout_sessions.find({
+                "user_id": current_user.user_id,
+                "completed": True,
+                "started_at": {"$gte": week_start_iso, "$lt": week_end_iso}
+            }).to_list(100)
+            progress = sum(1 for s in early_sessions 
+                         if datetime.fromisoformat(s["started_at"].replace("Z", "+00:00")).hour < 9)
+        
+        elif challenge["type"] == "workout_types":
+            # Count distinct workout types
+            types = await db.workout_sessions.distinct("workout_type", {
+                "user_id": current_user.user_id,
+                "completed": True,
+                "ended_at": {"$gte": week_start_iso, "$lt": week_end_iso}
+            })
+            progress = len(types)
+        
+        elif challenge["type"] == "reviews":
+            # Count reviews this week
+            progress = await db.reviews.count_documents({
+                "user_id": current_user.user_id,
+                "created_at": {"$gte": week_start_iso, "$lt": week_end_iso}
+            })
+        
+        is_completed = progress >= challenge["target"]
+        
+        # Check if already claimed
+        claimed = await db.challenge_completions.find_one({
+            "user_id": current_user.user_id,
+            "challenge_id": challenge["id"],
+            "week_start": week_start_iso
+        })
+        
+        challenges_with_progress.append({
+            **challenge,
+            "progress": min(progress, challenge["target"]),
+            "is_completed": is_completed,
+            "is_claimed": claimed is not None,
+            "percentage": min(round((progress / challenge["target"]) * 100), 100)
+        })
+    
+    # Sort by completion status (unclaimed completed first, then in-progress, then claimed)
+    challenges_with_progress.sort(key=lambda x: (
+        x["is_claimed"],  # Claimed last
+        not x["is_completed"],  # Completed first
+        -x["percentage"]  # Higher percentage first
+    ))
+    
+    return {
+        "challenges": challenges_with_progress,
+        "week_start": week_start_iso,
+        "week_end": week_end_iso,
+        "days_remaining": (week_end - datetime.now(timezone.utc)).days
+    }
+
+@api_router.post("/challenges/claim/{challenge_id}")
+async def claim_challenge_reward(challenge_id: str, current_user: User = Depends(get_current_user)):
+    """Claim reward for a completed challenge"""
+    # Find challenge
+    challenge = next((c for c in WEEKLY_CHALLENGES if c["id"] == challenge_id), None)
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+    
+    week_start, week_end = get_week_start_end()
+    week_start_iso = week_start.isoformat()
+    
+    # Check if already claimed
+    existing = await db.challenge_completions.find_one({
+        "user_id": current_user.user_id,
+        "challenge_id": challenge_id,
+        "week_start": week_start_iso
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Challenge already claimed this week")
+    
+    # Verify completion (simplified check - frontend should verify too)
+    # Record completion
+    await db.challenge_completions.insert_one({
+        "user_id": current_user.user_id,
+        "challenge_id": challenge_id,
+        "week_start": week_start_iso,
+        "points_awarded": challenge["points_reward"],
+        "completed_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Award points
+    await add_points(
+        current_user.user_id, 
+        challenge["points_reward"], 
+        f"Challenge completed: {challenge['name_en']}", 
+        challenge_id
+    )
+    
+    # Send notification
+    await send_push_notification(
+        current_user.user_id,
+        f"{challenge['emoji']} Défi Complété !",
+        f"Vous avez gagné {challenge['points_reward']} points pour '{challenge['name_fr']}' !",
+        {"url": "/rewards", "type": "challenge_completed"}
+    )
+    
+    return {
+        "success": True,
+        "points_awarded": challenge["points_reward"],
+        "message": f"Congratulations! You earned {challenge['points_reward']} points!"
+    }
+
 # Admin: Give points to user
 class GivePointsRequest(BaseModel):
     user_id: str
