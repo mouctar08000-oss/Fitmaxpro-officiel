@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +24,9 @@ import {
   Hand,
   Wifi,
   WifiOff,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  CameraOff
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -32,6 +34,123 @@ import { toast } from 'sonner';
 import { LiveKitVideoRoom, LiveKitCall, IncomingCallModal } from '../components/LiveKitRoom';
 
 const API = process.env.REACT_APP_BACKEND_URL;
+
+// Camera Preview Component
+const CameraPreview = () => {
+  const videoRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    
+    const startCamera = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 360, facingMode: 'user' },
+          audio: false
+        });
+        
+        if (mounted) {
+          setStream(mediaStream);
+          if (videoRef.current) {
+            videoRef.current.srcObject = mediaStream;
+          }
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('Camera error:', err);
+        if (mounted) {
+          setIsLoading(false);
+          if (err.name === 'NotAllowedError') {
+            setError('Veuillez autoriser l\'accès à la caméra');
+          } else if (err.name === 'NotFoundError') {
+            setError('Aucune caméra détectée');
+          } else {
+            setError(err.message || 'Erreur caméra');
+          }
+        }
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      mounted = false;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const retryCamera = async () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setStream(null);
+    setError(null);
+    setIsLoading(true);
+    
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 360, facingMode: 'user' },
+        audio: false
+      });
+      
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setIsLoading(false);
+    } catch (err) {
+      setIsLoading(false);
+      setError(err.message || 'Erreur caméra');
+    }
+  };
+
+  return (
+    <div className="relative aspect-video bg-zinc-800 rounded-lg overflow-hidden">
+      {isLoading ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-10 h-10 mx-auto mb-3 border-3 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-zinc-400 text-sm">Chargement de la caméra...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center px-4">
+            <CameraOff className="w-12 h-12 mx-auto mb-3 text-red-500" />
+            <p className="text-red-400 text-sm mb-3">{error}</p>
+            <Button onClick={retryCamera} size="sm" className="bg-red-600 hover:bg-red-700">
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Réessayer
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+            style={{ transform: 'scaleX(-1)' }}
+          />
+          <div className="absolute bottom-2 left-2 bg-green-600 px-2 py-1 rounded text-xs text-white flex items-center gap-1">
+            <Camera className="w-3 h-3" />
+            Caméra active
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const LiveStreamPage = () => {
   const { t } = useTranslation();
@@ -406,10 +525,11 @@ const LiveStreamPage = () => {
         {isAdmin ? (
           <Button 
             onClick={() => setShowCreateForm(true)}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 px-6 py-3 text-lg font-bold shadow-lg shadow-red-500/30 transition-all hover:scale-105"
+            data-testid="start-live-btn"
           >
-            <Play className="w-4 h-4 mr-2" />
-            {t('live.startLive', 'Start Live')}
+            <Play className="w-5 h-5 mr-2" />
+            {isFr ? 'DÉMARRER UN LIVE' : 'START LIVE'}
           </Button>
         ) : (
           <Button 
@@ -440,91 +560,107 @@ const LiveStreamPage = () => {
             {t('live.createNew', 'Create New Live Session')}
           </h2>
           
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-gray-400 block mb-2">
-                {t('live.sessionTitle', 'Session Title')} *
-              </label>
-              <Input
-                value={liveTitle}
-                onChange={(e) => setLiveTitle(e.target.value)}
-                placeholder="Ex: Séance abdos en direct"
-                className="bg-black border-zinc-700"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm text-gray-400 block mb-2">
-                {t('live.description', 'Description')}
-              </label>
-              <textarea
-                value={liveDescription}
-                onChange={(e) => setLiveDescription(e.target.value)}
-                placeholder="Description de la session..."
-                className="w-full bg-black border border-zinc-700 rounded-md p-3 text-white min-h-[100px]"
-              />
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsVipOnly(!isVipOnly)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                  isVipOnly 
-                    ? 'bg-amber-500/20 border-amber-500 text-amber-400' 
-                    : 'bg-zinc-800 border-zinc-700 text-gray-400'
-                }`}
-              >
-                {isVipOnly ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                {isVipOnly ? 'VIP Only' : 'Public'}
-              </button>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Left Side - Form */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">
+                  {t('live.sessionTitle', 'Session Title')} *
+                </label>
+                <Input
+                  value={liveTitle}
+                  onChange={(e) => setLiveTitle(e.target.value)}
+                  placeholder="Ex: Séance abdos en direct"
+                  className="bg-black border-zinc-700"
+                />
+              </div>
               
-              <span className="text-sm text-gray-500">
-                {isVipOnly 
-                  ? 'Seuls les abonnés VIP (9,99€) pourront rejoindre' 
-                  : 'Tous les abonnés pourront rejoindre'
-                }
-              </span>
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">
+                  {t('live.description', 'Description')}
+                </label>
+                <textarea
+                  value={liveDescription}
+                  onChange={(e) => setLiveDescription(e.target.value)}
+                  placeholder="Description de la session..."
+                  className="w-full bg-black border border-zinc-700 rounded-md p-3 text-white min-h-[80px]"
+                />
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsVipOnly(!isVipOnly)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    isVipOnly 
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-400' 
+                      : 'bg-zinc-800 border-zinc-700 text-gray-400'
+                  }`}
+                >
+                  {isVipOnly ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                  {isVipOnly ? 'VIP Only' : 'Public'}
+                </button>
+                
+                <span className="text-sm text-gray-500">
+                  {isVipOnly 
+                    ? 'Seuls les abonnés VIP pourront rejoindre' 
+                    : 'Tous les abonnés pourront rejoindre'
+                  }
+                </span>
+              </div>
+              
+              {/* Schedule Option */}
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">
+                  {isFr ? 'Programmer pour plus tard (optionnel)' : 'Schedule for later (optional)'}
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="bg-black border-zinc-700"
+                />
+              </div>
             </div>
             
-            {/* Schedule Option */}
-            <div>
-              <label className="text-sm text-gray-400 block mb-2">
-                {isFr ? 'Programmer pour plus tard (optionnel)' : 'Schedule for later (optional)'}
+            {/* Right Side - Camera Preview */}
+            <div className="space-y-3">
+              <label className="text-sm text-gray-400 block">
+                {isFr ? 'Aperçu de votre caméra' : 'Camera Preview'}
               </label>
-              <Input
-                type="datetime-local"
-                value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-                className="bg-black border-zinc-700"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {isFr ? 'Laissez vide pour démarrer maintenant' : 'Leave empty to start now'}
-              </p>
+              <CameraPreview />
             </div>
-            
-            <div className="flex gap-4 pt-4">
-              <Button 
-                onClick={createLive}
-                disabled={loading || !liveTitle.trim()}
-                className="bg-red-600 hover:bg-red-700 flex-1"
-              >
-                {loading ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : scheduledTime ? (
-                  <Calendar className="w-4 h-4 mr-2" />
-                ) : (
-                  <Play className="w-4 h-4 mr-2" />
-                )}
-                {scheduledTime ? (isFr ? 'Programmer' : 'Schedule') : (isFr ? 'Démarrer Live' : 'Go Live')}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowCreateForm(false)}
-                className="border-zinc-700"
-              >
-                {t('common.cancel', 'Cancel')}
-              </Button>
-            </div>
+          </div>
+          
+          <div className="flex gap-4 pt-6 mt-4 border-t border-zinc-800">
+            <Button 
+              onClick={createLive}
+              disabled={loading || !liveTitle.trim()}
+              className={`flex-1 py-4 text-lg font-bold transition-all ${
+                scheduledTime 
+                  ? 'bg-blue-600 hover:bg-blue-700' 
+                  : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 shadow-lg shadow-red-500/30 hover:scale-[1.02]'
+              }`}
+              data-testid="confirm-start-live-btn"
+            >
+              {loading ? (
+                <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+              ) : scheduledTime ? (
+                <Calendar className="w-5 h-5 mr-2" />
+              ) : (
+                <>
+                  <span className="w-3 h-3 bg-white rounded-full mr-3 animate-pulse"></span>
+                  <Play className="w-5 h-5 mr-2" />
+                </>
+              )}
+              {scheduledTime ? (isFr ? 'PROGRAMMER LE LIVE' : 'SCHEDULE LIVE') : (isFr ? 'DÉMARRER LE LIVE MAINTENANT' : 'GO LIVE NOW')}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCreateForm(false)}
+              className="border-zinc-700 px-6"
+            >
+              {t('common.cancel', 'Cancel')}
+            </Button>
           </div>
         </div>
       )}
@@ -902,44 +1038,78 @@ const LiveStreamPage = () => {
           </div>
         )}
         
-        {/* Viewer count */}
-        <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-2">
-          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-          <span className="text-sm">LIVE</span>
-          {isWebRTCConnected && (
-            <>
-              <Wifi className="w-3 h-3 text-green-400" />
-            </>
-          )}
-          <span className="text-gray-400">•</span>
-          <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm">{viewerCount}</span>
+        {/* Top Bar with Live Status and End Button */}
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-4">
+          <div className="flex items-center justify-between">
+            {/* Left - Live Status */}
+            <div className="flex items-center gap-4">
+              <div className="bg-red-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg">
+                <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
+                <span className="font-bold text-white">EN DIRECT</span>
+              </div>
+              {isWebRTCConnected && (
+                <div className="bg-green-600/80 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                  <Wifi className="w-4 h-4 text-white" />
+                  <span className="text-white text-sm">Connecté</span>
+                </div>
+              )}
+              <div className="bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-2">
+                <Users className="w-4 h-4 text-gray-300" />
+                <span className="text-white text-sm">{viewerCount} spectateurs</span>
+              </div>
+            </div>
+            
+            {/* Right - End Live Button */}
+            {isBroadcaster && (
+              <Button
+                onClick={endLive}
+                className="bg-red-600 hover:bg-red-700 px-6 py-2 text-lg font-bold shadow-lg animate-pulse hover:animate-none"
+                data-testid="end-live-btn"
+              >
+                <Square className="w-5 h-5 mr-2" />
+                {isFr ? 'TERMINER LE LIVE' : 'END LIVE'}
+              </Button>
+            )}
+            
+            {/* Right - Leave Button for Viewers */}
+            {!isBroadcaster && (
+              <Button
+                onClick={leaveLive}
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 px-4 py-2"
+                data-testid="leave-live-btn"
+              >
+                <X className="w-4 h-4 mr-2" />
+                {isFr ? 'Quitter' : 'Leave'}
+              </Button>
+            )}
+          </div>
         </div>
         
-        {/* Controls - Only show if LiveKit not handling them */}
-        {!liveKitToken && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
-            {isBroadcaster && (
-              <>
-                <button
-                  onClick={() => setVideoEnabled(!videoEnabled)}
-                  className={`p-2 rounded-full ${videoEnabled ? 'bg-zinc-700' : 'bg-red-500'}`}
-                >
-                  {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                </button>
-                <button
-                  onClick={() => setAudioEnabled(!audioEnabled)}
-                  className={`p-2 rounded-full ${audioEnabled ? 'bg-zinc-700' : 'bg-red-500'}`}
-                >
-                  {audioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                </button>
-              </>
-            )}
+        {/* Controls Bar at Bottom - Only show if LiveKit not handling them */}
+        {!liveKitToken && isBroadcaster && (
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/80 backdrop-blur-sm px-6 py-3 rounded-full shadow-xl">
             <button
-              onClick={isBroadcaster ? endLive : leaveLive}
-              className="p-2 rounded-full bg-red-500 hover:bg-red-600"
+              onClick={() => setVideoEnabled(!videoEnabled)}
+              className={`p-3 rounded-full transition-all ${videoEnabled ? 'bg-zinc-700 hover:bg-zinc-600' : 'bg-red-500 hover:bg-red-600'}`}
+              data-testid="toggle-camera-btn"
             >
-              <Square className="w-5 h-5" />
+              {videoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+            </button>
+            <button
+              onClick={() => setAudioEnabled(!audioEnabled)}
+              className={`p-3 rounded-full transition-all ${audioEnabled ? 'bg-zinc-700 hover:bg-zinc-600' : 'bg-red-500 hover:bg-red-600'}`}
+              data-testid="toggle-mic-btn"
+            >
+              {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+            </button>
+            <div className="w-px h-8 bg-zinc-600"></div>
+            <button
+              onClick={endLive}
+              className="p-3 rounded-full bg-red-600 hover:bg-red-700 transition-all"
+              data-testid="end-live-bottom-btn"
+            >
+              <Square className="w-6 h-6" />
             </button>
           </div>
         )}
