@@ -108,9 +108,19 @@ const LiveStreamPage = () => {
       const response = await axios.get(`${API}/api/lives`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setActiveLives(response.data || []);
+      // Handle new API format with active/scheduled arrays
+      const data = response.data;
+      if (data.active !== undefined) {
+        setActiveLives(data.active || []);
+        setScheduledLives(data.scheduled || []);
+      } else if (Array.isArray(data)) {
+        setActiveLives(data);
+      } else {
+        setActiveLives([]);
+      }
     } catch (err) {
       console.error('Error fetching lives:', err);
+      setActiveLives([]);
     }
   }, []);
 
