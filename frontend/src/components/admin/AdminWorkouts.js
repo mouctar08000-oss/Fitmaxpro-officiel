@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { 
   Plus, Pencil, Trash2, Save, X, Video, Image, 
   Clock, Dumbbell, ChevronDown, ChevronUp, Search,
-  GripVertical, Play
+  GripVertical, Play, Upload, Loader2, FileVideo, FileImage
 } from 'lucide-react';
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -21,6 +21,13 @@ const AdminWorkouts = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingWorkout, setEditingWorkout] = useState(null);
   const [expandedWorkout, setExpandedWorkout] = useState(null);
+  
+  // Upload states
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadTarget, setUploadTarget] = useState(null); // { type: 'workout'|'exercise', index?: number, field: 'video_url'|'image_url' }
+  const videoInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -157,6 +164,80 @@ const AdminWorkouts = () => {
   const handleRemoveExercise = (index) => {
     const newExercises = formData.exercises.filter((_, i) => i !== index);
     setFormData({ ...formData, exercises: newExercises });
+  };
+
+  // Upload handlers
+  const handleFileUpload = async (file, type) => {
+    if (!file) return;
+    
+    const isVideo = type === 'video';
+    const maxSize = isVideo ? 500 * 1024 * 1024 : 10 * 1024 * 1024;
+    const allowedTypes = isVideo 
+      ? ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo']
+      : ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    
+    if (file.size > maxSize) {
+      toast.error(`Fichier trop volumineux. Max ${isVideo ? '500MB' : '10MB'}`);
+      return;
+    }
+    
+    if (!allowedTypes.includes(file.type)) {
+      toast.error(`Format non supporté. ${isVideo ? 'Utilisez MP4, MOV, WebM' : 'Utilisez JPG, PNG, GIF, WebP'}`);
+      return;
+    }
+    
+    setUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      
+      const endpoint = isVideo 
+        ? `${API}/api/workouts/admin/upload/video`
+        : `${API}/api/workouts/admin/upload/image`;
+      
+      const response = await axios.post(endpoint, formDataUpload, {
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(progress);
+        }
+      });
+      
+      if (response.data.success) {
+        const fileUrl = `${API}${response.data.url}`;
+        
+        // Update the target field
+        if (uploadTarget) {
+          if (uploadTarget.type === 'workout') {
+            setFormData({ ...formData, [uploadTarget.field]: fileUrl });
+          } else if (uploadTarget.type === 'exercise' && uploadTarget.index !== undefined) {
+            handleUpdateExercise(uploadTarget.index, uploadTarget.field, fileUrl);
+          }
+        }
+        
+        toast.success(`${isVideo ? 'Vidéo' : 'Image'} uploadée avec succès`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error(`Erreur lors de l'upload: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadTarget(null);
+    }
+  };
+
+  const triggerVideoUpload = (target) => {
+    setUploadTarget(target);
+    videoInputRef.current?.click();
+  };
+
+  const triggerImageUpload = (target) => {
+    setUploadTarget(target);
+    imageInputRef.current?.click();
   };
 
   const filteredWorkouts = workouts.filter(workout => {
@@ -393,29 +474,76 @@ const AdminWorkouts = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">
-                    <Image className="w-4 h-4 inline mr-1" /> URL Image
+                    <Image className="w-4 h-4 inline mr-1" /> Image de couverture
                   </label>
-                  <input
-                    type="url"
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500"
-                    placeholder="https://..."
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={formData.image_url}
+                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                      className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500"
+                      placeholder="https://... ou uploadez"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => triggerImageUpload({ type: 'workout', field: 'image_url' })}
+                      disabled={uploading}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <Upload className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {formData.image_url && (
+                    <img src={formData.image_url} alt="Preview" className="mt-2 h-20 rounded object-cover" />
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">
-                    <Video className="w-4 h-4 inline mr-1" /> URL Vidéo
+                    <Video className="w-4 h-4 inline mr-1" /> Vidéo de présentation
                   </label>
-                  <input
-                    type="url"
-                    value={formData.video_url}
-                    onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500"
-                    placeholder="https://youtube.com/..."
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={formData.video_url}
+                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+                      className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500"
+                      placeholder="https://... ou uploadez"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => triggerVideoUpload({ type: 'workout', field: 'video_url' })}
+                      disabled={uploading}
+                      className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <Upload className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {formData.video_url && (
+                    <p className="mt-1 text-xs text-green-400 flex items-center gap-1">
+                      <FileVideo className="w-3 h-3" /> Vidéo configurée
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Upload Progress */}
+              {uploading && (
+                <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+                    <div className="flex-1">
+                      <p className="text-sm text-white">Upload en cours...</p>
+                      <div className="w-full bg-zinc-700 rounded-full h-2 mt-1">
+                        <div 
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-sm text-gray-400">{uploadProgress}%</span>
+                  </div>
+                </div>
+              )}
 
               {/* Exercises */}
               <div className="border-t border-zinc-700 pt-4">
@@ -463,13 +591,24 @@ const AdminWorkouts = () => {
                           className="px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
                           placeholder="Description"
                         />
-                        <input
-                          type="url"
-                          value={exercise.video_url}
-                          onChange={(e) => handleUpdateExercise(index, 'video_url', e.target.value)}
-                          className="px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
-                          placeholder="URL vidéo"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            value={exercise.video_url}
+                            onChange={(e) => handleUpdateExercise(index, 'video_url', e.target.value)}
+                            className="flex-1 px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
+                            placeholder="URL vidéo ou uploadez"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => triggerVideoUpload({ type: 'exercise', index, field: 'video_url' })}
+                            disabled={uploading}
+                            className="px-2 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs disabled:opacity-50"
+                            title="Uploader vidéo"
+                          >
+                            <Upload className="w-3 h-3" />
+                          </button>
+                        </div>
                         <div className="grid grid-cols-4 gap-2">
                           <div>
                             <label className="text-xs text-gray-500">Séries</label>
@@ -508,13 +647,30 @@ const AdminWorkouts = () => {
                             />
                           </div>
                         </div>
-                        <input
-                          type="url"
-                          value={exercise.image_url}
-                          onChange={(e) => handleUpdateExercise(index, 'image_url', e.target.value)}
-                          className="px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
-                          placeholder="URL image"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            value={exercise.image_url}
+                            onChange={(e) => handleUpdateExercise(index, 'image_url', e.target.value)}
+                            className="flex-1 px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:border-red-500"
+                            placeholder="URL image ou uploadez"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => triggerImageUpload({ type: 'exercise', index, field: 'image_url' })}
+                            disabled={uploading}
+                            className="px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs disabled:opacity-50"
+                            title="Uploader image"
+                          >
+                            <Upload className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {(exercise.video_url || exercise.image_url) && (
+                          <div className="flex gap-2 text-xs">
+                            {exercise.video_url && <span className="text-purple-400 flex items-center gap-1"><FileVideo className="w-3 h-3" /> Vidéo</span>}
+                            {exercise.image_url && <span className="text-blue-400 flex items-center gap-1"><FileImage className="w-3 h-3" /> Image</span>}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -549,6 +705,22 @@ const AdminWorkouts = () => {
           </div>
         </div>
       )}
+      
+      {/* Hidden file inputs */}
+      <input
+        type="file"
+        ref={videoInputRef}
+        accept="video/mp4,video/quicktime,video/webm,video/x-msvideo"
+        className="hidden"
+        onChange={(e) => handleFileUpload(e.target.files[0], 'video')}
+      />
+      <input
+        type="file"
+        ref={imageInputRef}
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        className="hidden"
+        onChange={(e) => handleFileUpload(e.target.files[0], 'image')}
+      />
     </div>
   );
 };

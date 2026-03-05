@@ -145,6 +145,7 @@ frontend/src/
 
 ### Gestion Admin des Séances ✅ (5 Mars 2025)
 - **Nouveau composant:** `AdminWorkouts.js`
+- **Upload de fichiers:** Vidéos (max 500MB) et Images (max 10MB)
 - **Nouvelles routes backend:**
   - `GET /api/workouts/admin/all` - Liste toutes les séances
   - `POST /api/workouts/admin/create` - Créer une séance
@@ -152,7 +153,15 @@ frontend/src/
   - `DELETE /api/workouts/admin/{workout_id}` - Supprimer une séance
   - `POST /api/workouts/admin/{workout_id}/exercise` - Ajouter un exercice
   - `DELETE /api/workouts/admin/{workout_id}/exercise/{exercise_id}` - Supprimer un exercice
-  - `GET /api/workouts/admin/options` - Options pour les dropdowns
+  - `POST /api/workouts/admin/upload/video` - Upload vidéo
+  - `POST /api/workouts/admin/upload/image` - Upload image
+  - `GET /api/workouts/admin/uploads` - Lister les fichiers uploadés
+  - `DELETE /api/workouts/admin/upload/{type}/{id}` - Supprimer fichier
+
+### Notifications Push ✅ (5 Mars 2025)
+- Hook `usePushNotifications.js` intégré dans App.js
+- Auto-subscription après connexion utilisateur
+- Notifications pour appels entrants
 
 ---
 

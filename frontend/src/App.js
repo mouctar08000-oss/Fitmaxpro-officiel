@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useIncomingCalls, IncomingCallNotification } from './components/IncomingCall';
+import usePushNotifications from './hooks/usePushNotifications';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -147,12 +148,32 @@ function IncomingCallHandler() {
   );
 }
 
+// Component to handle push notification subscription
+function PushNotificationHandler() {
+  const { user } = useAuth();
+  const { isSupported, isSubscribed, subscribe, permission } = usePushNotifications();
+
+  useEffect(() => {
+    // Auto-subscribe to push notifications when user is logged in
+    if (user && isSupported && !isSubscribed && permission === 'default') {
+      // Wait a bit before asking for permission (better UX)
+      const timer = setTimeout(() => {
+        subscribe();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, isSupported, isSubscribed, permission, subscribe]);
+
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <AppRouter />
         <IncomingCallHandler />
+        <PushNotificationHandler />
         <Toaster position="top-right" />
       </AuthProvider>
     </BrowserRouter>

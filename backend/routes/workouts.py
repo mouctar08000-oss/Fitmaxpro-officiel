@@ -1,11 +1,13 @@
 """
 FitMaxPro - Workout Routes
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
+import os
+import aiofiles
 
 import sys
 sys.path.insert(0, "/app/backend")
@@ -14,6 +16,15 @@ from models.schemas import User, Workout, WorkoutSession
 from routes.auth import get_current_user, verify_admin
 
 router = APIRouter(prefix="/workouts", tags=["Workouts"])
+
+# Upload directory
+UPLOAD_DIR = "/app/backend/uploads"
+VIDEO_DIR = os.path.join(UPLOAD_DIR, "videos")
+IMAGE_DIR = os.path.join(UPLOAD_DIR, "images")
+
+# Ensure directories exist
+os.makedirs(VIDEO_DIR, exist_ok=True)
+os.makedirs(IMAGE_DIR, exist_ok=True)
 
 
 # Pydantic models for admin operations
@@ -448,3 +459,182 @@ async def admin_get_workout_options(admin: User = Depends(verify_admin)):
             {"value": "en", "label": "English"}
         ]
     }
+
+
+
+# ============================================
+# FILE UPLOAD ROUTES
+# ============================================
+
+ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.webm', '.mkv'}
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB
+MAX_IMAGE_SIZE = 10 * 1024 * 1024   # 10MB
+
+
+@router.post("/admin/upload/video")
+async def admin_upload_video(
+    file: UploadFile = File(...),
+    admin: User = Depends(verify_admin)
+):
+    """Admin: Upload a video file for workouts/exercises"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    # Check file extension
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_VIDEO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid video format. Allowed: {', '.join(ALLOWED_VIDEO_EXTENSIONS)}"
+        )
+    
+    # Generate unique filename
+    file_id = uuid.uuid4().hex[:12]
+    filename = f"video_{file_id}{ext}"
+    filepath = os.path.join(VIDEO_DIR, filename)
+    
+    # Read and save file in chunks
+    total_size = 0
+    try:
+        async with aiofiles.open(filepath, 'wb') as out_file:
+            while chunk := await file.read(1024 * 1024):  # 1MB chunks
+                total_size += len(chunk)
+                if total_size > MAX_VIDEO_SIZE:
+                    await out_file.close()
+                    os.remove(filepath)
+                    raise HTTPException(status_code=400, detail="File too large. Max 500MB")
+                await out_file.write(chunk)
+    except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    # Store metadata in database
+    video_doc = {
+        "video_id": file_id,
+        "filename": filename,
+        "original_name": file.filename,
+        "size_bytes": total_size,
+        "content_type": file.content_type,
+        "uploaded_by": admin.user_id,
+        "uploaded_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.uploaded_videos.insert_one(video_doc)
+    
+    # Return the URL
+    video_url = f"/api/uploads/videos/{filename}"
+    
+    return {
+        "success": True,
+        "video_id": file_id,
+        "filename": filename,
+        "url": video_url,
+        "size_bytes": total_size
+    }
+
+
+@router.post("/admin/upload/image")
+async def admin_upload_image(
+    file: UploadFile = File(...),
+    admin: User = Depends(verify_admin)
+):
+    """Admin: Upload an image file for workouts/exercises"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    # Check file extension
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid image format. Allowed: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}"
+        )
+    
+    # Generate unique filename
+    file_id = uuid.uuid4().hex[:12]
+    filename = f"image_{file_id}{ext}"
+    filepath = os.path.join(IMAGE_DIR, filename)
+    
+    # Read and save file
+    total_size = 0
+    try:
+        async with aiofiles.open(filepath, 'wb') as out_file:
+            while chunk := await file.read(1024 * 1024):
+                total_size += len(chunk)
+                if total_size > MAX_IMAGE_SIZE:
+                    await out_file.close()
+                    os.remove(filepath)
+                    raise HTTPException(status_code=400, detail="File too large. Max 10MB")
+                await out_file.write(chunk)
+    except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    # Store metadata
+    image_doc = {
+        "image_id": file_id,
+        "filename": filename,
+        "original_name": file.filename,
+        "size_bytes": total_size,
+        "content_type": file.content_type,
+        "uploaded_by": admin.user_id,
+        "uploaded_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.uploaded_images.insert_one(image_doc)
+    
+    # Return the URL
+    image_url = f"/api/uploads/images/{filename}"
+    
+    return {
+        "success": True,
+        "image_id": file_id,
+        "filename": filename,
+        "url": image_url,
+        "size_bytes": total_size
+    }
+
+
+@router.get("/admin/uploads")
+async def admin_list_uploads(admin: User = Depends(verify_admin)):
+    """Admin: List all uploaded files"""
+    videos = await db.uploaded_videos.find({}, {"_id": 0}).sort("uploaded_at", -1).to_list(100)
+    images = await db.uploaded_images.find({}, {"_id": 0}).sort("uploaded_at", -1).to_list(100)
+    
+    return {
+        "videos": videos,
+        "images": images,
+        "video_count": len(videos),
+        "image_count": len(images)
+    }
+
+
+@router.delete("/admin/upload/{file_type}/{file_id}")
+async def admin_delete_upload(file_type: str, file_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Delete an uploaded file"""
+    if file_type == "video":
+        doc = await db.uploaded_videos.find_one({"video_id": file_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Video not found")
+        
+        filepath = os.path.join(VIDEO_DIR, doc["filename"])
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        await db.uploaded_videos.delete_one({"video_id": file_id})
+        
+    elif file_type == "image":
+        doc = await db.uploaded_images.find_one({"image_id": file_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        filepath = os.path.join(IMAGE_DIR, doc["filename"])
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        await db.uploaded_images.delete_one({"image_id": file_id})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+    
+    return {"success": True, "message": f"{file_type} deleted"}

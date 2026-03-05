@@ -95,7 +95,13 @@ app.include_router(api_router)
 ROOT_DIR = Path(__file__).parent
 uploads_dir = ROOT_DIR / "uploads"
 uploads_dir.mkdir(exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+(uploads_dir / "videos").mkdir(exist_ok=True)
+(uploads_dir / "images").mkdir(exist_ok=True)
+
+# Mount uploads at /api/uploads for proper routing through ingress
+app.mount("/api/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+# Also mount at /uploads for backwards compatibility
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads_legacy")
 
 
 # Shutdown event
