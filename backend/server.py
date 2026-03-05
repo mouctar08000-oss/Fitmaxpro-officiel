@@ -30,6 +30,8 @@ from routes import (
     running_router,
     rewards_router,
     reviews_router,
+    iap_router,
+    notifications_router,
 )
 
 # Setup logging
@@ -71,6 +73,8 @@ api_router.include_router(livekit_router)
 api_router.include_router(running_router)
 api_router.include_router(rewards_router)
 api_router.include_router(reviews_router)
+api_router.include_router(iap_router)
+api_router.include_router(notifications_router)
 
 
 # Health check endpoint
