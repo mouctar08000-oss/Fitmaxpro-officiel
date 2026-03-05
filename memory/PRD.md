@@ -129,13 +129,23 @@ frontend/src/
 ## Livrables
 
 ### Archive GitHub ✅
-- **Fichier:** `FitMaxPro_GitHub_Final.zip`
+- **Fichier:** `FitMaxPro_GitHub_Final.zip` (2.7 MB)
 - **Contenu:**
   - Code source complet (frontend + backend)
   - Dockerfiles et docker-compose.yml
   - Fichiers `.env.example` (sans credentials)
   - README.md avec instructions
   - Configuration Android/iOS (Capacitor)
+
+### Kit Marketing ✅ (5 Mars 2025)
+- **Fichier:** `FitMaxPro_Marketing_Kit.zip` (4.6 MB)
+- **Contenu:**
+  - `MARKETING_KIT.md` - Guide complet avec tous les textes (descriptions, posts Instagram/Facebook/TikTok, scripts vidéos, hashtags)
+  - 4 images promotionnelles générées:
+    - `promo_hero.png` - Bannière principale (1536x1024)
+    - `promo_live_streaming.png` - Promotion Lives (1024x1024)
+    - `promo_workouts.png` - Promotion Entraînements (1024x1024)
+    - `promo_running.png` - Promotion Running (1024x1024)
 
 ---
 
