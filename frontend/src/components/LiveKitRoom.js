@@ -734,21 +734,12 @@ export const LiveKitVideoRoom = ({ token, serverUrl, roomName, onDisconnect, isB
           stopLocalTrackOnUnpublish: true,
           videoCaptureDefaults: { 
             resolution: { width: 1280, height: 720, frameRate: 24 }, 
-            facingMode: 'user',
-            deviceId: undefined // Let the system choose
+            facingMode: 'user'
           },
           audioCaptureDefaults: { 
             echoCancellation: true, 
             noiseSuppression: true, 
             autoGainControl: true 
-          },
-          publishDefaults: {
-            videoSimulcastLayers: [
-              { width: 640, height: 360, bitrate: 500000 },
-              { width: 320, height: 180, bitrate: 150000 }
-            ],
-            stopMicTrackOnMute: false,
-            videoCodec: 'vp8'
           }
         }}
       >
