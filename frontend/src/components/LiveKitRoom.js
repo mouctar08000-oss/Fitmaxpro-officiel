@@ -125,12 +125,13 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState(null);
   const [localVideoTrack, setLocalVideoTrack] = useState(null);
-  const [facingMode, setFacingMode] = useState('user'); // 'user' = front, 'environment' = back
+  const [facingMode, setFacingMode] = useState('user');
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const [availableCameras, setAvailableCameras] = useState([]);
+  const [hasUserStartedMedia, setHasUserStartedMedia] = useState(false);
 
   // Get available cameras on mount
   useEffect(() => {
@@ -147,50 +148,54 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
     getDevices();
   }, []);
 
-  // Initialize camera for broadcaster
-  useEffect(() => {
-    if (!isBroadcaster || !localParticipant || !room) return;
+  // Start media when user clicks the button
+  const startMedia = async () => {
+    if (!localParticipant || !room) return;
+    
+    setIsInitializing(true);
+    setError(null);
+    setHasUserStartedMedia(true);
 
-    let mounted = true;
+    try {
+      // First request permissions with getUserMedia
+      console.log('Requesting camera permissions...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user' }, 
+        audio: true 
+      });
+      // Stop the test stream
+      stream.getTracks().forEach(t => t.stop());
+      console.log('Permissions granted');
 
-    const initializeMedia = async () => {
-      setIsInitializing(true);
-      setError(null);
-
-      try {
-        await localParticipant.setCameraEnabled(true);
-        console.log('Camera enabled');
-        if (mounted) {
-          setIsCameraOn(true);
-          const cameraPub = localParticipant.getTrackPublication(Track.Source.Camera);
-          if (cameraPub?.track) {
-            setLocalVideoTrack(cameraPub.track);
-          }
-        }
-      } catch (camErr) {
-        console.warn('Camera failed:', camErr.message);
-        if (mounted) {
-          setError(`Caméra: ${camErr.message}`);
-        }
-      }
+      // Now enable in LiveKit
+      await localParticipant.setCameraEnabled(true);
+      console.log('Camera enabled in LiveKit');
+      setIsCameraOn(true);
       
-      try {
-        await localParticipant.setMicrophoneEnabled(true);
-        console.log('Mic enabled');
-        if (mounted) setIsMicOn(true);
-      } catch (micErr) {
-        console.warn('Mic failed:', micErr.message);
+      const cameraPub = localParticipant.getTrackPublication(Track.Source.Camera);
+      if (cameraPub?.track) {
+        setLocalVideoTrack(cameraPub.track);
       }
 
-      if (mounted) setIsInitializing(false);
-    };
-
-    const timer = setTimeout(initializeMedia, 1000);
-    return () => {
-      mounted = false;
-      clearTimeout(timer);
-    };
-  }, [isBroadcaster, localParticipant, room]);
+      await localParticipant.setMicrophoneEnabled(true);
+      console.log('Mic enabled');
+      setIsMicOn(true);
+      
+    } catch (err) {
+      console.error('Media initialization failed:', err);
+      let errorMsg = err.message;
+      if (err.name === 'NotAllowedError') {
+        errorMsg = 'Accès à la caméra refusé. Veuillez autoriser l\'accès dans les paramètres du navigateur.';
+      } else if (err.name === 'NotFoundError') {
+        errorMsg = 'Aucune caméra détectée sur cet appareil.';
+      } else if (err.name === 'NotReadableError') {
+        errorMsg = 'La caméra est utilisée par une autre application.';
+      }
+      setError(errorMsg);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   // Track local video changes
   useEffect(() => {
@@ -301,21 +306,60 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
 
   const retryCamera = async () => {
     setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      stream.getTracks().forEach(t => t.stop());
-      await localParticipant?.setCameraEnabled(true);
-      await localParticipant?.setMicrophoneEnabled(true);
-      setIsCameraOn(true);
-      setIsMicOn(true);
-      const cameraPub = localParticipant?.getTrackPublication(Track.Source.Camera);
-      setLocalVideoTrack(cameraPub?.track || null);
-    } catch (err) {
-      setError(`Erreur: ${err.message}`);
-    }
+    await startMedia();
   };
 
   const remoteParticipants = participants.filter(p => p.identity !== localParticipant?.identity);
+
+  // Show start button if broadcaster hasn't started media yet
+  if (isBroadcaster && !hasUserStartedMedia && !isInitializing) {
+    return (
+      <div className="h-full flex flex-col bg-black">
+        {/* Top Bar */}
+        <div className="bg-gradient-to-b from-black/90 to-transparent p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-yellow-600 px-4 py-2 rounded-lg flex items-center gap-2">
+                <span className="font-bold text-white">PRÊT À DIFFUSER</span>
+              </div>
+              <div className="bg-green-600/80 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                <Wifi className="w-4 h-4 text-white" />
+                <span className="text-white text-sm">Connecté au serveur</span>
+              </div>
+            </div>
+            <Button onClick={() => { room?.disconnect(); onDisconnect?.(); }} variant="outline" className="border-white/30 text-white hover:bg-white/10">
+              Annuler
+            </Button>
+          </div>
+        </div>
+
+        {/* Start Camera Section */}
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-md">
+            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+              <Camera className="w-16 h-16 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">Démarrer votre Live</h2>
+            <p className="text-gray-400 mb-6">
+              Cliquez sur le bouton ci-dessous pour activer votre caméra et microphone, puis commencer la diffusion en direct.
+            </p>
+            <Button 
+              onClick={startMedia} 
+              size="lg" 
+              className="bg-red-600 hover:bg-red-700 px-8 py-6 text-lg font-bold"
+              data-testid="start-live-btn"
+            >
+              <Video className="w-6 h-6 mr-3" />
+              DÉMARRER LA CAMÉRA
+            </Button>
+            <p className="text-gray-600 text-sm mt-4">
+              Vous devrez peut-être autoriser l'accès à la caméra dans votre navigateur
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-black">
@@ -323,10 +367,16 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
       <div className="bg-gradient-to-b from-black/90 to-transparent p-4 absolute top-0 left-0 right-0 z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-red-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg shadow-red-500/30">
-              <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
-              <span className="font-bold text-white">EN DIRECT</span>
-            </div>
+            {isCameraOn ? (
+              <div className="bg-red-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg shadow-red-500/30">
+                <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
+                <span className="font-bold text-white">EN DIRECT</span>
+              </div>
+            ) : (
+              <div className="bg-yellow-600 px-4 py-2 rounded-lg flex items-center gap-2">
+                <span className="font-bold text-white">PRÉPARATION</span>
+              </div>
+            )}
             <div className="bg-green-600/80 px-3 py-1.5 rounded-lg flex items-center gap-2">
               <Wifi className="w-4 h-4 text-white" />
               <span className="text-white text-sm">Connecté</span>
