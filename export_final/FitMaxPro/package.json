@@ -1,0 +1,23 @@
+{
+  "name": "fitmaxpro",
+  "version": "2.0.0",
+  "description": "FitMaxPro - Complete Fitness Application",
+  "main": "backend/server.py",
+  "scripts": {
+    "start:backend": "cd backend && uvicorn server:app --host 0.0.0.0 --port 8001 --reload",
+    "start:frontend": "cd frontend && yarn start",
+    "test": "cd backend && pytest tests/ -v",
+    "install:backend": "cd backend && pip install -r requirements.txt",
+    "install:frontend": "cd frontend && yarn install"
+  },
+  "keywords": [
+    "fitness",
+    "workout",
+    "live-streaming",
+    "livekit",
+    "react",
+    "fastapi"
+  ],
+  "author": "FitMaxPro",
+  "license": "MIT"
+}

@@ -1,42 +1,44 @@
 # FitMaxPro 🏋️
 
-Application de fitness complète avec streaming en direct, programmes d'entraînement, gamification et plus encore.
+Application de fitness complète avec streaming en direct, programmes d'entraînement, gamification, achats in-app et notifications push.
 
 ## 🌟 Fonctionnalités
 
-### 🎥 Live Streaming & Appels
-- Streaming en direct avec WebRTC (LiveKit)
-- Appels vidéo 1-to-1 entre coach et abonnés
-- Chat en temps réel pendant les lives
-- Réactions en direct (🔥❤️💪👏)
+### 🎥 Live Streaming & Appels (LiveKit)
+- Streaming en direct avec WebRTC
+- Appels vidéo 1-to-1 coach/abonnés
+- Changement de caméra avant/arrière
+- Chat en temps réel
+- Notifications push pour les appels entrants
 
 ### 💪 Programmes d'Entraînement
 - +70 séances d'entraînement
-- Niveaux débutant, intermédiaire, avancé
+- Plans nutritionnels
 - Échauffements et étirements
-- Suivi des sessions et du temps
+- Suivi des sessions
 
 ### 🏃 Course à Pied
-- Suivi GPS des courses
+- Suivi GPS
 - Classement en temps réel
 - Défis hebdomadaires
 - Statistiques détaillées
 
 ### 🎮 Gamification
 - Système de points
-- Badges et récompenses
+- 5 récompenses échangeables
 - Hall of Fame
-- Échange de points contre des récompenses
+- Badges par paliers
 
 ### 💳 Abonnements
-- Intégration Stripe
+- **Web**: Intégration Stripe
+- **Mobile**: Intégration RevenueCat (iOS/Android)
 - Période d'essai de 7 jours
 - Plans Standard et VIP
-- In-App Purchases (RevenueCat)
 
-### 📱 Réseaux Sociaux
-- Liens vers tous les réseaux sociaux
-- Gestion admin complète
+### 🔔 Notifications Push
+- Service Worker dédié
+- Notifications d'appels interactives
+- Broadcast admin
 
 ## 🚀 Installation
 
@@ -44,8 +46,7 @@ Application de fitness complète avec streaming en direct, programmes d'entraîn
 - Node.js 18+
 - Python 3.10+
 - MongoDB 6+
-- Compte Stripe (pour les paiements)
-- Compte LiveKit (pour le streaming)
+- Comptes: Stripe, LiveKit, RevenueCat (optionnel)
 
 ### Backend
 
@@ -75,7 +76,7 @@ cp .env.example .env
 yarn start
 ```
 
-### Docker (Recommandé)
+### Docker
 
 ```bash
 docker-compose up -d
@@ -86,25 +87,30 @@ docker-compose up -d
 ```
 FitMaxPro/
 ├── backend/
-│   ├── routes/           # Routes API modulaires
+│   ├── routes/           # 16 modules API
 │   │   ├── auth.py       # Authentification
 │   │   ├── workouts.py   # Entraînements
 │   │   ├── lives.py      # Live streaming
 │   │   ├── livekit.py    # WebRTC
 │   │   ├── running.py    # Course à pied
 │   │   ├── rewards.py    # Gamification
+│   │   ├── iap.py        # Achats In-App
+│   │   ├── notifications.py # Push Notifications
 │   │   └── ...
-│   ├── utils/            # Utilitaires
-│   │   └── config.py     # Configuration centralisée
-│   ├── models/           # Modèles Pydantic
-│   └── server.py         # Point d'entrée FastAPI
+│   ├── utils/config.py   # Configuration
+│   ├── models/schemas.py # Modèles Pydantic
+│   ├── tests/            # Tests pytest
+│   └── server.py         # Point d'entrée
 ├── frontend/
 │   ├── src/
-│   │   ├── components/   # Composants React
+│   │   ├── components/
+│   │   │   ├── admin/    # Composants admin refactorisés
+│   │   │   └── ui/       # ShadcnUI
 │   │   ├── pages/        # Pages de l'app
-│   │   ├── context/      # Contexte Auth
-│   │   └── hooks/        # Hooks personnalisés
+│   │   ├── hooks/        # Hooks personnalisés
+│   │   └── context/      # Contexte Auth
 │   └── public/
+│       └── sw.js         # Service Worker
 └── docker-compose.yml
 ```
 
@@ -115,45 +121,41 @@ FitMaxPro/
 
 ## 📄 API Endpoints
 
-### Authentification
-- `POST /api/auth/register` - Inscription
-- `POST /api/auth/login` - Connexion
-- `POST /api/auth/logout` - Déconnexion
-- `GET /api/auth/me` - Utilisateur actuel
+| Module | Routes | Description |
+|--------|--------|-------------|
+| `/api/auth` | 6 | Authentification |
+| `/api/payments` | 3 | Paiements Stripe |
+| `/api/workouts` | 8 | Entraînements |
+| `/api/supplements` | 2 | Nutrition |
+| `/api/messages` | 4 | Messagerie |
+| `/api/reminders` | 7 | Rappels |
+| `/api/lives` | 12 | Live streaming |
+| `/api/livekit` | 10 | WebRTC/Appels |
+| `/api/running` | 5 | Course à pied |
+| `/api/rewards` | 8 | Gamification |
+| `/api/reviews` | 6 | Avis |
+| `/api/iap` | 5 | In-App Purchases |
+| `/api/notifications` | 7 | Push Notifications |
 
-### Entraînements
-- `GET /api/workouts` - Liste des entraînements
-- `GET /api/workouts/:id` - Détail d'un entraînement
-- `POST /api/workout/start` - Démarrer une session
-- `POST /api/workout/end` - Terminer une session
+## 🧪 Tests
 
-### Live Streaming
-- `GET /api/lives` - Lives actifs
-- `POST /api/lives` - Créer un live (admin)
-- `POST /api/lives/:id/join` - Rejoindre un live
-- `GET /api/lives/analytics` - Statistiques (admin)
-
-### Course à Pied
-- `GET /api/running/history` - Historique
-- `GET /api/running/leaderboard` - Classement
-- `GET /api/running/challenges` - Défis
-
-### Récompenses
-- `GET /api/rewards/catalog` - Catalogue
-- `POST /api/rewards/redeem` - Échanger des points
+```bash
+cd backend
+pytest tests/ -v
+```
 
 ## 🛠 Technologies
 
-- **Backend:** FastAPI, Motor (MongoDB async), Pydantic
+- **Backend:** FastAPI, Motor (MongoDB), Pydantic, pywebpush
 - **Frontend:** React, Tailwind CSS, ShadcnUI
 - **WebRTC:** LiveKit
-- **Paiements:** Stripe
+- **Paiements:** Stripe, RevenueCat
 - **Emails:** Resend
-- **In-App:** RevenueCat
+- **Push:** Web Push API
 
 ## 📝 Licence
 
-MIT License - Voir LICENSE
+MIT License
 
 ## 👨‍💻 Auteur
 

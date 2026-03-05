@@ -1,56 +1,54 @@
 version: '3.8'
 
 services:
-  # Base de données MongoDB
   mongodb:
     image: mongo:6
-    container_name: fitmaxpro-db
+    container_name: fitmaxpro-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
     volumes:
       - mongodb_data:/data/db
     environment:
       - MONGO_INITDB_DATABASE=fitmaxpro
-    restart: always
-    networks:
-      - fitmaxpro-network
 
-  # Backend FastAPI
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: fitmaxpro-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    depends_on:
+      - mongodb
     environment:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=fitmaxpro
-      - STRIPE_API_KEY=${STRIPE_API_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - JWT_SECRET=${JWT_SECRET}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-    depends_on:
-      - mongodb
-    restart: always
-    networks:
-      - fitmaxpro-network
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
 
-  # Frontend React
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: fitmaxpro-frontend
+    restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "3000:3000"
     depends_on:
       - backend
-    restart: always
-    networks:
-      - fitmaxpro-network
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8001
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
   mongodb_data:
-
-networks:
-  fitmaxpro-network:
-    driver: bridge
+  backend_uploads:

@@ -2,20 +2,20 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Installer les dépendances système
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copier et installer les dépendances Python
+# Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copier le code source
+# Copy application code
 COPY . .
 
-# Exposer le port
+# Expose port
 EXPOSE 8001
 
-# Commande de démarrage
+# Run the application
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
