@@ -7,7 +7,7 @@ import {
   useLocalParticipant,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { Track } from 'livekit-client';
+import { Track, facingModeFromLocalTrack, createLocalVideoTrack } from 'livekit-client';
 import { 
   Video, 
   VideoOff, 
@@ -23,12 +23,14 @@ import {
   AlertCircle,
   Wifi,
   ScreenShare,
-  ScreenShareOff
+  ScreenShareOff,
+  SwitchCamera,
+  Smartphone
 } from 'lucide-react';
 import { Button } from './ui/button';
 
 // Simple Video Element that attaches directly to a track
-const SimpleVideoView = ({ track, isLocal = false, className = '' }) => {
+const SimpleVideoView = ({ track, isLocal = false, isMirrored = true, className = '' }) => {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -36,7 +38,6 @@ const SimpleVideoView = ({ track, isLocal = false, className = '' }) => {
     if (!videoElement || !track) return;
 
     track.attach(videoElement);
-    console.log('Track attached:', track.sid);
 
     return () => {
       track.detach(videoElement);
@@ -61,7 +62,7 @@ const SimpleVideoView = ({ track, isLocal = false, className = '' }) => {
       playsInline
       muted={isLocal}
       className={`object-cover ${className}`}
-      style={{ transform: isLocal ? 'scaleX(-1)' : 'none' }}
+      style={{ transform: isLocal && isMirrored ? 'scaleX(-1)' : 'none' }}
     />
   );
 };
@@ -127,6 +128,24 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState(null);
   const [localVideoTrack, setLocalVideoTrack] = useState(null);
+  const [facingMode, setFacingMode] = useState('user'); // 'user' = front, 'environment' = back
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState([]);
+
+  // Get available cameras on mount
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(d => d.kind === 'videoinput');
+        setAvailableCameras(cameras);
+        console.log('Available cameras:', cameras.length);
+      } catch (err) {
+        console.error('Error getting devices:', err);
+      }
+    };
+    getDevices();
+  }, []);
 
   // Initialize camera for broadcaster
   useEffect(() => {
@@ -138,7 +157,6 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
       setIsInitializing(true);
       setError(null);
 
-      // Try to enable camera
       try {
         await localParticipant.setCameraEnabled(true);
         console.log('Camera enabled');
@@ -156,7 +174,6 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
         }
       }
       
-      // Try to enable microphone
       try {
         await localParticipant.setMicrophoneEnabled(true);
         console.log('Mic enabled');
@@ -197,6 +214,45 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
       localParticipant.off('trackUnmuted', updateLocalVideo);
     };
   }, [localParticipant]);
+
+  // Switch camera (front/back)
+  const switchCamera = async () => {
+    if (!localParticipant || isSwitchingCamera) return;
+    
+    setIsSwitchingCamera(true);
+    
+    try {
+      const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+      
+      // Create new video track with different facing mode
+      const newTrack = await createLocalVideoTrack({
+        facingMode: newFacingMode,
+        resolution: { width: 1280, height: 720, frameRate: 30 }
+      });
+      
+      // Get current camera publication
+      const currentCameraPub = localParticipant.getTrackPublication(Track.Source.Camera);
+      
+      if (currentCameraPub) {
+        // Unpublish current track
+        await localParticipant.unpublishTrack(currentCameraPub.track);
+      }
+      
+      // Publish new track
+      await localParticipant.publishTrack(newTrack);
+      
+      setFacingMode(newFacingMode);
+      setLocalVideoTrack(newTrack);
+      setError(null);
+      
+      console.log('Switched to', newFacingMode === 'user' ? 'front' : 'back', 'camera');
+    } catch (err) {
+      console.error('Error switching camera:', err);
+      setError(`Erreur: ${err.message}`);
+    } finally {
+      setIsSwitchingCamera(false);
+    }
+  };
 
   const toggleCamera = async () => {
     if (!localParticipant) return;
@@ -279,6 +335,15 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
               <Users className="w-4 h-4 text-gray-300" />
               <span className="text-white text-sm">{remoteParticipants.length} spectateur{remoteParticipants.length !== 1 ? 's' : ''}</span>
             </div>
+            {/* Camera indicator */}
+            {isCameraOn && (
+              <div className="bg-blue-600/80 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-white" />
+                <span className="text-white text-sm">
+                  {facingMode === 'user' ? 'Caméra avant' : 'Caméra arrière'}
+                </span>
+              </div>
+            )}
           </div>
           
           {isBroadcaster && (
@@ -313,7 +378,12 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
               ) : (
                 <div className="h-full bg-zinc-900 rounded-lg overflow-hidden relative">
                   {localVideoTrack ? (
-                    <SimpleVideoView track={localVideoTrack} isLocal={true} className="w-full h-full" />
+                    <SimpleVideoView 
+                      track={localVideoTrack} 
+                      isLocal={true} 
+                      isMirrored={facingMode === 'user'}
+                      className="w-full h-full" 
+                    />
                   ) : (
                     <div className="h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
                       <div className="text-center max-w-md px-6">
@@ -339,6 +409,23 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
                       </div>
                     </div>
                   )}
+                  
+                  {/* Switch Camera Button - Floating */}
+                  {isCameraOn && availableCameras.length > 1 && (
+                    <button
+                      onClick={switchCamera}
+                      disabled={isSwitchingCamera}
+                      className="absolute top-4 right-4 bg-black/70 backdrop-blur-sm p-3 rounded-full hover:bg-black/90 transition-all disabled:opacity-50"
+                      title={facingMode === 'user' ? 'Passer à la caméra arrière' : 'Passer à la caméra avant'}
+                    >
+                      {isSwitchingCamera ? (
+                        <RefreshCw className="w-6 h-6 text-white animate-spin" />
+                      ) : (
+                        <SwitchCamera className="w-6 h-6 text-white" />
+                      )}
+                    </button>
+                  )}
+                  
                   <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-2">
                     <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                     <span className="text-white text-sm font-medium">{localParticipant?.name || 'Vous'} (EN DIRECT)</span>
@@ -386,24 +473,59 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
       {/* Bottom Controls */}
       {isBroadcaster && !isInitializing && (
         <div className="bg-zinc-900/95 backdrop-blur-lg p-4 border-t border-zinc-800">
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-3">
+            {/* Mic */}
             <Button onClick={toggleMic} size="lg" className={`rounded-full w-14 h-14 ${isMicOn ? 'bg-zinc-700 hover:bg-zinc-600' : 'bg-red-600 hover:bg-red-700'}`} data-testid="toggle-mic-btn">
               {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
             </Button>
+            
+            {/* Camera */}
             <Button onClick={toggleCamera} size="lg" className={`rounded-full w-14 h-14 ${isCameraOn ? 'bg-zinc-700 hover:bg-zinc-600' : 'bg-red-600 hover:bg-red-700'}`} data-testid="toggle-camera-btn">
               {isCameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
             </Button>
+            
+            {/* Switch Camera */}
+            {availableCameras.length > 1 && (
+              <Button 
+                onClick={switchCamera} 
+                size="lg" 
+                disabled={!isCameraOn || isSwitchingCamera}
+                className={`rounded-full w-14 h-14 ${facingMode === 'environment' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-zinc-700 hover:bg-zinc-600'} disabled:opacity-50`}
+                data-testid="switch-camera-btn"
+                title={facingMode === 'user' ? 'Caméra arrière' : 'Caméra avant'}
+              >
+                {isSwitchingCamera ? (
+                  <RefreshCw className="w-6 h-6 animate-spin" />
+                ) : (
+                  <SwitchCamera className="w-6 h-6" />
+                )}
+              </Button>
+            )}
+            
+            {/* Screen Share */}
             <Button onClick={toggleScreenShare} size="lg" className={`rounded-full w-14 h-14 ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-zinc-700 hover:bg-zinc-600'}`} data-testid="toggle-screen-btn">
               {isScreenSharing ? <ScreenShareOff className="w-6 h-6" /> : <ScreenShare className="w-6 h-6" />}
             </Button>
-            <div className="w-px h-10 bg-zinc-700 mx-2"></div>
+            
+            <div className="w-px h-10 bg-zinc-700 mx-1"></div>
+            
+            {/* Fullscreen */}
             <Button onClick={() => setIsFullscreen(!isFullscreen)} size="lg" className="rounded-full w-14 h-14 bg-zinc-700 hover:bg-zinc-600">
               {isFullscreen ? <Minimize className="w-6 h-6" /> : <Maximize className="w-6 h-6" />}
             </Button>
+            
+            {/* End */}
             <Button onClick={handleDisconnect} size="lg" className="rounded-full w-14 h-14 bg-red-600 hover:bg-red-700" data-testid="end-call-btn">
               <PhoneOff className="w-6 h-6" />
             </Button>
           </div>
+          
+          {/* Camera info */}
+          {isCameraOn && availableCameras.length > 1 && (
+            <p className="text-center text-zinc-500 text-xs mt-2">
+              {facingMode === 'user' ? '📷 Caméra avant (selfie)' : '📷 Caméra arrière'}
+            </p>
+          )}
         </div>
       )}
 

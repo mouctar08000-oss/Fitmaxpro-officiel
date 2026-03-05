@@ -8,27 +8,24 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels 1-to-1,
 
 ## All Implemented Features (March 5, 2026)
 
-### 🎥 LIVE STREAMING WEBRTC (LiveKit) ✅ PERFECTED
-- Streaming en direct avec LiveKit WebRTC
-- Interface professionnelle avec contrôles complets
-- Chat en temps réel pendant les lives
-- Système de demandes de live pour les abonnés
+### 🎥 LIVE STREAMING & APPELS (LiveKit) ✅ PERFECTED
+- **Changement de caméra** avant/arrière (bouton SwitchCamera)
+- **Indicateur de caméra** : "Caméra avant" / "Caméra arrière"
+- **Contrôles complets** : Micro, Caméra, Switch Camera, Partage d'écran, Plein écran
+- **Appels 1-to-1** entre coach et abonnés
+- **Notification d'appels entrants** avec modal
+- **Chat en temps réel** pendant les lives
 
-### 📞 APPELS 1-TO-1 (LiveKit) ✅ NOUVEAU
-- **Appels vidéo/audio** entre coach et abonnés
-- **Boutons d'appel** dans le panneau Admin (Video Call / Audio Call)
-- **Icône téléphone** dans la liste des abonnés
-- **Système d'appels entrants** avec notification modale
-- **Vérification périodique** des appels en attente
-- **Interface d'appel** complète avec :
-  - Badge "Video Call" / "Audio Call"
-  - Chronomètre d'appel
-  - Contrôles : Micro, Caméra, Partage d'écran, Plein écran
-  - Bouton fin d'appel
+### 📱 RÉSEAUX SOCIAUX ✅ AMÉLIORÉS
+- **Design moderne** avec cartes et gradients
+- **Animations hover** avec scale et shadow
+- **Sous-titres** descriptifs pour chaque réseau
+- **Support complet** : Instagram, YouTube, TikTok, Facebook, Snapchat, Twitter/X, WhatsApp, Telegram, Website
+- **Footer** avec icônes de réseaux sociaux améliorées
 
 ### 🏆 GAMIFICATION COMPLÈTE ✅
 - Système de points automatique
-- Badges par paliers (Bronze, Argent, Or, etc.)
+- Badges par paliers
 - Hall of Fame
 - Défis hebdomadaires
 
@@ -37,65 +34,36 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels 1-to-1,
 - Logique d'engagement 12 mois
 - Achats in-app via RevenueCat
 
-### 🏃 COURSE À PIED ✅
-- Suivi GPS
-- Statistiques et classement
-- Défis hebdomadaires
-
 ## Changelog
 
-### March 5, 2026 - Session 7
-- ✅ **Bug écran noir CORRIGÉ** dans le Live Streaming
-- ✅ **Appels 1-to-1 implémentés** via LiveKit
-  - Nouveau composant `CallPage.js`
-  - Nouveau composant `IncomingCall.js`
-  - Boutons d'appel dans AdminPage
-  - Système de notification d'appels entrants
-- ✅ **Archive GitHub mise à jour** avec toutes les nouvelles fonctionnalités
+### March 5, 2026 - Session 7 (Final)
+- ✅ **Changement de caméra** avant/arrière pour Live et Appels
+- ✅ **Indicateur de caméra active** (Caméra avant/arrière)
+- ✅ **Réseaux sociaux améliorés** avec nouveau design
+- ✅ **Appels 1-to-1** implémentés
+- ✅ **Archive GitHub finale** générée
 
 ## Test Credentials
 - **Admin**: admin@fitmaxpro.com / admin123
 - **User**: test@test.com / test123
 
-## Key API Endpoints
-
-### Appels 1-to-1
-```
-POST /api/livekit/calls/initiate - Initier un appel
-GET /api/livekit/calls/pending - Appels en attente
-POST /api/livekit/calls/{call_id}/answer - Répondre à un appel
-```
-
-### Live Streaming
-```
-GET /api/livekit/status - Statut LiveKit
-POST /api/lives - Créer un live
-POST /api/lives/{id}/join - Rejoindre un live
-POST /api/lives/{id}/end - Terminer un live
-```
-
-## Files Modified/Created Today
+## Files Modified Today
+- `/app/frontend/src/components/LiveKitRoom.js` - Changement de caméra ajouté
+- `/app/frontend/src/components/Footer.js` - Design amélioré
+- `/app/frontend/src/pages/Dashboard.js` - Section réseaux sociaux refaite
 - `/app/frontend/src/pages/CallPage.js` - Page d'appel réécrite
-- `/app/frontend/src/components/IncomingCall.js` - NOUVEAU - Notification d'appels entrants
+- `/app/frontend/src/components/IncomingCall.js` - Notifications d'appels
 - `/app/frontend/src/pages/AdminPage.js` - Boutons d'appel ajoutés
-- `/app/frontend/src/App.js` - Hook d'appels entrants intégré
-- `/app/frontend/src/components/LiveKitRoom.js` - Bug écran noir corrigé
 
-## Prioritized Backlog
+## Archive GitHub
+**Fichier** : `/app/FitMaxPro_GitHub_Public.zip` (1.5 MB)
+- README.md complet
+- .env.example pour backend et frontend
+- Dockerfiles inclus
+- Code source complet sans clés API
 
-### ✅ Completed
-- Live Streaming fonctionnel ✅
-- Appels 1-to-1 implémentés ✅
-- Archive GitHub générée ✅
-
-### P0 - Refactorisation (Recommandé)
-- ⏳ Découper `server.py` (6820 lignes) en APIRouters
-- ⏳ Découper `AdminPage.js` (4980 lignes) en composants
-
-### P1 - Prochaines fonctionnalités
-- 🔲 Push notifications pour appels entrants (Firebase Cloud Messaging)
-- 🔲 Historique des appels
-
-### P2 - Améliorations futures
-- 🔲 Tests unitaires
-- 🔲 Configuration Capacitor pour stores
+## Fonctionnalités de la Caméra
+- **Caméra avant (user)** : Mode selfie, image miroir
+- **Caméra arrière (environment)** : Mode normal
+- **Bouton SwitchCamera** : Bascule instantanée
+- **Auto-détection** : Affiche le bouton uniquement si plusieurs caméras disponibles

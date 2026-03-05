@@ -88,14 +88,14 @@ const Footer = () => {
   ];
 
   const socialPlatforms = [
-    { key: 'instagram', icon: Instagram, color: 'hover:bg-pink-500' },
-    { key: 'youtube', icon: Youtube, color: 'hover:bg-red-600' },
-    { key: 'tiktok', icon: TikTokIcon, color: 'hover:bg-black' },
-    { key: 'snapchat', icon: SnapchatIcon, color: 'hover:bg-yellow-400' },
-    { key: 'facebook', icon: FacebookIcon, color: 'hover:bg-blue-600' },
-    { key: 'twitter', icon: TwitterIcon, color: 'hover:bg-black' },
-    { key: 'whatsapp', icon: WhatsAppIcon, color: 'hover:bg-green-500' },
-    { key: 'telegram', icon: TelegramIcon, color: 'hover:bg-blue-500' }
+    { key: 'instagram', icon: Instagram, color: 'hover:bg-gradient-to-br hover:from-purple-600 hover:to-pink-500', label: 'Instagram' },
+    { key: 'youtube', icon: Youtube, color: 'hover:bg-red-600', label: 'YouTube' },
+    { key: 'tiktok', icon: TikTokIcon, color: 'hover:bg-gradient-to-br hover:from-cyan-400 hover:to-pink-500', label: 'TikTok' },
+    { key: 'snapchat', icon: SnapchatIcon, color: 'hover:bg-yellow-400', label: 'Snapchat' },
+    { key: 'facebook', icon: FacebookIcon, color: 'hover:bg-blue-600', label: 'Facebook' },
+    { key: 'twitter', icon: TwitterIcon, color: 'hover:bg-black', label: 'X (Twitter)' },
+    { key: 'whatsapp', icon: WhatsAppIcon, color: 'hover:bg-green-500', label: 'WhatsApp' },
+    { key: 'telegram', icon: TelegramIcon, color: 'hover:bg-blue-500', label: 'Telegram' }
   ];
 
   return (
@@ -122,7 +122,7 @@ const Footer = () => {
             
             {/* Social Links */}
             <div className="flex items-center gap-3 flex-wrap">
-              {socialPlatforms.map(({ key, icon: Icon, color }) => {
+              {socialPlatforms.map(({ key, icon: Icon, color, label }) => {
                 const url = socialLinks[key];
                 if (!url) return null;
                 return (
@@ -131,10 +131,11 @@ const Footer = () => {
                     href={url}
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className={`p-2 bg-[#121212] rounded-lg ${color} transition-colors group`}
-                    aria-label={key}
+                    className={`p-3 bg-[#1a1a1a] rounded-xl ${color} transition-all duration-300 group hover:scale-110 hover:shadow-lg`}
+                    aria-label={label}
+                    title={label}
                   >
-                    <Icon className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                    <Icon className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
                   </a>
                 );
               })}
