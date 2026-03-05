@@ -14,6 +14,7 @@ from .lives import router as lives_router
 from .livekit import router as livekit_router
 from .running import router as running_router
 from .rewards import router as rewards_router
+from .reviews import router as reviews_router
 
 __all__ = [
     'auth_router',
@@ -30,6 +31,7 @@ __all__ = [
     'livekit_router',
     'running_router',
     'rewards_router',
+    'reviews_router',
     'get_current_user',
     'verify_admin',
 ]

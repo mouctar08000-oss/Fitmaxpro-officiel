@@ -4,9 +4,13 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 import uuid
 
-from ..utils import db, get_current_user, verify_admin, User
+import sys
+sys.path.insert(0, "/app/backend")
+from utils.config import db
+from models.schemas import User
+from routes.auth import get_current_user, verify_admin
 
-router = APIRouter(prefix="/api", tags=["reviews"])
+router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 class ReviewCreate(BaseModel):
     rating: int  # 1-5 stars
@@ -14,7 +18,7 @@ class ReviewCreate(BaseModel):
     content: str
     is_public: bool = True
 
-@router.post("/reviews")
+@router.post("")
 async def create_review(review: ReviewCreate, current_user: User = Depends(get_current_user)):
     """Create a new review - Only authenticated subscribers can create reviews"""
     review_data = {
@@ -33,7 +37,7 @@ async def create_review(review: ReviewCreate, current_user: User = Depends(get_c
     await db.reviews.insert_one(review_data)
     return {"message": "Review created", "review_id": review_data["review_id"]}
 
-@router.get("/reviews")
+@router.get("")
 async def get_public_reviews():
     """Get all public reviews - accessible by everyone"""
     reviews = await db.reviews.find(
@@ -51,7 +55,7 @@ async def get_public_reviews():
         "average_rating": round(avg_rating, 1)
     }
 
-@router.get("/user/reviews")
+@router.get("/user")
 async def get_user_reviews(current_user: User = Depends(get_current_user)):
     """Get current user's reviews"""
     reviews = await db.reviews.find(
@@ -60,7 +64,7 @@ async def get_user_reviews(current_user: User = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(50)
     return {"reviews": reviews}
 
-@router.get("/admin/reviews")
+@router.get("/admin/all")
 async def admin_get_all_reviews(admin: User = Depends(verify_admin)):
     """Admin: Get all reviews (public and private)"""
     reviews = await db.reviews.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -79,7 +83,7 @@ async def admin_get_all_reviews(admin: User = Depends(verify_admin)):
         }
     }
 
-@router.put("/admin/reviews/{review_id}/respond")
+@router.put("/admin/{review_id}/respond")
 async def admin_respond_to_review(review_id: str, response: str, admin: User = Depends(verify_admin)):
     """Admin: Respond to a review"""
     await db.reviews.update_one(
@@ -91,7 +95,7 @@ async def admin_respond_to_review(review_id: str, response: str, admin: User = D
     )
     return {"message": "Response added"}
 
-@router.delete("/admin/reviews/{review_id}")
+@router.delete("/admin/{review_id}")
 async def admin_delete_review(review_id: str, admin: User = Depends(verify_admin)):
     """Admin: Delete a review"""
     await db.reviews.delete_one({"review_id": review_id})

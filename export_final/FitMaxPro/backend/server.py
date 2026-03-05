@@ -29,6 +29,7 @@ from routes import (
     livekit_router,
     running_router,
     rewards_router,
+    reviews_router,
 )
 
 # Setup logging
@@ -69,6 +70,7 @@ api_router.include_router(lives_router)
 api_router.include_router(livekit_router)
 api_router.include_router(running_router)
 api_router.include_router(rewards_router)
+api_router.include_router(reviews_router)
 
 
 # Health check endpoint

@@ -6,16 +6,19 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels 1-to-1,
 ## Website URL
 **https://fitmax-gains.preview.emergentagent.com**
 
-## Session du 5 Mars 2026 - Refactorisation Backend
+---
+
+## Session du 5 Mars 2026 - Refactorisation Complète
 
 ### ✅ REFACTORISATION BACKEND COMPLÉTÉE
 
-Le backend monolithique (`server.py` ~6900 lignes) a été refactorisé en architecture modulaire:
+Le backend monolithique (`server.py` ~6900 lignes) a été **entièrement refactorisé** en architecture modulaire :
 
 ```
 backend/
-├── server.py           # Point d'entrée (~100 lignes)
+├── server.py           # Point d'entrée (~80 lignes)
 ├── routes/
+│   ├── __init__.py     # Exports centralisés
 │   ├── auth.py         # Authentification
 │   ├── payments.py     # Paiements Stripe
 │   ├── workouts.py     # Entraînements
@@ -27,41 +30,67 @@ backend/
 │   ├── lives.py        # Live streaming
 │   ├── livekit.py      # WebRTC calls
 │   ├── running.py      # Course à pied
-│   └── rewards.py      # Gamification
+│   ├── rewards.py      # Gamification
+│   └── reviews.py      # Avis
 ├── utils/
 │   └── config.py       # Configuration centralisée
 └── models/
     └── schemas.py      # Modèles Pydantic
 ```
 
+### ✅ REFACTORISATION FRONTEND INITIÉE
+
+Création de composants admin réutilisables :
+
+```
+frontend/src/components/admin/
+├── index.js
+├── AdminDashboard.js     # Tableau de bord
+├── AdminSocialLinks.js   # Gestion réseaux sociaux
+└── AdminLiveAnalytics.js # Stats des lives
+```
+
+`AdminPage.js` utilise maintenant ces composants, réduisant sa taille et améliorant la maintenabilité.
+
 ### ✅ ARCHIVE GITHUB CRÉÉE
 
 **Fichier**: `/app/FitMaxPro_GitHub_Final.zip` (1.3 MB)
-- Code source complet refactorisé
-- README.md avec documentation
-- .env.example pour backend et frontend
-- Dockerfiles inclus
-- AUCUNE clé API ou credential
+- ✅ Code source complet et refactorisé
+- ✅ README.md avec documentation complète
+- ✅ .env.example pour backend et frontend
+- ✅ Dockerfiles inclus
+- ✅ **AUCUNE clé API ou credential**
+
+---
 
 ## All Implemented Features
 
 ### 🎥 LIVE STREAMING & APPELS (LiveKit)
+- Streaming en direct avec WebRTC
 - Changement de caméra avant/arrière
 - Contrôles complets (Micro, Caméra, Partage d'écran)
 - Appels 1-to-1 coach/abonnés
 - Notifications d'appels entrants
 - Chat en temps réel
+- Statistiques d'engagement
 
 ### 📱 RÉSEAUX SOCIAUX
 - Design moderne avec cartes et gradients
-- Support complet (Instagram, YouTube, TikTok, etc.)
-- Gestion admin
+- Support complet (Instagram, YouTube, TikTok, Facebook, etc.)
+- Gestion admin complète
 
 ### 🏆 GAMIFICATION
 - Système de points automatique
+- 5 récompenses échangeables
 - Badges par paliers
 - Hall of Fame
 - Défis hebdomadaires
+
+### 💪 ENTRAÎNEMENTS
+- 72 séances d'entraînement
+- 2 plans nutritionnels
+- Échauffements et étirements
+- Suivi des sessions
 
 ### 💳 ABONNEMENTS
 - Intégration Stripe
@@ -73,49 +102,75 @@ backend/
 - Classement temps réel
 - Défis hebdomadaires
 
+---
+
+## API Endpoints (v2.0 Refactorisée)
+
+### Authentification (`/api/auth`)
+- POST /register - Inscription
+- POST /login - Connexion
+- POST /logout - Déconnexion
+- GET /me - Utilisateur actuel
+
+### Entraînements (`/api/workouts`)
+- GET / - Liste des entraînements
+- GET /{id} - Détail d'un entraînement
+
+### Live Streaming (`/api/lives`)
+- GET / - Lives actifs
+- GET /analytics - Statistiques (admin)
+- GET /scheduled - Lives programmés
+- POST / - Créer un live (admin)
+- POST /{id}/join - Rejoindre un live
+
+### Course à Pied (`/api/running`)
+- GET /history - Historique
+- GET /leaderboard - Classement
+- GET /challenges - Défis
+
+### Récompenses (`/api/rewards`)
+- GET /catalog - Catalogue
+- POST /redeem - Échanger des points
+- GET /my-points - Mes points
+
+### Avis (`/api/reviews`)
+- GET / - Avis publics
+- POST / - Créer un avis
+
+---
+
 ## Test Credentials
 - **Admin**: admin@fitmaxpro.com / admin123
 - **User**: testuser@test.com / password123
 
-## API Routes (v2.0)
-
-### Authentification
-- POST /api/auth/register
-- POST /api/auth/login
-- POST /api/auth/logout
-- GET /api/auth/me
-
-### Entraînements
-- GET /api/workouts
-- GET /api/workouts/:id
-- POST /api/workout/start
-- POST /api/workout/end
-
-### Live Streaming
-- GET /api/lives
-- GET /api/lives/analytics
-- POST /api/lives
-- POST /api/lives/:id/join
-
-### Course à Pied
-- GET /api/running/history
-- GET /api/running/leaderboard
-- GET /api/running/challenges
-
-### Récompenses
-- GET /api/rewards/catalog
-- POST /api/rewards/redeem
-- GET /api/rewards/my-points
+---
 
 ## Backlog (P2-P3)
-- Logique d'abonnement annuel Stripe (bloquer annulation avant 12 mois)
-- Achats In-App natifs (RevenueCat)
-- Notifications push pour les appels
-- Refactorisation frontend AdminPage.js
+
+### P2 - Prochaines améliorations
+- [ ] Compléter la refactorisation de `AdminPage.js` (extraire tous les onglets)
+- [ ] Logique d'abonnement annuel Stripe (bloquer annulation avant 12 mois)
+- [ ] Tests automatisés (pytest)
+
+### P3 - Future
+- [ ] Achats In-App natifs (RevenueCat)
+- [ ] Notifications push pour les appels
+
+---
 
 ## Technologies
-- **Backend**: FastAPI, Motor (MongoDB), Pydantic
-- **Frontend**: React, Tailwind CSS, ShadcnUI
+- **Backend**: FastAPI, Motor (MongoDB), Pydantic, LiveKit Python SDK
+- **Frontend**: React, Tailwind CSS, ShadcnUI, LiveKit React SDK, Recharts
 - **WebRTC**: LiveKit
 - **Paiements**: Stripe
 - **Emails**: Resend
+
+---
+
+## Changelog
+
+### 5 Mars 2026
+- ✅ Refactorisation complète du backend (6900 -> 80 lignes dans server.py)
+- ✅ Création de 14 modules de routes
+- ✅ Début de refactorisation frontend avec 3 composants admin
+- ✅ Archive GitHub finale générée sans credentials
