@@ -6,64 +6,116 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, Appels 1-to-1,
 ## Website URL
 **https://fitmax-gains.preview.emergentagent.com**
 
-## All Implemented Features (March 5, 2026)
+## Session du 5 Mars 2026 - Refactorisation Backend
 
-### 🎥 LIVE STREAMING & APPELS (LiveKit) ✅ PERFECTED
-- **Changement de caméra** avant/arrière (bouton SwitchCamera)
-- **Indicateur de caméra** : "Caméra avant" / "Caméra arrière"
-- **Contrôles complets** : Micro, Caméra, Switch Camera, Partage d'écran, Plein écran
-- **Appels 1-to-1** entre coach et abonnés
-- **Notification d'appels entrants** avec modal
-- **Chat en temps réel** pendant les lives
+### ✅ REFACTORISATION BACKEND COMPLÉTÉE
 
-### 📱 RÉSEAUX SOCIAUX ✅ AMÉLIORÉS
-- **Design moderne** avec cartes et gradients
-- **Animations hover** avec scale et shadow
-- **Sous-titres** descriptifs pour chaque réseau
-- **Support complet** : Instagram, YouTube, TikTok, Facebook, Snapchat, Twitter/X, WhatsApp, Telegram, Website
-- **Footer** avec icônes de réseaux sociaux améliorées
+Le backend monolithique (`server.py` ~6900 lignes) a été refactorisé en architecture modulaire:
 
-### 🏆 GAMIFICATION COMPLÈTE ✅
+```
+backend/
+├── server.py           # Point d'entrée (~100 lignes)
+├── routes/
+│   ├── auth.py         # Authentification
+│   ├── payments.py     # Paiements Stripe
+│   ├── workouts.py     # Entraînements
+│   ├── supplements.py  # Nutrition
+│   ├── messages.py     # Messagerie
+│   ├── reminders.py    # Rappels
+│   ├── user.py         # Profil utilisateur
+│   ├── social.py       # Réseaux sociaux
+│   ├── lives.py        # Live streaming
+│   ├── livekit.py      # WebRTC calls
+│   ├── running.py      # Course à pied
+│   └── rewards.py      # Gamification
+├── utils/
+│   └── config.py       # Configuration centralisée
+└── models/
+    └── schemas.py      # Modèles Pydantic
+```
+
+### ✅ ARCHIVE GITHUB CRÉÉE
+
+**Fichier**: `/app/FitMaxPro_GitHub_Final.zip` (1.3 MB)
+- Code source complet refactorisé
+- README.md avec documentation
+- .env.example pour backend et frontend
+- Dockerfiles inclus
+- AUCUNE clé API ou credential
+
+## All Implemented Features
+
+### 🎥 LIVE STREAMING & APPELS (LiveKit)
+- Changement de caméra avant/arrière
+- Contrôles complets (Micro, Caméra, Partage d'écran)
+- Appels 1-to-1 coach/abonnés
+- Notifications d'appels entrants
+- Chat en temps réel
+
+### 📱 RÉSEAUX SOCIAUX
+- Design moderne avec cartes et gradients
+- Support complet (Instagram, YouTube, TikTok, etc.)
+- Gestion admin
+
+### 🏆 GAMIFICATION
 - Système de points automatique
 - Badges par paliers
 - Hall of Fame
 - Défis hebdomadaires
 
-### 💳 ABONNEMENTS ✅
+### 💳 ABONNEMENTS
 - Intégration Stripe
-- Logique d'engagement 12 mois
-- Achats in-app via RevenueCat
+- Période d'essai 7 jours
+- Plans Standard/VIP
 
-## Changelog
-
-### March 5, 2026 - Session 7 (Final)
-- ✅ **Changement de caméra** avant/arrière pour Live et Appels
-- ✅ **Indicateur de caméra active** (Caméra avant/arrière)
-- ✅ **Réseaux sociaux améliorés** avec nouveau design
-- ✅ **Appels 1-to-1** implémentés
-- ✅ **Archive GitHub finale** générée
+### 🏃 COURSE À PIED
+- Suivi GPS
+- Classement temps réel
+- Défis hebdomadaires
 
 ## Test Credentials
 - **Admin**: admin@fitmaxpro.com / admin123
-- **User**: test@test.com / test123
+- **User**: testuser@test.com / password123
 
-## Files Modified Today
-- `/app/frontend/src/components/LiveKitRoom.js` - Changement de caméra ajouté
-- `/app/frontend/src/components/Footer.js` - Design amélioré
-- `/app/frontend/src/pages/Dashboard.js` - Section réseaux sociaux refaite
-- `/app/frontend/src/pages/CallPage.js` - Page d'appel réécrite
-- `/app/frontend/src/components/IncomingCall.js` - Notifications d'appels
-- `/app/frontend/src/pages/AdminPage.js` - Boutons d'appel ajoutés
+## API Routes (v2.0)
 
-## Archive GitHub
-**Fichier** : `/app/FitMaxPro_GitHub_Public.zip` (1.5 MB)
-- README.md complet
-- .env.example pour backend et frontend
-- Dockerfiles inclus
-- Code source complet sans clés API
+### Authentification
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/logout
+- GET /api/auth/me
 
-## Fonctionnalités de la Caméra
-- **Caméra avant (user)** : Mode selfie, image miroir
-- **Caméra arrière (environment)** : Mode normal
-- **Bouton SwitchCamera** : Bascule instantanée
-- **Auto-détection** : Affiche le bouton uniquement si plusieurs caméras disponibles
+### Entraînements
+- GET /api/workouts
+- GET /api/workouts/:id
+- POST /api/workout/start
+- POST /api/workout/end
+
+### Live Streaming
+- GET /api/lives
+- GET /api/lives/analytics
+- POST /api/lives
+- POST /api/lives/:id/join
+
+### Course à Pied
+- GET /api/running/history
+- GET /api/running/leaderboard
+- GET /api/running/challenges
+
+### Récompenses
+- GET /api/rewards/catalog
+- POST /api/rewards/redeem
+- GET /api/rewards/my-points
+
+## Backlog (P2-P3)
+- Logique d'abonnement annuel Stripe (bloquer annulation avant 12 mois)
+- Achats In-App natifs (RevenueCat)
+- Notifications push pour les appels
+- Refactorisation frontend AdminPage.js
+
+## Technologies
+- **Backend**: FastAPI, Motor (MongoDB), Pydantic
+- **Frontend**: React, Tailwind CSS, ShadcnUI
+- **WebRTC**: LiveKit
+- **Paiements**: Stripe
+- **Emails**: Resend

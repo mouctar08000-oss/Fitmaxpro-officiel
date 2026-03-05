@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # Base de données MongoDB
+  mongodb:
+    image: mongo:6
+    container_name: fitmaxpro-db
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=fitmaxpro
+    restart: always
+    networks:
+      - fitmaxpro-network
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fitmaxpro-backend
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=fitmaxpro
+      - STRIPE_API_KEY=${STRIPE_API_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    depends_on:
+      - mongodb
+    restart: always
+    networks:
+      - fitmaxpro-network
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fitmaxpro-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - fitmaxpro-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  fitmaxpro-network:
+    driver: bridge
