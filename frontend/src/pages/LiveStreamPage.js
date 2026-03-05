@@ -247,7 +247,7 @@ const LiveStreamPage = () => {
   const fetchSchedule = useCallback(async () => {
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('session_token');
-      const response = await axios.get(`${API}/api/live/schedule`, {
+      const response = await axios.get(`${API}/api/lives/scheduled`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setScheduledLives(response.data.scheduled_lives || []);
@@ -260,7 +260,7 @@ const LiveStreamPage = () => {
   const fetchRequests = useCallback(async () => {
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('session_token');
-      const response = await axios.get(`${API}/api/live/requests`, {
+      const response = await axios.get(`${API}/api/lives/requests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setLiveRequests(response.data.requests || []);
@@ -367,7 +367,7 @@ const LiveStreamPage = () => {
       
       if (scheduledTime) {
         // Schedule for later
-        await axios.post(`${API}/api/live/schedule`, {
+        await axios.post(`${API}/api/lives/schedule`, {
           title: liveTitle,
           description: liveDescription,
           is_vip: isVipOnly,
@@ -399,6 +399,12 @@ const LiveStreamPage = () => {
         if (response.data.host_token && response.data.livekit_url) {
           setLiveKitToken(response.data.host_token);
           setLiveKitServerUrl(response.data.livekit_url);
+          setIsWebRTCConnected(true);
+          toast.success(isFr ? '🎥 Caméra prête ! Vous êtes en direct.' : '🎥 Camera ready! You are live.');
+        } else if (response.data.token && response.data.server_url) {
+          // Alternative field names from backend
+          setLiveKitToken(response.data.token);
+          setLiveKitServerUrl(response.data.server_url);
           setIsWebRTCConnected(true);
           toast.success(isFr ? '🎥 Caméra prête ! Vous êtes en direct.' : '🎥 Camera ready! You are live.');
         } else if (liveKitStatus.configured && response.data.live_id) {

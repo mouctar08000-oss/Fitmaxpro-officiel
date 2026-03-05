@@ -42,6 +42,15 @@ class CreateScheduledLive(BaseModel):
     scheduled_time: Optional[str] = None
 
 
+class LiveRequest(BaseModel):
+    title: str
+    message: Optional[str] = None
+    category: Optional[str] = None
+    exercise_type: Optional[str] = None
+    category_label: Optional[str] = None
+    exercise_label: Optional[str] = None
+
+
 # IMPORTANT: Static routes must be defined BEFORE parameterized routes
 
 @router.get("")
@@ -134,6 +143,39 @@ async def get_scheduled_lives(current_user: User = Depends(get_current_user)):
     }
 
 
+@router.get("/requests")
+async def get_live_requests(current_user: User = Depends(get_current_user)):
+    """Get live requests (for admin to see subscriber requests)"""
+    requests = await db.live_requests.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return {"requests": requests}
+
+
+@router.post("/request")
+async def create_live_request(request_data: LiveRequest, current_user: User = Depends(get_current_user)):
+    """Submit a request for a live session (subscribers)"""
+    request_id = f"req_{uuid.uuid4().hex[:12]}"
+    
+    request_doc = {
+        "request_id": request_id,
+        "user_id": current_user.user_id,
+        "user_name": current_user.name,
+        "title": request_data.title,
+        "message": request_data.message,
+        "category": request_data.category,
+        "exercise_type": request_data.exercise_type,
+        "category_label": request_data.category_label,
+        "exercise_label": request_data.exercise_label,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.live_requests.insert_one(request_doc)
+    return {"success": True, "request_id": request_id}
+
+
 @router.post("")
 async def create_live(live_data: LiveCreate, admin: User = Depends(verify_admin)):
     """Admin: Create a new live session"""
@@ -162,27 +204,47 @@ async def create_live(live_data: LiveCreate, admin: User = Depends(verify_admin)
     await db.lives.insert_one(live)
     
     if LIVEKIT_AVAILABLE and all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]):
-        token = livekit_api.AccessToken(
-            api_key=LIVEKIT_API_KEY,
-            api_secret=LIVEKIT_API_SECRET,
-        )
-        token.identity = admin.user_id
-        token.name = admin.name
-        token.video_grants = livekit_api.VideoGrants(
-            room_join=True,
-            room=room_name,
-            can_publish=True,
-            can_subscribe=True,
-            can_publish_data=True,
-        )
-        jwt_token = token.to_jwt()
-        
-        return {
-            "live_id": live_id,
-            "room_name": room_name,
-            "token": jwt_token,
-            "server_url": LIVEKIT_URL
-        }
+        try:
+            # First, create the LiveKit room
+            http_url = LIVEKIT_URL.replace("wss://", "https://")
+            lkapi = livekit_api.LiveKitAPI(http_url, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+            
+            await lkapi.room.create_room(
+                livekit_api.CreateRoomRequest(
+                    name=room_name,
+                    max_participants=100,
+                    empty_timeout=300,
+                )
+            )
+            await lkapi.aclose()
+            
+            # Generate the token for the host using chained syntax
+            from livekit.api import AccessToken, VideoGrants
+            jwt_token = (
+                AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+                .with_identity(admin.user_id)
+                .with_name(admin.name)
+                .with_grants(VideoGrants(
+                    room_join=True,
+                    room=room_name,
+                    can_publish=True,
+                    can_subscribe=True,
+                    can_publish_data=True,
+                ))
+            ).to_jwt()
+            
+            return {
+                "live_id": live_id,
+                "room_name": room_name,
+                "livekit_room_name": room_name,
+                "token": jwt_token,
+                "host_token": jwt_token,
+                "server_url": LIVEKIT_URL,
+                "livekit_url": LIVEKIT_URL
+            }
+        except Exception as e:
+            print(f"LiveKit room creation error: {e}")
+            # Continue without LiveKit
     
     return {"live_id": live_id, "room_name": room_name}
 
@@ -262,20 +324,19 @@ async def join_live(live_id: str, current_user: User = Depends(get_current_user)
         )
     
     if LIVEKIT_AVAILABLE and all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]):
-        token = livekit_api.AccessToken(
-            api_key=LIVEKIT_API_KEY,
-            api_secret=LIVEKIT_API_SECRET,
-        )
-        token.identity = current_user.user_id
-        token.name = current_user.name
-        token.video_grants = livekit_api.VideoGrants(
-            room_join=True,
-            room=room_name,
-            can_publish=False,
-            can_subscribe=True,
-            can_publish_data=True,
-        )
-        jwt_token = token.to_jwt()
+        from livekit.api import AccessToken, VideoGrants
+        jwt_token = (
+            AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+            .with_identity(current_user.user_id)
+            .with_name(current_user.name)
+            .with_grants(VideoGrants(
+                room_join=True,
+                room=room_name,
+                can_publish=False,
+                can_subscribe=True,
+                can_publish_data=True,
+            ))
+        ).to_jwt()
         
         return {
             "token": jwt_token,

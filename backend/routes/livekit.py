@@ -60,24 +60,23 @@ async def get_livekit_token(request: LiveKitTokenRequest, current_user: User = D
         raise HTTPException(status_code=503, detail="LiveKit not configured")
     
     try:
-        token = livekit_api.AccessToken(
-            api_key=LIVEKIT_API_KEY,
-            api_secret=LIVEKIT_API_SECRET,
-        )
+        from livekit.api import AccessToken, VideoGrants
         
-        token.identity = current_user.user_id
-        token.name = request.participant_name or current_user.name
+        participant_name = request.participant_name or current_user.name
         
-        token.video_grants = livekit_api.VideoGrants(
-            room_join=True,
-            room=request.room_name,
-            can_publish=request.can_publish,
-            can_subscribe=request.can_subscribe,
-            can_publish_data=True,
-            can_update_own_metadata=True,
-        )
-        
-        jwt_token = token.to_jwt()
+        jwt_token = (
+            AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+            .with_identity(current_user.user_id)
+            .with_name(participant_name)
+            .with_grants(VideoGrants(
+                room_join=True,
+                room=request.room_name,
+                can_publish=request.can_publish,
+                can_subscribe=request.can_subscribe,
+                can_publish_data=True,
+                can_update_own_metadata=True,
+            ))
+        ).to_jwt()
         
         await db.livekit_sessions.insert_one({
             "session_id": str(uuid.uuid4()),
@@ -230,20 +229,19 @@ async def initiate_call(callee_id: str, call_type: str = "video", current_user: 
     await db.livekit_calls.insert_one(call_doc)
     
     if LIVEKIT_AVAILABLE and all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]):
-        token = livekit_api.AccessToken(
-            api_key=LIVEKIT_API_KEY,
-            api_secret=LIVEKIT_API_SECRET,
-        )
-        token.identity = current_user.user_id
-        token.name = current_user.name
-        token.video_grants = livekit_api.VideoGrants(
-            room_join=True,
-            room=room_name,
-            can_publish=True,
-            can_subscribe=True,
-            can_publish_data=True,
-        )
-        jwt_token = token.to_jwt()
+        from livekit.api import AccessToken, VideoGrants
+        jwt_token = (
+            AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+            .with_identity(current_user.user_id)
+            .with_name(current_user.name)
+            .with_grants(VideoGrants(
+                room_join=True,
+                room=room_name,
+                can_publish=True,
+                can_subscribe=True,
+                can_publish_data=True,
+            ))
+        ).to_jwt()
         
         return {
             "call_id": call_id,
@@ -292,20 +290,19 @@ async def answer_call(call_id: str, accept: bool = True, current_user: User = De
     )
     
     if LIVEKIT_AVAILABLE and all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]):
-        token = livekit_api.AccessToken(
-            api_key=LIVEKIT_API_KEY,
-            api_secret=LIVEKIT_API_SECRET,
-        )
-        token.identity = current_user.user_id
-        token.name = current_user.name
-        token.video_grants = livekit_api.VideoGrants(
-            room_join=True,
-            room=call["room_name"],
-            can_publish=True,
-            can_subscribe=True,
-            can_publish_data=True,
-        )
-        jwt_token = token.to_jwt()
+        from livekit.api import AccessToken, VideoGrants
+        jwt_token = (
+            AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+            .with_identity(current_user.user_id)
+            .with_name(current_user.name)
+            .with_grants(VideoGrants(
+                room_join=True,
+                room=call["room_name"],
+                can_publish=True,
+                can_subscribe=True,
+                can_publish_data=True,
+            ))
+        ).to_jwt()
         
         return {
             "status": "active",
