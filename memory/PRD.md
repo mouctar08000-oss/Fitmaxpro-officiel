@@ -140,12 +140,19 @@ frontend/src/
 ### Kit Marketing ✅ (5 Mars 2025)
 - **Fichier:** `FitMaxPro_Marketing_Kit.zip` (4.6 MB)
 - **Contenu:**
-  - `MARKETING_KIT.md` - Guide complet avec tous les textes (descriptions, posts Instagram/Facebook/TikTok, scripts vidéos, hashtags)
-  - 4 images promotionnelles générées:
-    - `promo_hero.png` - Bannière principale (1536x1024)
-    - `promo_live_streaming.png` - Promotion Lives (1024x1024)
-    - `promo_workouts.png` - Promotion Entraînements (1024x1024)
-    - `promo_running.png` - Promotion Running (1024x1024)
+  - `MARKETING_KIT.md` - Guide complet avec tous les textes
+  - 4 images promotionnelles générées
+
+### Gestion Admin des Séances ✅ (5 Mars 2025)
+- **Nouveau composant:** `AdminWorkouts.js`
+- **Nouvelles routes backend:**
+  - `GET /api/workouts/admin/all` - Liste toutes les séances
+  - `POST /api/workouts/admin/create` - Créer une séance
+  - `PUT /api/workouts/admin/{workout_id}` - Modifier une séance
+  - `DELETE /api/workouts/admin/{workout_id}` - Supprimer une séance
+  - `POST /api/workouts/admin/{workout_id}/exercise` - Ajouter un exercice
+  - `DELETE /api/workouts/admin/{workout_id}/exercise/{exercise_id}` - Supprimer un exercice
+  - `GET /api/workouts/admin/options` - Options pour les dropdowns
 
 ---
 

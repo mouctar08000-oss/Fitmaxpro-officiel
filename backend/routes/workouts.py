@@ -2,6 +2,7 @@
 FitMaxPro - Workout Routes
 """
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
@@ -10,9 +11,47 @@ import sys
 sys.path.insert(0, "/app/backend")
 from utils.config import db
 from models.schemas import User, Workout, WorkoutSession
-from routes.auth import get_current_user
+from routes.auth import get_current_user, verify_admin
 
 router = APIRouter(prefix="/workouts", tags=["Workouts"])
+
+
+# Pydantic models for admin operations
+class ExerciseCreate(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    duration_seconds: Optional[int] = 45
+    video_url: Optional[str] = ""
+    image_url: Optional[str] = ""
+    sets: Optional[int] = 3
+    reps: Optional[str] = "12"
+    rest_seconds: Optional[int] = 60
+
+
+class WorkoutCreate(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    level: str = "BEGINNER"  # BEGINNER, INTERMEDIATE, ADVANCED
+    program_type: str = "general"  # mass_gain, weight_loss, legs, arms, etc.
+    duration_minutes: Optional[int] = 30
+    image_url: Optional[str] = ""
+    video_url: Optional[str] = ""
+    exercises: List[ExerciseCreate] = []
+    language: str = "fr"
+    tags: List[str] = []
+
+
+class WorkoutUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    level: Optional[str] = None
+    program_type: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    exercises: Optional[List[ExerciseCreate]] = None
+    language: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 
 @router.get("", response_model=List[Workout])
@@ -203,3 +242,209 @@ async def get_session_details(session_id: str, user: User = Depends(get_current_
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+
+# ============================================
+# ADMIN ROUTES - Workout Management
+# ============================================
+
+@router.get("/admin/all")
+async def admin_get_all_workouts(admin: User = Depends(verify_admin)):
+    """Admin: Get all workouts for management"""
+    workouts = await db.workouts.find({}, {"_id": 0}).to_list(500)
+    return {"workouts": workouts, "total": len(workouts)}
+
+
+@router.post("/admin/create")
+async def admin_create_workout(workout_data: WorkoutCreate, admin: User = Depends(verify_admin)):
+    """Admin: Create a new workout"""
+    workout_id = f"workout_{uuid.uuid4().hex[:12]}"
+    
+    # Convert exercises to dict format
+    exercises = []
+    for i, ex in enumerate(workout_data.exercises):
+        exercises.append({
+            "exercise_id": f"ex_{uuid.uuid4().hex[:8]}",
+            "order": i + 1,
+            "name": ex.name,
+            "description": ex.description,
+            "duration_seconds": ex.duration_seconds,
+            "video_url": ex.video_url,
+            "image_url": ex.image_url,
+            "sets": ex.sets,
+            "reps": ex.reps,
+            "rest_seconds": ex.rest_seconds
+        })
+    
+    workout = {
+        "workout_id": workout_id,
+        "title": workout_data.title,
+        "description": workout_data.description,
+        "level": workout_data.level.upper(),
+        "program_type": workout_data.program_type,
+        "duration_minutes": workout_data.duration_minutes,
+        "image_url": workout_data.image_url,
+        "video_url": workout_data.video_url,
+        "exercises": exercises,
+        "exercise_count": len(exercises),
+        "language": workout_data.language,
+        "tags": workout_data.tags,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": admin.user_id
+    }
+    
+    await db.workouts.insert_one(workout)
+    
+    return {"success": True, "workout_id": workout_id, "message": "Workout created successfully"}
+
+
+@router.put("/admin/{workout_id}")
+async def admin_update_workout(workout_id: str, workout_data: WorkoutUpdate, admin: User = Depends(verify_admin)):
+    """Admin: Update an existing workout"""
+    existing = await db.workouts.find_one({"workout_id": workout_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if workout_data.title is not None:
+        update_data["title"] = workout_data.title
+    if workout_data.description is not None:
+        update_data["description"] = workout_data.description
+    if workout_data.level is not None:
+        update_data["level"] = workout_data.level.upper()
+    if workout_data.program_type is not None:
+        update_data["program_type"] = workout_data.program_type
+    if workout_data.duration_minutes is not None:
+        update_data["duration_minutes"] = workout_data.duration_minutes
+    if workout_data.image_url is not None:
+        update_data["image_url"] = workout_data.image_url
+    if workout_data.video_url is not None:
+        update_data["video_url"] = workout_data.video_url
+    if workout_data.language is not None:
+        update_data["language"] = workout_data.language
+    if workout_data.tags is not None:
+        update_data["tags"] = workout_data.tags
+    
+    if workout_data.exercises is not None:
+        exercises = []
+        for i, ex in enumerate(workout_data.exercises):
+            exercises.append({
+                "exercise_id": f"ex_{uuid.uuid4().hex[:8]}",
+                "order": i + 1,
+                "name": ex.name,
+                "description": ex.description,
+                "duration_seconds": ex.duration_seconds,
+                "video_url": ex.video_url,
+                "image_url": ex.image_url,
+                "sets": ex.sets,
+                "reps": ex.reps,
+                "rest_seconds": ex.rest_seconds
+            })
+        update_data["exercises"] = exercises
+        update_data["exercise_count"] = len(exercises)
+    
+    await db.workouts.update_one({"workout_id": workout_id}, {"$set": update_data})
+    
+    return {"success": True, "message": "Workout updated successfully"}
+
+
+@router.delete("/admin/{workout_id}")
+async def admin_delete_workout(workout_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Delete a workout"""
+    result = await db.workouts.delete_one({"workout_id": workout_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    return {"success": True, "message": "Workout deleted successfully"}
+
+
+@router.post("/admin/{workout_id}/exercise")
+async def admin_add_exercise(workout_id: str, exercise: ExerciseCreate, admin: User = Depends(verify_admin)):
+    """Admin: Add an exercise to a workout"""
+    workout = await db.workouts.find_one({"workout_id": workout_id})
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    exercises = workout.get("exercises", [])
+    new_exercise = {
+        "exercise_id": f"ex_{uuid.uuid4().hex[:8]}",
+        "order": len(exercises) + 1,
+        "name": exercise.name,
+        "description": exercise.description,
+        "duration_seconds": exercise.duration_seconds,
+        "video_url": exercise.video_url,
+        "image_url": exercise.image_url,
+        "sets": exercise.sets,
+        "reps": exercise.reps,
+        "rest_seconds": exercise.rest_seconds
+    }
+    exercises.append(new_exercise)
+    
+    await db.workouts.update_one(
+        {"workout_id": workout_id},
+        {"$set": {
+            "exercises": exercises,
+            "exercise_count": len(exercises),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"success": True, "exercise_id": new_exercise["exercise_id"], "message": "Exercise added"}
+
+
+@router.delete("/admin/{workout_id}/exercise/{exercise_id}")
+async def admin_remove_exercise(workout_id: str, exercise_id: str, admin: User = Depends(verify_admin)):
+    """Admin: Remove an exercise from a workout"""
+    workout = await db.workouts.find_one({"workout_id": workout_id})
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    exercises = workout.get("exercises", [])
+    exercises = [ex for ex in exercises if ex.get("exercise_id") != exercise_id]
+    
+    # Reorder remaining exercises
+    for i, ex in enumerate(exercises):
+        ex["order"] = i + 1
+    
+    await db.workouts.update_one(
+        {"workout_id": workout_id},
+        {"$set": {
+            "exercises": exercises,
+            "exercise_count": len(exercises),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"success": True, "message": "Exercise removed"}
+
+
+# Get program types and levels for dropdowns
+@router.get("/admin/options")
+async def admin_get_workout_options(admin: User = Depends(verify_admin)):
+    """Admin: Get available program types and levels"""
+    return {
+        "levels": ["BEGINNER", "INTERMEDIATE", "ADVANCED", "WORKOUTS.INTERMEDIATE", "WORKOUTS.ADVANCED"],
+        "program_types": [
+            {"value": "mass_gain", "label": "Prise de Masse"},
+            {"value": "weight_loss", "label": "Perte de Poids"},
+            {"value": "legs", "label": "Jambes & Fessiers"},
+            {"value": "Legs & Glutes", "label": "Legs & Glutes"},
+            {"value": "arms", "label": "Bras & Épaules"},
+            {"value": "chest", "label": "Pectoraux"},
+            {"value": "back", "label": "Dos"},
+            {"value": "abs", "label": "Abdominaux"},
+            {"value": "cardio", "label": "Cardio"},
+            {"value": "hiit", "label": "HIIT"},
+            {"value": "yoga", "label": "Yoga & Stretching"},
+            {"value": "warmup", "label": "Échauffement"},
+            {"value": "Women Special", "label": "Programme Femmes"},
+            {"value": "general", "label": "Général"}
+        ],
+        "languages": [
+            {"value": "fr", "label": "Français"},
+            {"value": "en", "label": "English"}
+        ]
+    }
