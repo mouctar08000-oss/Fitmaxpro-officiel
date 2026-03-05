@@ -4777,6 +4777,92 @@ async def end_live(live_id: str, current_user: User = Depends(get_current_user))
         "total_reactions": sum(live.get('reactions', {}).values())
     }
 
+@api_router.get("/lives/analytics")
+async def get_lives_analytics(current_user: User = Depends(verify_admin)):
+    """Get comprehensive analytics for all lives (admin only)"""
+    # Get all lives (active and ended)
+    all_lives = await db.lives.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    
+    # Calculate statistics
+    total_lives = len(all_lives)
+    total_viewers = sum(l.get('peak_viewers', 0) for l in all_lives)
+    total_duration = sum(l.get('duration_minutes', 0) for l in all_lives)
+    total_messages = sum(len(l.get('chat_messages', [])) for l in all_lives)
+    total_reactions = sum(sum(l.get('reactions', {}).values()) for l in all_lives)
+    
+    # Active and ended counts
+    active_lives = [l for l in all_lives if l.get('status') == 'active']
+    ended_lives = [l for l in all_lives if l.get('status') == 'ended']
+    scheduled_lives = [l for l in all_lives if l.get('status') == 'scheduled']
+    
+    # Top performers
+    top_by_viewers = sorted(ended_lives, key=lambda x: x.get('peak_viewers', 0), reverse=True)[:5]
+    top_by_duration = sorted(ended_lives, key=lambda x: x.get('duration_minutes', 0), reverse=True)[:5]
+    top_by_engagement = sorted(ended_lives, key=lambda x: len(x.get('chat_messages', [])) + sum(x.get('reactions', {}).values()), reverse=True)[:5]
+    
+    # Recent lives history
+    recent_lives = []
+    for live in all_lives[:20]:
+        recent_lives.append({
+            "live_id": live.get('live_id'),
+            "title": live.get('title'),
+            "status": live.get('status'),
+            "created_at": live.get('created_at'),
+            "started_at": live.get('started_at'),
+            "ended_at": live.get('ended_at'),
+            "duration_minutes": live.get('duration_minutes', 0),
+            "peak_viewers": live.get('peak_viewers', 0),
+            "final_viewer_count": live.get('final_viewer_count', live.get('viewer_count', 0)),
+            "chat_messages_count": len(live.get('chat_messages', [])),
+            "reactions": live.get('reactions', {}),
+            "total_reactions": sum(live.get('reactions', {}).values()),
+            "vip_only": live.get('vip_only', False)
+        })
+    
+    # Calculate averages
+    avg_viewers = total_viewers / len(ended_lives) if ended_lives else 0
+    avg_duration = total_duration / len(ended_lives) if ended_lives else 0
+    avg_messages = total_messages / len(ended_lives) if ended_lives else 0
+    
+    return {
+        "summary": {
+            "total_lives": total_lives,
+            "active_lives": len(active_lives),
+            "ended_lives": len(ended_lives),
+            "scheduled_lives": len(scheduled_lives),
+            "total_viewers_all_time": total_viewers,
+            "total_duration_minutes": total_duration,
+            "total_chat_messages": total_messages,
+            "total_reactions": total_reactions
+        },
+        "averages": {
+            "avg_peak_viewers": round(avg_viewers, 1),
+            "avg_duration_minutes": round(avg_duration, 1),
+            "avg_messages_per_live": round(avg_messages, 1)
+        },
+        "top_performers": {
+            "by_viewers": [{
+                "live_id": l.get('live_id'),
+                "title": l.get('title'),
+                "peak_viewers": l.get('peak_viewers', 0),
+                "created_at": l.get('created_at')
+            } for l in top_by_viewers],
+            "by_duration": [{
+                "live_id": l.get('live_id'),
+                "title": l.get('title'),
+                "duration_minutes": l.get('duration_minutes', 0),
+                "created_at": l.get('created_at')
+            } for l in top_by_duration],
+            "by_engagement": [{
+                "live_id": l.get('live_id'),
+                "title": l.get('title'),
+                "engagement": len(l.get('chat_messages', [])) + sum(l.get('reactions', {}).values()),
+                "created_at": l.get('created_at')
+            } for l in top_by_engagement]
+        },
+        "recent_lives": recent_lives
+    }
+
 @api_router.post("/lives/{live_id}/chat")
 async def send_chat_message(live_id: str, chat: LiveChat, current_user: User = Depends(get_current_user)):
     """Send a chat message in a live session"""
@@ -4869,7 +4955,6 @@ async def get_livekit_live_status():
         },
         "message": "LiveKit is ready for live streaming" if configured else "Configure LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env to enable real-time streaming"
     }
-    return lives
 
 # ==================== LIVEKIT WEBRTC REAL-TIME COMMUNICATION ====================
 
