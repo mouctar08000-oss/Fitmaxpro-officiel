@@ -1,64 +1,74 @@
 # FitMaxPro - Product Requirements Document
 
 ## Version
-- **Version:** 2.5.0
-- **Dernière mise à jour:** 5 Mars 2025
+- **Version:** 2.6.0
+- **Derniere mise a jour:** 5 Mars 2025
 
 ## Description du Produit
-FitMaxPro est une application de fitness complète offrant du live streaming, des appels vidéo 1-to-1 coach/client, des programmes d'entraînement personnalisés, un suivi de course à pied avec GPS, et un système de gamification.
+FitMaxPro est une application de fitness complete offrant du live streaming, des appels video 1-to-1 coach/client, des programmes d'entrainement personnalises, un suivi de course a pied avec GPS, et un systeme de gamification.
 
 ---
 
-## Fonctionnalités Implémentées
+## Fonctionnalites Implementees
 
-### Core Features ✅
+### Core Features
 - [x] **Authentification** - Login/Signup avec JWT
-- [x] **Dashboard utilisateur** - Vue d'ensemble personnalisée
+- [x] **Dashboard utilisateur** - Vue d'ensemble personnalisee
 - [x] **Navigation responsive** - Mobile et desktop
 
-### Live Streaming ✅ (Mise à jour 5 Mars 2025)
+### Live Streaming (Corrige 5 Mars 2025)
 - [x] Streaming WebRTC avec LiveKit
-- [x] **Tokens JWT avec video grants** - Corrigé avec nouvelle syntaxe chaînée
-- [x] Création de room LiveKit automatique
-- [x] Chat en temps réel
-- [x] **Bouton "Démarrer la caméra"** - Activation manuelle
+- [x] **Tokens JWT avec video grants** - Corrige avec nouvelle syntaxe chainee
+- [x] Creation de room LiveKit automatique
+- [x] Chat en temps reel
+- [x] **Bouton "Demarrer la camera"** - Activation manuelle
 - [x] Demandes de live (Live Requests)
-- [x] Lives programmés
+- [x] Lives programmes
 
-### Appels Vidéo 1-to-1 ✅
+### Appels Video 1-to-1
 - [x] Appels coach/client avec LiveKit
 - [x] Notifications d'appels entrants
 - [x] Historique des appels
 
-### Entraînements ✅
-- [x] 72+ séances prédéfinies
+### Entrainements
+- [x] 72+ seances predefinies
 - [x] Plans prise de masse / perte de poids
 - [x] Exercices par groupe musculaire
-- [x] Lecteur vidéo d'exercices
+- [x] Lecteur video d'exercices
 
-### Course à Pied ✅
+### Admin Panel - Gestion des Seances (NOUVEAU 5 Mars 2025)
+- [x] **CRUD complet** - Creer, Lire, Modifier, Supprimer
+- [x] **Upload videos** - Max 500MB avec compression automatique
+- [x] **Upload images** - Max 10MB
+- [x] **Compression video FFmpeg** - H.264, 720p, optimise web
+- [x] Gestion des exercices par seance
+
+### Course a Pied
 - [x] Suivi GPS
 - [x] Classements
-- [x] Défis hebdomadaires
+- [x] Defis hebdomadaires
 
-### Gamification ✅
-- [x] Points et récompenses
+### Gamification
+- [x] Points et recompenses
 - [x] Hall of Fame
 - [x] Badges
 
-### Paiements ✅
+### Paiements (Mis a jour 5 Mars 2025)
 - [x] Stripe (abonnements web)
-- [x] RevenueCat (achats in-app mobile) - Backend prêt
-- [x] Webhooks configurés
+- [x] RevenueCat (achats in-app mobile) - Backend pret
+- [x] Webhooks configures
+- [x] **Logique abonnement annuel** - Blocage annulation avant 12 mois
+- [x] Reactivation d'abonnement
 
-### Admin Panel ✅
+### Admin Panel
 - [x] Dashboard analytique
-- [x] Gestion abonnés
+- [x] Gestion abonnes
 - [x] Statistiques lives
 - [x] Gestion messages
 - [x] Gestion avis
-- [x] Liens réseaux sociaux
-- [x] Gestion vidéos
+- [x] Liens reseaux sociaux
+- [x] Gestion videos
+- [x] **Gestion seances** (NOUVEAU)
 
 ---
 
@@ -72,23 +82,28 @@ backend/
 │   ├── auth.py            # Authentification
 │   ├── lives.py           # Live streaming
 │   ├── livekit.py         # WebRTC
-│   ├── payments.py        # Stripe
+│   ├── payments.py        # Stripe + logique annuelle
+│   ├── workouts.py        # CRUD admin + upload + compression
 │   ├── iap.py             # RevenueCat
 │   ├── notifications.py   # Push notifications
 │   └── ...
 ├── utils/                 # Configuration
 ├── models/                # Pydantic schemas
-└── tests/                 # Tests Pytest
+├── tests/                 # Tests Pytest
+└── uploads/               # Fichiers uploades
+    ├── videos/
+    └── images/
 ```
 
 ### Frontend (React)
 ```
 frontend/src/
 ├── components/
-│   ├── admin/             # Composants admin (7 fichiers)
+│   ├── admin/             # Composants admin
+│   │   ├── AdminWorkouts.js  # NOUVEAU - Gestion seances
+│   │   └── ...
 │   ├── ui/                # Shadcn components
-│   ├── LiveKitRoom.js     # Composant streaming
-│   └── ...
+│   └── LiveKitRoom.js     # Composant streaming
 ├── pages/
 ├── hooks/
 │   └── usePushNotifications.js
@@ -97,38 +112,24 @@ frontend/src/
 
 ---
 
-## Intégrations Tierces
+## Tests Valides (5 Mars 2025)
 
-| Service | Statut | Description |
-|---------|--------|-------------|
-| LiveKit | ✅ Configuré | WebRTC streaming |
-| Stripe | ✅ Configuré | Paiements web |
-| RevenueCat | ✅ Backend prêt | IAP mobile |
-| Resend | ✅ Configuré | Emails |
-| MongoDB | ✅ Actif | Base de données |
+### Compression Video FFmpeg
+- **Statut:** PASSE
+- Fichier test: 48KB -> 43KB (9.6% compression)
+- Format sortie: H.264, 720p, optimise streaming
 
----
-
-## Corrections Récentes (5 Mars 2025)
-
-### Bug Caméra Live - RÉSOLU ✅
-- **Problème:** Écran noir lors du live streaming
-- **Cause:** Tokens JWT sans video grants (ancienne API livekit)
-- **Solution:** 
-  - Migration vers syntaxe chaînée `AccessToken().with_identity().with_grants()`
-  - Création automatique de room LiveKit avant génération du token
-  - Bouton "Démarrer la caméra" pour activation manuelle
-
-### Routes API Corrigées
-- `/api/lives/requests` - GET demandes de live
-- `/api/lives/request` - POST nouvelle demande
-- `/api/lives/scheduled` - GET lives programmés
+### Logique Abonnement Annuel Stripe
+- **Statut:** PASSE
+- Abonnement annuel: Annulation bloquee (HTTP 403)
+- Message: "334 jours restants avant annulation possible"
+- Abonnement mensuel: Annulation autorisee (can_cancel=true)
 
 ---
 
 ## Livrables
 
-### Archive GitHub ✅
+### Archive GitHub (Mis a jour 5 Mars 2025)
 - **Fichier:** `FitMaxPro_GitHub_Final.zip` (2.7 MB)
 - **Contenu:**
   - Code source complet (frontend + backend)
@@ -136,51 +137,47 @@ frontend/src/
   - Fichiers `.env.example` (sans credentials)
   - README.md avec instructions
   - Configuration Android/iOS (Capacitor)
+  - Compression video FFmpeg integree
 
-### Kit Marketing ✅ (5 Mars 2025)
+### Kit Marketing
 - **Fichier:** `FitMaxPro_Marketing_Kit.zip` (4.6 MB)
 - **Contenu:**
   - `MARKETING_KIT.md` - Guide complet avec tous les textes
-  - 4 images promotionnelles générées
-
-### Gestion Admin des Séances ✅ (5 Mars 2025)
-- **Nouveau composant:** `AdminWorkouts.js`
-- **Upload de fichiers:** Vidéos (max 500MB) et Images (max 10MB)
-- **Nouvelles routes backend:**
-  - `GET /api/workouts/admin/all` - Liste toutes les séances
-  - `POST /api/workouts/admin/create` - Créer une séance
-  - `PUT /api/workouts/admin/{workout_id}` - Modifier une séance
-  - `DELETE /api/workouts/admin/{workout_id}` - Supprimer une séance
-  - `POST /api/workouts/admin/{workout_id}/exercise` - Ajouter un exercice
-  - `DELETE /api/workouts/admin/{workout_id}/exercise/{exercise_id}` - Supprimer un exercice
-  - `POST /api/workouts/admin/upload/video` - Upload vidéo
-  - `POST /api/workouts/admin/upload/image` - Upload image
-  - `GET /api/workouts/admin/uploads` - Lister les fichiers uploadés
-  - `DELETE /api/workouts/admin/upload/{type}/{id}` - Supprimer fichier
-
-### Notifications Push ✅ (5 Mars 2025)
-- Hook `usePushNotifications.js` intégré dans App.js
-- Auto-subscription après connexion utilisateur
-- Notifications pour appels entrants
+  - 4 images promotionnelles generees
 
 ---
 
-## Backlog / Tâches Futures
+## Backlog / Taches Futures
 
-### P1 - Haute Priorité
-- [ ] Finaliser intégration frontend RevenueCat
-- [ ] Intégrer hook usePushNotifications dans App.js
-- [ ] Compléter refactorisation AdminPage.js (14 onglets restants)
+### P1 - Haute Priorite
+- [ ] Finaliser integration frontend RevenueCat
+- [ ] Completer refactorisation AdminPage.js (13 onglets restants)
 
-### P2 - Moyenne Priorité
-- [ ] Logique abonnement annuel Stripe (blocage annulation)
-- [ ] Améliorer couverture tests Pytest
+### P2 - Moyenne Priorite
+- [ ] Ameliorer couverture tests Pytest
 - [ ] Optimisation performances frontend
 
-### P3 - Basse Priorité
+### P3 - Basse Priorite
 - [ ] Mode hors-ligne
 - [ ] Synchronisation multi-appareils
-- [ ] Analytics avancées
+- [ ] Analytics avancees
+
+---
+
+## API Endpoints Cles
+
+### Admin Workouts (NOUVEAU)
+- `GET /api/workouts/admin/all` - Liste toutes les seances
+- `POST /api/workouts/admin/create` - Creer une seance
+- `PUT /api/workouts/admin/{workout_id}` - Modifier une seance
+- `DELETE /api/workouts/admin/{workout_id}` - Supprimer une seance
+- `POST /api/workouts/admin/upload/video` - Upload + compression video
+- `POST /api/workouts/admin/upload/image` - Upload image
+
+### Abonnements (MIS A JOUR)
+- `GET /api/payments/subscription` - Details + can_cancel + jours restants
+- `POST /api/payments/cancel` - Annulation (bloquee si annuel)
+- `POST /api/payments/reactivate` - Reactivation
 
 ---
 
@@ -193,30 +190,11 @@ frontend/src/
 
 ---
 
-## Notes Techniques
+## Variables d'Environnement Requises
 
-### Génération Token LiveKit (Nouvelle Syntaxe)
-```python
-from livekit.api import AccessToken, VideoGrants
-
-token = (
-    AccessToken(API_KEY, API_SECRET)
-    .with_identity(user_id)
-    .with_name(user_name)
-    .with_grants(VideoGrants(
-        room_join=True,
-        room=room_name,
-        can_publish=True,
-        can_subscribe=True,
-        can_publish_data=True
-    ))
-).to_jwt()
-```
-
-### Variables d'Environnement Requises
-
-**Backend (.env):**
+### Backend (.env)
 - MONGO_URL
+- DB_NAME
 - JWT_SECRET
 - LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET
 - STRIPE_API_KEY
@@ -224,6 +202,6 @@ token = (
 - REVENUECAT_API_KEY
 - VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY
 
-**Frontend (.env):**
+### Frontend (.env)
 - REACT_APP_BACKEND_URL
 - REACT_APP_STRIPE_PUBLIC_KEY
