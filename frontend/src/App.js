@@ -1,8 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
+import { useIncomingCalls, IncomingCallNotification } from './components/IncomingCall';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -130,11 +131,28 @@ function AppRouter() {
   );
 }
 
+// Component to handle incoming calls
+function IncomingCallHandler() {
+  const { user } = useAuth();
+  const { incomingCall, clearIncomingCall } = useIncomingCalls();
+
+  if (!user || !incomingCall) return null;
+
+  return (
+    <IncomingCallNotification
+      call={incomingCall}
+      onAccept={clearIncomingCall}
+      onDecline={clearIncomingCall}
+    />
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <AppRouter />
+        <IncomingCallHandler />
         <Toaster position="top-right" />
       </AuthProvider>
     </BrowserRouter>

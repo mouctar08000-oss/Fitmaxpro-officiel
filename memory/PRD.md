@@ -1,7 +1,7 @@
 # FitMaxPro - Product Requirements Document
 
 ## Original Problem Statement
-Application de fitness "FitMaxPro" complète avec Live Streaming, programmes d'entraînement, course à pied, gamification et plus encore.
+Application de fitness "FitMaxPro" complète avec Live Streaming, Appels 1-to-1, programmes d'entraînement, course à pied, gamification et plus encore.
 
 ## Website URL
 **https://fitmax-gains.preview.emergentagent.com**
@@ -9,16 +9,22 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, programmes d'e
 ## All Implemented Features (March 5, 2026)
 
 ### 🎥 LIVE STREAMING WEBRTC (LiveKit) ✅ PERFECTED
-- **Composant LiveKitRoom.js** entièrement réécrit pour un rendu vidéo parfait
-- **Connexion différée** : Se connecte au serveur SANS demander la caméra d'abord
-- **Activation manuelle** : Caméra/micro activés APRÈS la connexion
-- **Gestion d'erreurs** : Si la caméra échoue, le live reste actif
-- **Interface complète** :
-  - Badges : EN DIRECT, Connecté, Spectateurs
+- Streaming en direct avec LiveKit WebRTC
+- Interface professionnelle avec contrôles complets
+- Chat en temps réel pendant les lives
+- Système de demandes de live pour les abonnés
+
+### 📞 APPELS 1-TO-1 (LiveKit) ✅ NOUVEAU
+- **Appels vidéo/audio** entre coach et abonnés
+- **Boutons d'appel** dans le panneau Admin (Video Call / Audio Call)
+- **Icône téléphone** dans la liste des abonnés
+- **Système d'appels entrants** avec notification modale
+- **Vérification périodique** des appels en attente
+- **Interface d'appel** complète avec :
+  - Badge "Video Call" / "Audio Call"
+  - Chronomètre d'appel
   - Contrôles : Micro, Caméra, Partage d'écran, Plein écran
-  - Bouton "TERMINER LE LIVE" visible
-  - Bouton "Activer la caméra" si non disponible
-- **Live Chat** en temps réel
+  - Bouton fin d'appel
 
 ### 🏆 GAMIFICATION COMPLÈTE ✅
 - Système de points automatique
@@ -39,81 +45,57 @@ Application de fitness "FitMaxPro" complète avec Live Streaming, programmes d'e
 ## Changelog
 
 ### March 5, 2026 - Session 7
-- ✅ **Bug écran noir CORRIGÉ** : LiveKit se connecte maintenant sans demander la caméra immédiatement
-- ✅ **Interface live améliorée** : Contrôles visibles même si caméra non disponible
-- ✅ **Archive GitHub mise à jour** avec les dernières corrections
-- ⏳ **Refactorisation backend** : Structure de base créée (/backend/routes/, /backend/models/, /backend/utils/)
-- ⏳ **Refactorisation frontend** : Dossier /frontend/src/pages/admin/ créé
-
-### March 4, 2026 - Session 6
-- ✅ Composant LiveKitRoom.js réécrit
-- ✅ Aperçu caméra avant démarrage du live
-- ✅ Tests passés : 100% des fonctionnalités live
+- ✅ **Bug écran noir CORRIGÉ** dans le Live Streaming
+- ✅ **Appels 1-to-1 implémentés** via LiveKit
+  - Nouveau composant `CallPage.js`
+  - Nouveau composant `IncomingCall.js`
+  - Boutons d'appel dans AdminPage
+  - Système de notification d'appels entrants
+- ✅ **Archive GitHub mise à jour** avec toutes les nouvelles fonctionnalités
 
 ## Test Credentials
 - **Admin**: admin@fitmaxpro.com / admin123
 - **User**: test@test.com / test123
 
+## Key API Endpoints
+
+### Appels 1-to-1
+```
+POST /api/livekit/calls/initiate - Initier un appel
+GET /api/livekit/calls/pending - Appels en attente
+POST /api/livekit/calls/{call_id}/answer - Répondre à un appel
+```
+
+### Live Streaming
+```
+GET /api/livekit/status - Statut LiveKit
+POST /api/lives - Créer un live
+POST /api/lives/{id}/join - Rejoindre un live
+POST /api/lives/{id}/end - Terminer un live
+```
+
+## Files Modified/Created Today
+- `/app/frontend/src/pages/CallPage.js` - Page d'appel réécrite
+- `/app/frontend/src/components/IncomingCall.js` - NOUVEAU - Notification d'appels entrants
+- `/app/frontend/src/pages/AdminPage.js` - Boutons d'appel ajoutés
+- `/app/frontend/src/App.js` - Hook d'appels entrants intégré
+- `/app/frontend/src/components/LiveKitRoom.js` - Bug écran noir corrigé
+
 ## Prioritized Backlog
 
 ### ✅ Completed
 - Live Streaming fonctionnel ✅
+- Appels 1-to-1 implémentés ✅
 - Archive GitHub générée ✅
 
-### P0 - Refactorisation (En cours)
+### P0 - Refactorisation (Recommandé)
 - ⏳ Découper `server.py` (6820 lignes) en APIRouters
-  - Structure créée : `/backend/routes/`, `/backend/models/`, `/backend/utils/`
-  - Fichiers créés : `config.py`, `schemas.py`, `auth.py`
-- ⏳ Découper `AdminPage.js` (4965 lignes) en composants
-  - Dossier créé : `/frontend/src/pages/admin/`
+- ⏳ Découper `AdminPage.js` (4980 lignes) en composants
 
 ### P1 - Prochaines fonctionnalités
-- 🔲 Appels 1-to-1 via LiveKit
-- 🔲 Tests unitaires
+- 🔲 Push notifications pour appels entrants (Firebase Cloud Messaging)
+- 🔲 Historique des appels
 
 ### P2 - Améliorations futures
-- 🔲 Cron job pour emails automatiques
+- 🔲 Tests unitaires
 - 🔲 Configuration Capacitor pour stores
-
-## Files Modified Today
-- `/app/frontend/src/components/LiveKitRoom.js` - Bug écran noir corrigé
-- `/app/backend/utils/config.py` - Configuration partagée (NOUVEAU)
-- `/app/backend/models/schemas.py` - Modèles Pydantic (NOUVEAU)
-- `/app/backend/utils/auth.py` - Utilitaires auth (NOUVEAU)
-- `/app/FitMaxPro_GitHub_Public.zip` - Archive mise à jour
-
-## Architecture Refactorisation (Planifiée)
-
-### Backend (/app/backend/)
-```
-backend/
-├── server.py          # Point d'entrée (à réduire)
-├── routes/
-│   ├── __init__.py
-│   ├── auth.py        # Authentification
-│   ├── workouts.py    # Programmes
-│   ├── admin.py       # Administration
-│   ├── live.py        # Live streaming
-│   ├── points.py      # Gamification
-│   ├── running.py     # Course
-│   └── messages.py    # Messages
-├── models/
-│   ├── __init__.py
-│   └── schemas.py     # ✅ Créé
-└── utils/
-    ├── __init__.py
-    ├── config.py      # ✅ Créé
-    └── auth.py        # ✅ Créé
-```
-
-### Frontend (/app/frontend/src/pages/)
-```
-pages/
-├── AdminPage.js       # À découper
-└── admin/
-    ├── DashboardTab.js
-    ├── SubscribersTab.js
-    ├── WorkoutsTab.js
-    ├── AnalyticsTab.js
-    └── ...
-```

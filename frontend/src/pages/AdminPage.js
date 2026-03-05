@@ -1260,6 +1260,15 @@ const AdminPage = () => {
                               <Button 
                                 size="sm" 
                                 variant="ghost"
+                                onClick={() => navigate(`/call?type=video&callee=${sub.user_id}`)}
+                                className="text-green-400 hover:text-green-300"
+                                title={isFr ? 'Appeler' : 'Call'}
+                              >
+                                <Phone className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
                                 onClick={() => deleteUser(sub.user_id)}
                                 className="text-red-400 hover:text-red-300"
                               >
@@ -1282,6 +1291,27 @@ const AdminPage = () => {
                       <Eye className="w-5 h-5 text-[#EF4444]" />
                       {isFr ? 'Détails & Évolution' : 'Details & Progress'}
                     </h3>
+                    
+                    {/* Call Buttons */}
+                    <div className="flex gap-2 mb-4">
+                      <Button 
+                        onClick={() => navigate(`/call?type=video&callee=${selectedUser.user?.user_id}`)}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        data-testid="call-video-btn"
+                      >
+                        <Video className="w-4 h-4 mr-2" />
+                        {isFr ? 'Appel Vidéo' : 'Video Call'}
+                      </Button>
+                      <Button 
+                        onClick={() => navigate(`/call?type=audio&callee=${selectedUser.user?.user_id}`)}
+                        variant="outline"
+                        className="flex-1 border-green-600 text-green-400 hover:bg-green-600/20"
+                        data-testid="call-audio-btn"
+                      >
+                        <Phone className="w-4 h-4 mr-2" />
+                        {isFr ? 'Appel Audio' : 'Audio Call'}
+                      </Button>
+                    </div>
                     
                     <div className="space-y-4">
                       <div>
