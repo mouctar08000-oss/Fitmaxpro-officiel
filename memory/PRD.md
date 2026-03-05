@@ -1,177 +1,119 @@
 # FitMaxPro - Product Requirements Document
 
 ## Original Problem Statement
-Application de fitness "FitMaxPro" complète avec Live Streaming, Appels Audio/Vidéo, gestion d'abonnements, programmes d'entraînement, course à pied, et panneau d'administration.
+Application de fitness "FitMaxPro" complète avec Live Streaming, programmes d'entraînement, course à pied, gamification et plus encore.
 
 ## Website URL
 **https://fitmax-gains.preview.emergentagent.com**
 
-## All Implemented Features (March 4, 2026)
+## All Implemented Features (March 5, 2026)
 
-### 🎥 LIVE STREAMING WEBRTC (LiveKit) ✅ UPDATED - PERFECTED
+### 🎥 LIVE STREAMING WEBRTC (LiveKit) ✅ PERFECTED
 - **Composant LiveKitRoom.js** entièrement réécrit pour un rendu vidéo parfait
-- **VideoTile** : Composant personnalisé pour afficher les participants avec gestion d'état
-- **RoomContent** : Gestion complète de la caméra, micro, partage d'écran
-- **Aperçu Caméra** : Prévisualisation avant de démarrer un live
-- **Bouton START LIVE** : Design professionnel avec gradient rouge
-- **Bouton END LIVE** : Visible en haut à droite pendant le live
-- **Badges Live** : EN DIRECT (rouge pulsant), Connecté (vert), Spectateurs
-- **Barre de contrôles** : Micro, Caméra, Partage d'écran, Plein écran, Fin d'appel
-- **Gestion d'erreurs** : Messages clairs pour les permissions caméra
-- **Live Chat** : Chat en temps réel pendant le live
+- **Connexion différée** : Se connecte au serveur SANS demander la caméra d'abord
+- **Activation manuelle** : Caméra/micro activés APRÈS la connexion
+- **Gestion d'erreurs** : Si la caméra échoue, le live reste actif
+- **Interface complète** :
+  - Badges : EN DIRECT, Connecté, Spectateurs
+  - Contrôles : Micro, Caméra, Partage d'écran, Plein écran
+  - Bouton "TERMINER LE LIVE" visible
+  - Bouton "Activer la caméra" si non disponible
+- **Live Chat** en temps réel
 
-### 🏆 AUTOMATISATION DES POINTS ✅
-Points automatiques pour:
-- **Avis créé**: +25 points
-- **Course à pied**:
-  - +10 points de base
-  - +5 points par km
-  - +25 bonus pour 5km+
-  - +50 bonus pour 10km+
-- **Séance d'entraînement terminée**:
-  - +15 points de base
-  - +1 point par minute (max 30)
-  - +25 bonus premier workout du jour
-  - +5 à +50 bonus pour série de jours consécutifs
+### 🏆 GAMIFICATION COMPLÈTE ✅
+- Système de points automatique
+- Badges par paliers (Bronze, Argent, Or, etc.)
+- Hall of Fame
+- Défis hebdomadaires
 
-### 💳 ABONNEMENT ANNUEL STRIPE ✅
-- Logique d'engagement 12 mois implémentée
-- Vérification `can_cancel` avant annulation
-- Demandes d'annulation avec approbation admin
-- Onglet Admin "Subscriptions" avec gestion des demandes
-
-### 📱 ACHATS IN-APP (RevenueCat) ✅
-- Intégration complète avec l'API RevenueCat
-- Vérification automatique des reçus quand clé API configurée
-- Webhook pour mises à jour de statut en temps réel
-- 4 produits IAP définis (standard/vip × monthly/annual)
+### 💳 ABONNEMENTS ✅
+- Intégration Stripe
+- Logique d'engagement 12 mois
+- Achats in-app via RevenueCat
 
 ### 🏃 COURSE À PIED ✅
-- **Page /running** : Interface complète de suivi de course
-- **5 Onglets** : Courir, Historique, Stats, Classement, Défis
-- **Partage Social** : Instagram, TikTok, X, WhatsApp
-- **Badges permanents** : 7 badges à débloquer
-- **Notifications Push** : Défis complétés, classement
-
-### 🎁 SYSTÈME DE RÉCOMPENSES & GAMIFICATION ✅
-- **Page /rewards** : Boutique de récompenses avec points
-- **6 récompenses** : Accès VIP, coaching, nutrition, badges
-- **Hall of Fame** : Classement des utilisateurs par badges
-- **Défis Hebdomadaires** : 6 défis avec récompenses
-
-### 📺 LIVE STREAMING ✅ PERFECTED
-- Interface complète style professionnelle
-- Demande de Live avec 10 thèmes/programmes
-- Programmation des lives par l'admin
-- Notifications automatiques aux utilisateurs
-- Aperçu caméra avant démarrage
-- Contrôles complets pendant le live
-
-### 📞 APPELS AUDIO/VIDÉO ✅
-- Interface d'appel complète
-- Contrôles micro/caméra/speaker
-- Chronomètre et logging des appels
-- Prêt pour appels 1-to-1 via LiveKit
-
-### 📊 Workout Programs (138 séances)
-| Type | Nombre | Description |
-|------|--------|-------------|
-| mass_gain | 44 | Prise de masse |
-| weight_loss | 24 | Perte de poids |
-| abs | 18 | Abdominaux |
-| legs_glutes | 16 | Jambes & Fessiers |
-| women_fitness | 18 | Spécial Femmes |
-| yoga | 18 | Yoga & Détente |
-| **TOTAL** | **138** | |
-
-### 🛠️ Admin Capabilities ✅
-- Création libre de séances (tous types/niveaux)
-- Modification des vidéos d'exercices
-- Upload de vidéos personnalisées
-- Gestion des réseaux sociaux (individuelle)
-- Statistiques détaillées
-- Gestion des abonnements et annulations
-
-## Test Credentials
-- Admin: admin@fitmaxpro.com / admin123
-- User: test@test.com / test123
-
-## Key API Endpoints
-
-### LiveKit / Live Streaming
-```
-GET /api/livekit/status - Statut LiveKit
-POST /api/lives - Créer un live (retourne host_token)
-POST /api/lives/{id}/join - Rejoindre un live
-POST /api/lives/{id}/end - Terminer un live
-POST /api/livekit/token - Obtenir un token LiveKit
-```
-
-### In-App Purchases
-```
-GET /api/iap/products - Produits disponibles
-POST /api/iap/verify-purchase - Vérifier achat
-POST /api/iap/webhook/revenuecat - Webhook RevenueCat
-GET /api/iap/subscription-status - Statut abonnement
-```
-
-### Workout Points
-```
-POST /api/workout/start - Démarrer (renvoie session_id)
-POST /api/workout/end - Terminer (renvoie points_earned)
-GET /api/rewards/points - Points de l'utilisateur
-```
+- Suivi GPS
+- Statistiques et classement
+- Défis hebdomadaires
 
 ## Changelog
 
-### March 4, 2026 - Session 6 (Live Streaming Perfected)
-- ✅ **Composant LiveKitRoom.js** entièrement réécrit
-- ✅ **VideoTile** avec gestion complète des tracks vidéo
-- ✅ **RoomContent** avec contrôles professionnels
-- ✅ **Aperçu Caméra** dans le formulaire de création de live
-- ✅ **Boutons START/END LIVE** très visibles et fonctionnels
-- ✅ **Badges Live** : EN DIRECT, Connecté, Spectateurs
-- ✅ **Barre de contrôles** : Micro, Caméra, Écran, Plein écran
-- ✅ **Tests passés** : 100% des fonctionnalités live vérifiées
+### March 5, 2026 - Session 7
+- ✅ **Bug écran noir CORRIGÉ** : LiveKit se connecte maintenant sans demander la caméra immédiatement
+- ✅ **Interface live améliorée** : Contrôles visibles même si caméra non disponible
+- ✅ **Archive GitHub mise à jour** avec les dernières corrections
+- ⏳ **Refactorisation backend** : Structure de base créée (/backend/routes/, /backend/models/, /backend/utils/)
+- ⏳ **Refactorisation frontend** : Dossier /frontend/src/pages/admin/ créé
 
-### March 4, 2026 - Session 5
-- ✅ Intégration WebRTC Complète - CallPage.js refait avec LiveKit
-- ✅ Automatisation Points Workout
-- ✅ Intégration RevenueCat Complète
-- ✅ Tableau de Bord des Points
-- ✅ Système de Badges par Paliers
-- ✅ Notifications Push Badge
-- ✅ Hall of Fame
-- ✅ Défis Hebdomadaires
-- ✅ Vérification des Vidéos (2694 vidéos)
-- ✅ Gestion Admin Vidéos
+### March 4, 2026 - Session 6
+- ✅ Composant LiveKitRoom.js réécrit
+- ✅ Aperçu caméra avant démarrage du live
+- ✅ Tests passés : 100% des fonctionnalités live
+
+## Test Credentials
+- **Admin**: admin@fitmaxpro.com / admin123
+- **User**: test@test.com / test123
 
 ## Prioritized Backlog
 
 ### ✅ Completed
-- Intégration WebRTC (LiveKit) ✅
-- Live Streaming perfectionné ✅
-- Automatisation des points ✅
-- Logique abonnement annuel ✅
-- Achats in-app (RevenueCat) ✅
+- Live Streaming fonctionnel ✅
+- Archive GitHub générée ✅
 
-### P0 - Refactorisation (Important pour maintenabilité)
-- ⏳ Découper `server.py` (~6500 lignes) en APIRouters
-- ⏳ Découper `AdminPage.js` (~5000 lignes) en composants
+### P0 - Refactorisation (En cours)
+- ⏳ Découper `server.py` (6820 lignes) en APIRouters
+  - Structure créée : `/backend/routes/`, `/backend/models/`, `/backend/utils/`
+  - Fichiers créés : `config.py`, `schemas.py`, `auth.py`
+- ⏳ Découper `AdminPage.js` (4965 lignes) en composants
+  - Dossier créé : `/frontend/src/pages/admin/`
 
-### P1 - Prochaines étapes
+### P1 - Prochaines fonctionnalités
 - 🔲 Appels 1-to-1 via LiveKit
-- 🔲 Code source exporté pour GitHub
+- 🔲 Tests unitaires
 
-### P2 - Futures améliorations
+### P2 - Améliorations futures
 - 🔲 Cron job pour emails automatiques
-- 🔲 Configuration icônes/splash Capacitor pour stores
-- 🔲 Tests unitaires backend/frontend
+- 🔲 Configuration Capacitor pour stores
 
 ## Files Modified Today
-- `frontend/src/components/LiveKitRoom.js` - Entièrement réécrit
-- `frontend/src/pages/LiveStreamPage.js` - Aperçu caméra + améliorations UI
-- `memory/PRD.md` - Mis à jour
+- `/app/frontend/src/components/LiveKitRoom.js` - Bug écran noir corrigé
+- `/app/backend/utils/config.py` - Configuration partagée (NOUVEAU)
+- `/app/backend/models/schemas.py` - Modèles Pydantic (NOUVEAU)
+- `/app/backend/utils/auth.py` - Utilitaires auth (NOUVEAU)
+- `/app/FitMaxPro_GitHub_Public.zip` - Archive mise à jour
 
-## Test Reports
-- `/app/test_reports/iteration_12.json` - Tests Live Streaming (100% passed)
+## Architecture Refactorisation (Planifiée)
+
+### Backend (/app/backend/)
+```
+backend/
+├── server.py          # Point d'entrée (à réduire)
+├── routes/
+│   ├── __init__.py
+│   ├── auth.py        # Authentification
+│   ├── workouts.py    # Programmes
+│   ├── admin.py       # Administration
+│   ├── live.py        # Live streaming
+│   ├── points.py      # Gamification
+│   ├── running.py     # Course
+│   └── messages.py    # Messages
+├── models/
+│   ├── __init__.py
+│   └── schemas.py     # ✅ Créé
+└── utils/
+    ├── __init__.py
+    ├── config.py      # ✅ Créé
+    └── auth.py        # ✅ Créé
+```
+
+### Frontend (/app/frontend/src/pages/)
+```
+pages/
+├── AdminPage.js       # À découper
+└── admin/
+    ├── DashboardTab.js
+    ├── SubscribersTab.js
+    ├── WorkoutsTab.js
+    ├── AnalyticsTab.js
+    └── ...
+```

@@ -1,63 +1,80 @@
-"""Authentication utilities"""
+"""
+FitMaxPro - Authentication Utilities
+"""
 from fastapi import Request, HTTPException, Header, Depends
-from passlib.context import CryptContext
 from typing import Optional
-from datetime import datetime, timezone
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime, timezone, timedelta
+from passlib.context import CryptContext
+import uuid
 
-from .database import db
+from ..utils.config import db, SECRET_KEY
+from ..models.schemas import User, UserSession
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-class User(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    user_id: str
-    email: str
-    name: str
-    picture: Optional[str] = None
-    subscription_tier: str = "none"
-    subscription_status: str = "inactive"
-    role: Optional[str] = None
-    subscription: Optional[dict] = None
-    created_at: datetime
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def generate_session_token() -> str:
+    return str(uuid.uuid4())
 
 async def get_current_user(request: Request, authorization: Optional[str] = Header(None)) -> User:
-    """Get current authenticated user from session token"""
+    """Get current user from session token (cookie or header)"""
     session_token = request.cookies.get("session_token")
     
     if not session_token and authorization:
         if authorization.startswith("Bearer "):
-            session_token = authorization.split(" ")[1]
+            session_token = authorization[7:]
+        else:
+            session_token = authorization
     
     if not session_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    session_doc = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
-    if not session_doc:
-        raise HTTPException(status_code=401, detail="Invalid session")
+    session = await db.sessions.find_one({
+        "session_token": session_token,
+        "expires_at": {"$gt": datetime.now(timezone.utc)}
+    })
     
-    expires_at = session_doc["expires_at"]
-    if isinstance(expires_at, str):
-        expires_at = datetime.fromisoformat(expires_at)
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
     
-    if expires_at < datetime.now(timezone.utc):
-        await db.user_sessions.delete_one({"session_token": session_token})
-        raise HTTPException(status_code=401, detail="Session expired")
+    user_data = await db.users.find_one({"user_id": session["user_id"]})
+    if not user_data:
+        raise HTTPException(status_code=401, detail="User not found")
     
-    user_doc = await db.users.find_one({"user_id": session_doc["user_id"]}, {"_id": 0})
-    if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if isinstance(user_doc["created_at"], str):
-        user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
-    
-    return User(**user_doc)
+    return User(**user_data)
 
-async def verify_admin(current_user: User = Depends(get_current_user)):
-    """Verify that the current user is an admin (VIP tier)"""
-    if current_user.subscription_tier != "vip":
+async def verify_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Verify that the current user is an admin"""
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+async def create_user_session(user_id: str, days_valid: int = 30) -> str:
+    """Create a new session for a user"""
+    session_token = generate_session_token()
+    session_data = {
+        "user_id": user_id,
+        "session_token": session_token,
+        "created_at": datetime.now(timezone.utc),
+        "expires_at": datetime.now(timezone.utc) + timedelta(days=days_valid)
+    }
+    await db.sessions.insert_one(session_data)
+    return session_token
+
+async def delete_user_sessions(user_id: str):
+    """Delete all sessions for a user"""
+    await db.sessions.delete_many({"user_id": user_id})
+
+async def get_user_by_email(email: str) -> Optional[dict]:
+    """Get user by email"""
+    return await db.users.find_one({"email": email.lower()})
+
+async def get_user_by_id(user_id: str) -> Optional[dict]:
+    """Get user by ID"""
+    return await db.users.find_one({"user_id": user_id})
