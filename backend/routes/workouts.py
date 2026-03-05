@@ -477,7 +477,10 @@ async def admin_upload_video(
     file: UploadFile = File(...),
     admin: User = Depends(verify_admin)
 ):
-    """Admin: Upload a video file for workouts/exercises"""
+    """Admin: Upload a video file for workouts/exercises with automatic compression"""
+    import subprocess
+    import asyncio
+    
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
     
@@ -491,46 +494,104 @@ async def admin_upload_video(
     
     # Generate unique filename
     file_id = uuid.uuid4().hex[:12]
-    filename = f"video_{file_id}{ext}"
-    filepath = os.path.join(VIDEO_DIR, filename)
+    original_filename = f"original_{file_id}{ext}"
+    original_filepath = os.path.join(VIDEO_DIR, original_filename)
+    compressed_filename = f"video_{file_id}.mp4"
+    compressed_filepath = os.path.join(VIDEO_DIR, compressed_filename)
     
     # Read and save file in chunks
     total_size = 0
     try:
-        async with aiofiles.open(filepath, 'wb') as out_file:
+        async with aiofiles.open(original_filepath, 'wb') as out_file:
             while chunk := await file.read(1024 * 1024):  # 1MB chunks
                 total_size += len(chunk)
                 if total_size > MAX_VIDEO_SIZE:
                     await out_file.close()
-                    os.remove(filepath)
+                    os.remove(original_filepath)
                     raise HTTPException(status_code=400, detail="File too large. Max 500MB")
                 await out_file.write(chunk)
     except Exception as e:
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        if os.path.exists(original_filepath):
+            os.remove(original_filepath)
         raise HTTPException(status_code=500, detail=str(e))
+    
+    # Compress video with FFmpeg in background
+    compressed_size = total_size
+    compression_status = "original"
+    
+    try:
+        # FFmpeg compression command: H.264 codec, 720p max, reasonable quality
+        ffmpeg_cmd = [
+            'ffmpeg', '-y', '-i', original_filepath,
+            '-vf', 'scale=-2:720',  # Scale to 720p maintaining aspect ratio
+            '-c:v', 'libx264',
+            '-preset', 'fast',
+            '-crf', '28',  # Quality (lower = better, 28 is good for web)
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',  # Enable streaming
+            compressed_filepath
+        ]
+        
+        # Run compression
+        process = await asyncio.create_subprocess_exec(
+            *ffmpeg_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)  # 5 min timeout
+        
+        if process.returncode == 0 and os.path.exists(compressed_filepath):
+            compressed_size = os.path.getsize(compressed_filepath)
+            compression_status = "compressed"
+            # Remove original if compression successful
+            os.remove(original_filepath)
+            final_filename = compressed_filename
+        else:
+            # Compression failed, use original
+            print(f"FFmpeg compression failed: {stderr.decode()}")
+            os.rename(original_filepath, compressed_filepath.replace('.mp4', ext))
+            final_filename = compressed_filename.replace('.mp4', ext)
+            compression_status = "original"
+            
+    except asyncio.TimeoutError:
+        print("FFmpeg compression timeout, using original")
+        if os.path.exists(compressed_filepath):
+            os.remove(compressed_filepath)
+        final_filename = original_filename
+        compression_status = "original"
+    except Exception as e:
+        print(f"Compression error: {e}")
+        final_filename = original_filename
+        compression_status = "original"
     
     # Store metadata in database
     video_doc = {
         "video_id": file_id,
-        "filename": filename,
+        "filename": final_filename,
         "original_name": file.filename,
-        "size_bytes": total_size,
-        "content_type": file.content_type,
+        "original_size_bytes": total_size,
+        "compressed_size_bytes": compressed_size,
+        "compression_ratio": round((1 - compressed_size/total_size) * 100, 1) if total_size > 0 else 0,
+        "compression_status": compression_status,
+        "content_type": "video/mp4" if compression_status == "compressed" else file.content_type,
         "uploaded_by": admin.user_id,
         "uploaded_at": datetime.now(timezone.utc).isoformat()
     }
     await db.uploaded_videos.insert_one(video_doc)
     
     # Return the URL
-    video_url = f"/api/uploads/videos/{filename}"
+    video_url = f"/api/uploads/videos/{final_filename}"
     
     return {
         "success": True,
         "video_id": file_id,
-        "filename": filename,
+        "filename": final_filename,
         "url": video_url,
-        "size_bytes": total_size
+        "original_size_bytes": total_size,
+        "compressed_size_bytes": compressed_size,
+        "compression_ratio": video_doc["compression_ratio"],
+        "compression_status": compression_status
     }
 
 

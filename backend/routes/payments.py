@@ -225,3 +225,149 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         logging.error(f"Webhook error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============================================
+# SUBSCRIPTION MANAGEMENT ROUTES
+# ============================================
+
+@router.get("/subscription")
+async def get_subscription(current_user: User = Depends(get_current_user)):
+    """Get current user's subscription details"""
+    subscription = await db.user_subscriptions.find_one(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    )
+    
+    if not subscription:
+        return {
+            "status": "none",
+            "tier": "free",
+            "message": "No active subscription"
+        }
+    
+    # Calculate if annual subscription can be cancelled
+    can_cancel = True
+    cancel_blocked_reason = None
+    
+    if subscription.get("billing_cycle") == "annual":
+        started_at = subscription.get("started_at")
+        if started_at:
+            start_date = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+            min_commitment_end = start_date + timedelta(days=365)  # 12 months minimum
+            
+            if datetime.now(timezone.utc) < min_commitment_end:
+                can_cancel = False
+                days_remaining = (min_commitment_end - datetime.now(timezone.utc)).days
+                cancel_blocked_reason = f"Abonnement annuel: annulation possible dans {days_remaining} jours"
+    
+    return {
+        **subscription,
+        "can_cancel": can_cancel,
+        "cancel_blocked_reason": cancel_blocked_reason
+    }
+
+
+@router.post("/cancel")
+async def cancel_subscription(current_user: User = Depends(get_current_user)):
+    """Cancel user's subscription (with annual commitment check)"""
+    subscription = await db.user_subscriptions.find_one({"user_id": current_user.user_id})
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    # Check if it's an annual subscription within commitment period
+    if subscription.get("billing_cycle") == "annual":
+        started_at = subscription.get("started_at")
+        if started_at:
+            start_date = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+            min_commitment_end = start_date + timedelta(days=365)
+            
+            if datetime.now(timezone.utc) < min_commitment_end:
+                days_remaining = (min_commitment_end - datetime.now(timezone.utc)).days
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "message": "Impossible d'annuler un abonnement annuel avant la fin de la période d'engagement",
+                        "days_remaining": days_remaining,
+                        "can_cancel_after": min_commitment_end.isoformat(),
+                        "billing_cycle": "annual"
+                    }
+                )
+    
+    # Cancel on Stripe
+    stripe_subscription_id = subscription.get("stripe_subscription_id")
+    if stripe_subscription_id:
+        try:
+            # Cancel at period end (user keeps access until end of billing period)
+            stripe.Subscription.modify(
+                stripe_subscription_id,
+                cancel_at_period_end=True
+            )
+        except stripe.error.StripeError as e:
+            logging.error(f"Stripe cancel error: {e}")
+            raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
+    
+    # Update database
+    await db.user_subscriptions.update_one(
+        {"user_id": current_user.user_id},
+        {"$set": {
+            "status": "cancelling",
+            "cancel_at_period_end": True,
+            "cancelled_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await db.users.update_one(
+        {"user_id": current_user.user_id},
+        {"$set": {"subscription_status": "cancelling"}}
+    )
+    
+    return {
+        "success": True,
+        "message": "Abonnement sera annulé à la fin de la période en cours",
+        "status": "cancelling"
+    }
+
+
+@router.post("/reactivate")
+async def reactivate_subscription(current_user: User = Depends(get_current_user)):
+    """Reactivate a cancelled subscription (before period end)"""
+    subscription = await db.user_subscriptions.find_one({"user_id": current_user.user_id})
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No subscription found")
+    
+    if subscription.get("status") != "cancelling":
+        raise HTTPException(status_code=400, detail="Subscription is not in cancellation status")
+    
+    stripe_subscription_id = subscription.get("stripe_subscription_id")
+    if stripe_subscription_id:
+        try:
+            stripe.Subscription.modify(
+                stripe_subscription_id,
+                cancel_at_period_end=False
+            )
+        except stripe.error.StripeError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    await db.user_subscriptions.update_one(
+        {"user_id": current_user.user_id},
+        {"$set": {
+            "status": "active",
+            "cancel_at_period_end": False,
+            "cancelled_at": None
+        }}
+    )
+    
+    await db.users.update_one(
+        {"user_id": current_user.user_id},
+        {"$set": {"subscription_status": "active"}}
+    )
+    
+    return {
+        "success": True,
+        "message": "Abonnement réactivé avec succès",
+        "status": "active"
+    }
+
