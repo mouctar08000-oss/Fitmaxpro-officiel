@@ -32,17 +32,54 @@ import { Button } from './ui/button';
 // Simple Video Element that attaches directly to a track
 const SimpleVideoView = ({ track, isLocal = false, isMirrored = true, className = '' }) => {
   const videoRef = useRef(null);
+  const [isAttached, setIsAttached] = useState(false);
+  const [attachError, setAttachError] = useState(null);
 
   useEffect(() => {
     const videoElement = videoRef.current;
-    if (!videoElement || !track) return;
+    if (!videoElement || !track) {
+      console.log('SimpleVideoView: Missing video element or track', { hasVideo: !!videoElement, hasTrack: !!track });
+      setIsAttached(false);
+      return;
+    }
 
-    track.attach(videoElement);
+    console.log('SimpleVideoView: Attaching track to video element', { 
+      trackSid: track.sid, 
+      trackKind: track.kind,
+      trackSource: track.source,
+      isLocal 
+    });
+
+    try {
+      // Clear any previous src
+      videoElement.srcObject = null;
+      
+      // Attach the track
+      track.attach(videoElement);
+      setIsAttached(true);
+      setAttachError(null);
+      
+      // Force play
+      videoElement.play().catch(e => {
+        console.warn('Auto-play blocked:', e);
+      });
+      
+      console.log('SimpleVideoView: Track attached successfully');
+    } catch (err) {
+      console.error('SimpleVideoView: Failed to attach track:', err);
+      setAttachError(err.message);
+    }
 
     return () => {
-      track.detach(videoElement);
+      try {
+        console.log('SimpleVideoView: Detaching track');
+        track.detach(videoElement);
+        setIsAttached(false);
+      } catch (err) {
+        console.warn('Error detaching track:', err);
+      }
     };
-  }, [track]);
+  }, [track, isLocal]);
 
   if (!track) {
     return (
@@ -55,6 +92,17 @@ const SimpleVideoView = ({ track, isLocal = false, isMirrored = true, className 
     );
   }
 
+  if (attachError) {
+    return (
+      <div className={`bg-zinc-900 flex items-center justify-center ${className}`}>
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 mx-auto mb-2 text-red-500" />
+          <p className="text-red-400 text-sm">Erreur vidéo: {attachError}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <video
       ref={videoRef}
@@ -62,7 +110,10 @@ const SimpleVideoView = ({ track, isLocal = false, isMirrored = true, className 
       playsInline
       muted={isLocal}
       className={`object-cover ${className}`}
-      style={{ transform: isLocal && isMirrored ? 'scaleX(-1)' : 'none' }}
+      style={{ 
+        transform: isLocal && isMirrored ? 'scaleX(-1)' : 'none',
+        backgroundColor: '#18181b' 
+      }}
     />
   );
 };
@@ -150,46 +201,78 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
 
   // Start media when user clicks the button
   const startMedia = async () => {
-    if (!localParticipant || !room) return;
+    if (!localParticipant || !room) {
+      console.error('No localParticipant or room available');
+      setError('Connexion non établie. Veuillez rafraîchir la page.');
+      return;
+    }
     
     setIsInitializing(true);
     setError(null);
     setHasUserStartedMedia(true);
 
     try {
-      // First request permissions with getUserMedia
-      console.log('Requesting camera permissions...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' }, 
-        audio: true 
+      console.log('Starting media initialization...');
+      console.log('Room state:', room.state);
+      console.log('LocalParticipant:', localParticipant.identity);
+
+      // Method 1: Try using createLocalVideoTrack directly for more control
+      console.log('Creating local video track...');
+      const videoTrack = await createLocalVideoTrack({
+        facingMode: 'user',
+        resolution: { width: 1280, height: 720, frameRate: 24 }
       });
-      // Stop the test stream
-      stream.getTracks().forEach(t => t.stop());
-      console.log('Permissions granted');
-
-      // Now enable in LiveKit
-      await localParticipant.setCameraEnabled(true);
-      console.log('Camera enabled in LiveKit');
-      setIsCameraOn(true);
       
-      const cameraPub = localParticipant.getTrackPublication(Track.Source.Camera);
-      if (cameraPub?.track) {
-        setLocalVideoTrack(cameraPub.track);
-      }
+      console.log('Video track created:', videoTrack);
+      
+      // Publish the track to the room
+      console.log('Publishing video track...');
+      await localParticipant.publishTrack(videoTrack);
+      console.log('Video track published');
+      
+      // Set the local track for display
+      setLocalVideoTrack(videoTrack);
+      setIsCameraOn(true);
 
+      // Enable microphone
+      console.log('Enabling microphone...');
       await localParticipant.setMicrophoneEnabled(true);
       console.log('Mic enabled');
       setIsMicOn(true);
       
     } catch (err) {
       console.error('Media initialization failed:', err);
+      console.error('Error name:', err.name);
+      console.error('Error message:', err.message);
+      
+      // Fallback: Try the standard method
+      try {
+        console.log('Trying fallback method with setCameraEnabled...');
+        await localParticipant.setCameraEnabled(true);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const cameraPub = localParticipant.getTrackPublication(Track.Source.Camera);
+        if (cameraPub?.track) {
+          setLocalVideoTrack(cameraPub.track);
+          setIsCameraOn(true);
+          await localParticipant.setMicrophoneEnabled(true);
+          setIsMicOn(true);
+          console.log('Fallback method successful');
+          return;
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
+      
       let errorMsg = err.message;
-      if (err.name === 'NotAllowedError') {
+      if (err.name === 'NotAllowedError' || err.message?.includes('Permission')) {
         errorMsg = 'Accès à la caméra refusé. Veuillez autoriser l\'accès dans les paramètres du navigateur.';
-      } else if (err.name === 'NotFoundError') {
+      } else if (err.name === 'NotFoundError' || err.message?.includes('not found')) {
         errorMsg = 'Aucune caméra détectée sur cet appareil.';
-      } else if (err.name === 'NotReadableError') {
-        errorMsg = 'La caméra est utilisée par une autre application.';
+      } else if (err.name === 'NotReadableError' || err.message?.includes('Could not start')) {
+        errorMsg = 'La caméra est utilisée par une autre application ou indisponible.';
+      } else if (err.message?.includes('timeout') || err.message?.includes('Timeout')) {
+        errorMsg = 'Délai d\'attente dépassé. Veuillez réessayer.';
       }
       setError(errorMsg);
     } finally {
@@ -203,20 +286,38 @@ const RoomContent = ({ isBroadcaster, onDisconnect, isFullscreen, setIsFullscree
 
     const updateLocalVideo = () => {
       const cameraPub = localParticipant.getTrackPublication(Track.Source.Camera);
-      setLocalVideoTrack(cameraPub?.track || null);
-      setIsCameraOn(!!cameraPub?.track && !cameraPub.isMuted);
+      console.log('updateLocalVideo called:', { 
+        hasCameraPub: !!cameraPub, 
+        hasTrack: !!cameraPub?.track,
+        isMuted: cameraPub?.isMuted,
+        trackSid: cameraPub?.track?.sid
+      });
+      
+      if (cameraPub?.track) {
+        setLocalVideoTrack(cameraPub.track);
+        setIsCameraOn(!cameraPub.isMuted);
+      } else {
+        setLocalVideoTrack(null);
+        setIsCameraOn(false);
+      }
     };
 
+    // Initial check
+    updateLocalVideo();
+    
+    // Subscribe to events
     localParticipant.on('trackPublished', updateLocalVideo);
     localParticipant.on('trackUnpublished', updateLocalVideo);
     localParticipant.on('trackMuted', updateLocalVideo);
     localParticipant.on('trackUnmuted', updateLocalVideo);
+    localParticipant.on('localTrackPublished', updateLocalVideo);
 
     return () => {
       localParticipant.off('trackPublished', updateLocalVideo);
       localParticipant.off('trackUnpublished', updateLocalVideo);
       localParticipant.off('trackMuted', updateLocalVideo);
       localParticipant.off('trackUnmuted', updateLocalVideo);
+      localParticipant.off('localTrackPublished', updateLocalVideo);
     };
   }, [localParticipant]);
 
@@ -624,14 +725,31 @@ export const LiveKitVideoRoom = ({ token, serverUrl, roomName, onDisconnect, isB
         connect={true}
         video={false}
         audio={false}
-        onConnected={() => console.log('Connected to LiveKit')}
-        onDisconnected={() => { console.log('Disconnected'); onDisconnect?.(); }}
-        onError={(error) => { console.error('LiveKit error:', error); setConnectionError(error.message); }}
+        onConnected={() => console.log('Connected to LiveKit room')}
+        onDisconnected={() => { console.log('Disconnected from LiveKit'); onDisconnect?.(); }}
+        onError={(error) => { console.error('LiveKit connection error:', error); setConnectionError(error.message); }}
         options={{
           adaptiveStream: true,
           dynacast: true,
-          videoCaptureDefaults: { resolution: { width: 1280, height: 720, frameRate: 30 }, facingMode: 'user' },
-          audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          stopLocalTrackOnUnpublish: true,
+          videoCaptureDefaults: { 
+            resolution: { width: 1280, height: 720, frameRate: 24 }, 
+            facingMode: 'user',
+            deviceId: undefined // Let the system choose
+          },
+          audioCaptureDefaults: { 
+            echoCancellation: true, 
+            noiseSuppression: true, 
+            autoGainControl: true 
+          },
+          publishDefaults: {
+            videoSimulcastLayers: [
+              { width: 640, height: 360, bitrate: 500000 },
+              { width: 320, height: 180, bitrate: 150000 }
+            ],
+            stopMicTrackOnMute: false,
+            videoCodec: 'vp8'
+          }
         }}
       >
         <RoomContent isBroadcaster={isBroadcaster} onDisconnect={onDisconnect} isFullscreen={isFullscreen} setIsFullscreen={setIsFullscreen} />
