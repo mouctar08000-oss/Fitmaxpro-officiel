@@ -4,14 +4,16 @@
  */
 
 const DB_NAME = 'fitmaxpro_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Store names
 const STORES = {
   WORKOUTS: 'workouts',
   IMAGES: 'images',
   SYNC_QUEUE: 'sync_queue',
-  USER_DATA: 'user_data'
+  USER_DATA: 'user_data',
+  FAVORITES: 'favorites',
+  SETTINGS: 'settings'
 };
 
 class OfflineStorage {
@@ -66,6 +68,17 @@ class OfflineStorage {
         if (!db.objectStoreNames.contains(STORES.USER_DATA)) {
           const userStore = db.createObjectStore(STORES.USER_DATA, { keyPath: 'key' });
           userStore.createIndex('updated_at', 'updated_at', { unique: false });
+        }
+
+        // Favorites store (for auto-download)
+        if (!db.objectStoreNames.contains(STORES.FAVORITES)) {
+          const favStore = db.createObjectStore(STORES.FAVORITES, { keyPath: 'workout_id' });
+          favStore.createIndex('added_at', 'added_at', { unique: false });
+        }
+
+        // Settings store
+        if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
+          db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
         }
       };
     });
@@ -336,7 +349,7 @@ class OfflineStorage {
 
   // Clear all offline data
   async clearAllData() {
-    const stores = [STORES.WORKOUTS, STORES.IMAGES, STORES.SYNC_QUEUE, STORES.USER_DATA];
+    const stores = [STORES.WORKOUTS, STORES.IMAGES, STORES.SYNC_QUEUE, STORES.USER_DATA, STORES.FAVORITES];
     
     for (const storeName of stores) {
       const tx = this.db.transaction(storeName, 'readwrite');
@@ -349,6 +362,139 @@ class OfflineStorage {
     }
     
     return true;
+  }
+
+  // ==================== FAVORITES ====================
+
+  // Add workout to favorites
+  async addToFavorites(workoutId, workoutData = null) {
+    const tx = this.db.transaction(STORES.FAVORITES, 'readwrite');
+    const store = tx.objectStore(STORES.FAVORITES);
+    
+    const favorite = {
+      workout_id: workoutId,
+      added_at: new Date().toISOString(),
+      auto_download: true,
+      workout_data: workoutData
+    };
+    
+    return new Promise((resolve, reject) => {
+      const request = store.put(favorite);
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Remove from favorites
+  async removeFromFavorites(workoutId) {
+    const tx = this.db.transaction(STORES.FAVORITES, 'readwrite');
+    const store = tx.objectStore(STORES.FAVORITES);
+    
+    return new Promise((resolve, reject) => {
+      const request = store.delete(workoutId);
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Get all favorites
+  async getAllFavorites() {
+    const tx = this.db.transaction(STORES.FAVORITES, 'readonly');
+    const store = tx.objectStore(STORES.FAVORITES);
+    
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Check if workout is favorite
+  async isFavorite(workoutId) {
+    const tx = this.db.transaction(STORES.FAVORITES, 'readonly');
+    const store = tx.objectStore(STORES.FAVORITES);
+    
+    return new Promise((resolve) => {
+      const request = store.get(workoutId);
+      request.onsuccess = () => resolve(!!request.result);
+      request.onerror = () => resolve(false);
+    });
+  }
+
+  // ==================== AUTO DOWNLOAD ====================
+
+  // Get setting
+  async getSetting(key) {
+    if (!this.db) return null;
+    const tx = this.db.transaction(STORES.SETTINGS, 'readonly');
+    const store = tx.objectStore(STORES.SETTINGS);
+    
+    return new Promise((resolve) => {
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result?.value);
+      request.onerror = () => resolve(null);
+    });
+  }
+
+  // Set setting
+  async setSetting(key, value) {
+    const tx = this.db.transaction(STORES.SETTINGS, 'readwrite');
+    const store = tx.objectStore(STORES.SETTINGS);
+    
+    return new Promise((resolve, reject) => {
+      const request = store.put({ key, value, updated_at: new Date().toISOString() });
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Auto-download all favorites
+  async autoDownloadFavorites(fetchWorkoutFn) {
+    const autoDownloadEnabled = await this.getSetting('auto_download_favorites');
+    if (autoDownloadEnabled === false) return { downloaded: 0, skipped: 0 };
+    
+    const favorites = await this.getAllFavorites();
+    let downloaded = 0;
+    let skipped = 0;
+    
+    for (const fav of favorites) {
+      const isAlreadyDownloaded = await this.isWorkoutDownloaded(fav.workout_id);
+      
+      if (!isAlreadyDownloaded) {
+        try {
+          // Fetch full workout data if not stored
+          let workoutData = fav.workout_data;
+          if (!workoutData && fetchWorkoutFn) {
+            workoutData = await fetchWorkoutFn(fav.workout_id);
+          }
+          
+          if (workoutData) {
+            await this.saveWorkout(workoutData);
+            downloaded++;
+          } else {
+            skipped++;
+          }
+        } catch (error) {
+          console.warn(`Failed to auto-download workout ${fav.workout_id}:`, error);
+          skipped++;
+        }
+      } else {
+        skipped++;
+      }
+    }
+    
+    return { downloaded, skipped };
+  }
+
+  // Toggle auto-download setting
+  async setAutoDownloadEnabled(enabled) {
+    return await this.setSetting('auto_download_favorites', enabled);
+  }
+
+  // Check if auto-download is enabled
+  async isAutoDownloadEnabled() {
+    const setting = await this.getSetting('auto_download_favorites');
+    return setting !== false; // Default to true
   }
 }
 

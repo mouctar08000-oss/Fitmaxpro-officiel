@@ -10,8 +10,11 @@ const useOffline = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isInitialized, setIsInitialized] = useState(false);
   const [downloadedWorkouts, setDownloadedWorkouts] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [storageUsage, setStorageUsage] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [autoDownloadEnabled, setAutoDownloadEnabled] = useState(true);
+  const [autoDownloading, setAutoDownloading] = useState(false);
 
   // Initialize IndexedDB
   useEffect(() => {
@@ -20,7 +23,10 @@ const useOffline = () => {
         await offlineStorage.init();
         setIsInitialized(true);
         await refreshDownloadedWorkouts();
+        await refreshFavorites();
         await refreshStorageUsage();
+        const autoEnabled = await offlineStorage.isAutoDownloadEnabled();
+        setAutoDownloadEnabled(autoEnabled);
       } catch (error) {
         console.error('Failed to initialize offline storage:', error);
       }
@@ -53,6 +59,17 @@ const useOffline = () => {
       setDownloadedWorkouts(workouts);
     } catch (error) {
       console.error('Failed to get downloaded workouts:', error);
+    }
+  }, [isInitialized]);
+
+  // Refresh favorites list
+  const refreshFavorites = useCallback(async () => {
+    if (!isInitialized) return;
+    try {
+      const favs = await offlineStorage.getAllFavorites();
+      setFavorites(favs);
+    } catch (error) {
+      console.error('Failed to get favorites:', error);
     }
   }, [isInitialized]);
 
@@ -151,19 +168,80 @@ const useOffline = () => {
     try {
       await offlineStorage.clearAllData();
       await refreshDownloadedWorkouts();
+      await refreshFavorites();
       await refreshStorageUsage();
       return true;
     } catch (error) {
       console.error('Failed to clear offline data:', error);
       return false;
     }
-  }, [isInitialized, refreshDownloadedWorkouts, refreshStorageUsage]);
+  }, [isInitialized, refreshDownloadedWorkouts, refreshFavorites, refreshStorageUsage]);
+
+  // ==================== FAVORITES ====================
+
+  // Add to favorites (and optionally auto-download)
+  const addToFavorites = useCallback(async (workout) => {
+    if (!isInitialized) return false;
+    try {
+      await offlineStorage.addToFavorites(workout.workout_id, workout);
+      await refreshFavorites();
+      
+      // Auto-download if enabled and online
+      if (autoDownloadEnabled && isOnline) {
+        await downloadWorkout(workout);
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to add to favorites:', error);
+      return false;
+    }
+  }, [isInitialized, autoDownloadEnabled, isOnline, refreshFavorites]);
+
+  // Remove from favorites
+  const removeFromFavorites = useCallback(async (workoutId) => {
+    if (!isInitialized) return false;
+    try {
+      await offlineStorage.removeFromFavorites(workoutId);
+      await refreshFavorites();
+      return true;
+    } catch (error) {
+      console.error('Failed to remove from favorites:', error);
+      return false;
+    }
+  }, [isInitialized, refreshFavorites]);
+
+  // Check if workout is favorite
+  const isFavorite = useCallback(async (workoutId) => {
+    if (!isInitialized) return false;
+    return await offlineStorage.isFavorite(workoutId);
+  }, [isInitialized]);
+
+  // Toggle auto-download setting
+  const toggleAutoDownload = useCallback(async (enabled) => {
+    await offlineStorage.setAutoDownloadEnabled(enabled);
+    setAutoDownloadEnabled(enabled);
+  }, []);
+
+  // Auto-download all favorites
+  const autoDownloadAllFavorites = useCallback(async (fetchWorkoutFn) => {
+    if (!isOnline || autoDownloading) return null;
+    setAutoDownloading(true);
+    try {
+      const result = await offlineStorage.autoDownloadFavorites(fetchWorkoutFn);
+      await refreshDownloadedWorkouts();
+      await refreshStorageUsage();
+      return result;
+    } finally {
+      setAutoDownloading(false);
+    }
+  }, [isOnline, autoDownloading, refreshDownloadedWorkouts, refreshStorageUsage]);
 
   return {
     // Status
     isOnline,
     isInitialized,
     syncing,
+    autoDownloading,
     
     // Downloaded workouts
     downloadedWorkouts,
@@ -171,6 +249,17 @@ const useOffline = () => {
     removeWorkout,
     isWorkoutDownloaded,
     getWorkout,
+    
+    // Favorites
+    favorites,
+    addToFavorites,
+    removeFromFavorites,
+    isFavorite,
+    
+    // Auto-download
+    autoDownloadEnabled,
+    toggleAutoDownload,
+    autoDownloadAllFavorites,
     
     // Image caching
     getCachedImage,

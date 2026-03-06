@@ -1,6 +1,6 @@
 /**
  * FitMaxPro - Offline Manager Component
- * UI for managing offline workouts and sync status
+ * UI for managing offline workouts, favorites and sync status
  */
 
 import React, { useState, useEffect } from 'react';
@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
 import { 
   Download, Trash2, Wifi, WifiOff, Cloud, CloudOff,
-  RefreshCw, HardDrive, CheckCircle, AlertCircle
+  RefreshCw, HardDrive, CheckCircle, AlertCircle,
+  Heart, HeartOff, Settings, DownloadCloud
 } from 'lucide-react';
 import { toast } from 'sonner';
 import useOffline from '../hooks/useOffline';
@@ -22,12 +23,16 @@ const OfflineManager = ({ workout, onDownloadComplete }) => {
     downloadedWorkouts,
     downloadWorkout,
     removeWorkout,
+    favorites,
+    addToFavorites,
+    removeFromFavorites,
     syncing,
     syncData,
     storageUsage
   } = useOffline();
   
   const [isDownloaded, setIsDownloaded] = useState(false);
+  const [isFav, setIsFav] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
@@ -35,6 +40,12 @@ const OfflineManager = ({ workout, onDownloadComplete }) => {
       setIsDownloaded(downloadedWorkouts.some(w => w.workout_id === workout.workout_id));
     }
   }, [workout, downloadedWorkouts]);
+
+  useEffect(() => {
+    if (workout && favorites) {
+      setIsFav(favorites.some(f => f.workout_id === workout.workout_id));
+    }
+  }, [workout, favorites]);
 
   const handleDownload = async () => {
     if (!workout) return;
@@ -76,6 +87,27 @@ const OfflineManager = ({ workout, onDownloadComplete }) => {
     }
   };
 
+  const handleToggleFavorite = async () => {
+    if (!workout) return;
+    
+    try {
+      if (isFav) {
+        await removeFromFavorites(workout.workout_id);
+        setIsFav(false);
+        toast.success(isFr ? 'Retiré des favoris' : 'Removed from favorites');
+      } else {
+        await addToFavorites(workout);
+        setIsFav(true);
+        toast.success(isFr 
+          ? 'Ajouté aux favoris (téléchargement auto activé)'
+          : 'Added to favorites (auto-download enabled)'
+        );
+      }
+    } catch (error) {
+      toast.error(isFr ? 'Erreur' : 'Error');
+    }
+  };
+
   if (!workout) return null;
 
   return (
@@ -87,6 +119,17 @@ const OfflineManager = ({ workout, onDownloadComplete }) => {
         {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
         {isOnline ? (isFr ? 'En ligne' : 'Online') : (isFr ? 'Hors-ligne' : 'Offline')}
       </div>
+
+      {/* Favorite button */}
+      <Button
+        onClick={handleToggleFavorite}
+        variant="ghost"
+        size="sm"
+        className={isFav ? 'text-red-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}
+        title={isFr ? (isFav ? 'Retirer des favoris' : 'Ajouter aux favoris') : (isFav ? 'Remove from favorites' : 'Add to favorites')}
+      >
+        {isFav ? <Heart className="w-4 h-4 fill-current" /> : <Heart className="w-4 h-4" />}
+      </Button>
 
       {/* Download/Remove button */}
       {isDownloaded ? (
@@ -155,7 +198,7 @@ export const OfflineStatusBar = () => {
 };
 
 // Downloaded Workouts Manager - Full page component
-export const DownloadedWorkoutsManager = () => {
+export const DownloadedWorkoutsManager = ({ fetchWorkoutFn }) => {
   const { i18n } = useTranslation();
   const isFr = i18n.language?.startsWith('fr');
   
@@ -163,6 +206,12 @@ export const DownloadedWorkoutsManager = () => {
     isOnline,
     downloadedWorkouts,
     removeWorkout,
+    favorites,
+    removeFromFavorites,
+    autoDownloadEnabled,
+    toggleAutoDownload,
+    autoDownloadAllFavorites,
+    autoDownloading,
     storageUsage,
     clearAllData,
     syncing,
@@ -189,6 +238,17 @@ export const DownloadedWorkoutsManager = () => {
     }
   };
 
+  const handleAutoDownload = async () => {
+    if (!fetchWorkoutFn) return;
+    const result = await autoDownloadAllFavorites(fetchWorkoutFn);
+    if (result) {
+      toast.success(isFr 
+        ? `${result.downloaded} séance(s) téléchargée(s)`
+        : `${result.downloaded} workout(s) downloaded`
+      );
+    }
+  };
+
   return (
     <div className="bg-[#121212] border border-[#27272a] rounded-lg p-6">
       <div className="flex items-center justify-between mb-6">
@@ -205,23 +265,37 @@ export const DownloadedWorkoutsManager = () => {
               {isFr ? 'Séances Hors-ligne' : 'Offline Workouts'}
             </h3>
             <p className="text-gray-400 text-sm">
-              {downloadedWorkouts.length} {isFr ? 'séances téléchargées' : 'workouts downloaded'}
+              {downloadedWorkouts.length} {isFr ? 'téléchargées' : 'downloaded'} • {favorites.length} {isFr ? 'favoris' : 'favorites'}
             </p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
           {isOnline && (
-            <Button
-              onClick={syncData}
-              disabled={syncing}
-              variant="outline"
-              size="sm"
-              className="border-blue-500 text-blue-500"
-            >
-              <RefreshCw className={`w-4 h-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
-              {isFr ? 'Sync' : 'Sync'}
-            </Button>
+            <>
+              <Button
+                onClick={syncData}
+                disabled={syncing}
+                variant="outline"
+                size="sm"
+                className="border-blue-500 text-blue-500"
+              >
+                <RefreshCw className={`w-4 h-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                Sync
+              </Button>
+              {favorites.length > 0 && (
+                <Button
+                  onClick={handleAutoDownload}
+                  disabled={autoDownloading}
+                  variant="outline"
+                  size="sm"
+                  className="border-green-500 text-green-500"
+                >
+                  <DownloadCloud className={`w-4 h-4 mr-1 ${autoDownloading ? 'animate-pulse' : ''}`} />
+                  {isFr ? 'Télécharger favoris' : 'Download favorites'}
+                </Button>
+              )}
+            </>
           )}
           {downloadedWorkouts.length > 0 && (
             <Button
@@ -235,6 +309,28 @@ export const DownloadedWorkoutsManager = () => {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Auto-download toggle */}
+      <div className="mb-6 p-4 bg-[#09090b] rounded-lg flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Settings className="w-4 h-4 text-gray-400" />
+          <span className="text-sm">
+            {isFr ? 'Téléchargement automatique des favoris' : 'Auto-download favorites'}
+          </span>
+        </div>
+        <Button
+          onClick={() => toggleAutoDownload(!autoDownloadEnabled)}
+          variant="ghost"
+          size="sm"
+          className={autoDownloadEnabled ? 'text-green-400' : 'text-gray-400'}
+        >
+          {autoDownloadEnabled ? (
+            <><CheckCircle className="w-4 h-4 mr-1" /> {isFr ? 'Activé' : 'On'}</>
+          ) : (
+            <><AlertCircle className="w-4 h-4 mr-1" /> {isFr ? 'Désactivé' : 'Off'}</>
+          )}
+        </Button>
       </div>
 
       {/* Storage usage */}
@@ -260,6 +356,50 @@ export const DownloadedWorkoutsManager = () => {
         </div>
       )}
 
+      {/* Favorites section */}
+      {favorites.length > 0 && (
+        <div className="mb-6">
+          <h4 className="font-medium mb-3 flex items-center gap-2">
+            <Heart className="w-4 h-4 text-red-500" />
+            {isFr ? 'Favoris' : 'Favorites'} ({favorites.length})
+          </h4>
+          <div className="space-y-2">
+            {favorites.map((fav) => {
+              const isDownloaded = downloadedWorkouts.some(w => w.workout_id === fav.workout_id);
+              return (
+                <div 
+                  key={fav.workout_id}
+                  className="flex items-center justify-between p-3 bg-[#09090b] rounded-lg"
+                >
+                  <span className="text-sm">{fav.workout_data?.title || fav.workout_id}</span>
+                  <div className="flex items-center gap-2">
+                    {isDownloaded ? (
+                      <span className="text-green-400 text-xs flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        {isFr ? 'Téléchargé' : 'Downloaded'}
+                      </span>
+                    ) : (
+                      <span className="text-yellow-400 text-xs flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {isFr ? 'En attente' : 'Pending'}
+                      </span>
+                    )}
+                    <Button
+                      onClick={() => removeFromFavorites(fav.workout_id)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-red-400"
+                    >
+                      <HeartOff className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Downloaded workouts list */}
       {downloadedWorkouts.length === 0 ? (
         <div className="text-center py-8 text-gray-400">
@@ -267,13 +407,17 @@ export const DownloadedWorkoutsManager = () => {
           <p>{isFr ? 'Aucune séance téléchargée' : 'No downloaded workouts'}</p>
           <p className="text-sm mt-1">
             {isFr 
-              ? 'Téléchargez des séances pour y accéder hors-ligne'
-              : 'Download workouts to access them offline'
+              ? 'Ajoutez des séances en favoris pour les télécharger automatiquement'
+              : 'Add workouts to favorites to auto-download them'
             }
           </p>
         </div>
       ) : (
         <div className="space-y-3">
+          <h4 className="font-medium mb-3 flex items-center gap-2">
+            <Download className="w-4 h-4 text-blue-500" />
+            {isFr ? 'Téléchargées' : 'Downloaded'} ({downloadedWorkouts.length})
+          </h4>
           {downloadedWorkouts.map((workout) => (
             <div 
               key={workout.workout_id}
@@ -292,7 +436,7 @@ export const DownloadedWorkoutsManager = () => {
                   {workout.exercises?.length || 0} {isFr ? 'exercices' : 'exercises'}
                   {workout.downloaded_at && (
                     <span className="ml-2">
-                      • {isFr ? 'Téléchargé le' : 'Downloaded'} {new Date(workout.downloaded_at).toLocaleDateString()}
+                      • {new Date(workout.downloaded_at).toLocaleDateString()}
                     </span>
                   )}
                 </p>
