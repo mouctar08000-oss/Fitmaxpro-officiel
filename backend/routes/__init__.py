@@ -19,6 +19,7 @@ from .iap import router as iap_router
 from .notifications import router as notifications_router
 from .routines import router as routines_router, routine_session_router
 from .sync import router as sync_router
+from .admin_users import router as admin_users_router
 
 __all__ = [
     'auth_router',
@@ -41,6 +42,7 @@ __all__ = [
     'routines_router',
     'routine_session_router',
     'sync_router',
+    'admin_users_router',
     'get_current_user',
     'verify_admin',
 ]

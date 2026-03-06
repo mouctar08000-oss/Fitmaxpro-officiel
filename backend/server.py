@@ -35,6 +35,7 @@ from routes import (
     routines_router,
     routine_session_router,
     sync_router,
+    admin_users_router,
 )
 
 # Setup logging
@@ -81,6 +82,7 @@ api_router.include_router(notifications_router)
 api_router.include_router(routines_router)
 api_router.include_router(routine_session_router)
 api_router.include_router(sync_router)
+api_router.include_router(admin_users_router)
 
 
 # Health check endpoint
