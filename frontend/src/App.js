@@ -5,6 +5,7 @@ import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useIncomingCalls, IncomingCallNotification } from './components/IncomingCall';
 import usePushNotifications from './hooks/usePushNotifications';
+import { OfflineStatusBar } from './components/OfflineManager';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -171,6 +172,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <OfflineStatusBar />
         <AppRouter />
         <IncomingCallHandler />
         <PushNotificationHandler />

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import ExercisePlayer from '../components/ExercisePlayer';
+import OfflineManager from '../components/OfflineManager';
 import { Button } from '../components/ui/button.jsx';
 import { 
   ArrowLeft, Clock, Dumbbell, Play, X, 
@@ -600,15 +601,18 @@ const WorkoutDetailPage = () => {
                 <span>{workout.exercises.length} exercices</span>
               </div>
               {user && (
-                <Button
-                  onClick={() => navigate('/my-progress')}
-                  variant="outline"
-                  className="border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white"
-                  data-testid="my-progress-btn"
-                >
-                  <TrendingUp className="w-5 h-5 mr-2" />
-                  {isFr ? 'Mon Évolution' : 'My Progress'}
-                </Button>
+                <>
+                  <OfflineManager workout={workout} />
+                  <Button
+                    onClick={() => navigate('/my-progress')}
+                    variant="outline"
+                    className="border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white"
+                    data-testid="my-progress-btn"
+                  >
+                    <TrendingUp className="w-5 h-5 mr-2" />
+                    {isFr ? 'Mon Évolution' : 'My Progress'}
+                  </Button>
+                </>
               )}
             </div>
           </div>

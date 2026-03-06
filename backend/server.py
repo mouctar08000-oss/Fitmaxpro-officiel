@@ -32,6 +32,9 @@ from routes import (
     reviews_router,
     iap_router,
     notifications_router,
+    routines_router,
+    routine_session_router,
+    sync_router,
 )
 
 # Setup logging
@@ -75,6 +78,9 @@ api_router.include_router(rewards_router)
 api_router.include_router(reviews_router)
 api_router.include_router(iap_router)
 api_router.include_router(notifications_router)
+api_router.include_router(routines_router)
+api_router.include_router(routine_session_router)
+api_router.include_router(sync_router)
 
 
 # Health check endpoint
